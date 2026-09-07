@@ -20,11 +20,17 @@ end at your door.
   data and filtered on total ascent, so "flat five miles" means flat.
 - **Gives you options.** Several distinct routes in different directions, not
   one take-it-or-leave-it suggestion. "Find different routes" reshuffles.
+- **Keeps the navigation simple.** Ask for fewer turns and it builds rounder,
+  straighter loops and ranks them by how little you'll have to think. Every
+  route shows its turn count.
 - **Elevation profile.** Scrub the profile to see exactly where the hills are
   on the map.
-- **GPX export.** Download a route straight onto a watch, Strava, or Garmin.
+- **Sends to your phone.** On an iPhone, the share sheet hands the GPX straight
+  to Strava, Garmin, Files or AirDrop. Everywhere else it downloads.
 
-Loop or out-and-back, miles or kilometres, feet or metres.
+Loop or out-and-back, miles or kilometres, feet or metres. Built for the phone
+you'll actually hold at the front door: safe-area aware, no zoom-on-focus, and
+sized for thumbs.
 
 ## Running it
 
@@ -56,8 +62,22 @@ want. LoopMaker works backwards from the target:
    or four passes land inside the tolerance.
 4. **Sample the terrain.** Resample the route to 100 evenly spaced points and
    look up elevation for each.
-5. **Score and filter.** Rank on distance error and ascent overage, drop
-   near-duplicates, return the best few.
+5. **Score and filter.** Rank on distance error, ascent overage and turn
+   density, drop near-duplicates, return the best few.
+
+### Turns are a preference, not a limit
+
+Distance and climbing are stated constraints: a route either satisfies them or
+it doesn't. Turns are different — you'd rather have fewer, but you wouldn't
+reject a good run over one extra corner. So turn count never disqualifies a
+route, it only orders the ones that already qualify.
+
+Asking for fewer turns also changes what gets built, not just what gets shown:
+the loop is generated from a triangle rather than a pentagon, giving longer legs
+along single roads. Turns are counted per kilometre, since a 10 km route
+naturally has more corners than a 5 km one without being harder to follow. Only
+real decisions count — a road bending gently or changing name under your feet
+isn't something you have to remember.
 
 ### Elevation is smoothed, deliberately
 
@@ -90,6 +110,15 @@ against a synthetic city.
 Swapping the map for Google Maps means replacing `MapView.tsx`; nothing else
 depends on Leaflet.
 
+### Why there's no "open this route in Apple Maps"
+
+Apple's URL scheme carries a single destination. There is no parameter for a
+list of waypoints, let alone a polyline, so a loop cannot be expressed as a
+Maps link at all. The honest substitutes are both here: **Send to phone** puts
+the GPX into the iOS share sheet, which is how routes actually reach Strava,
+Garmin and Files; and **Directions to start** opens Apple Maps walking
+directions to the start line, which is the one thing its URL scheme can do.
+
 ## Layout
 
 ```
@@ -98,8 +127,10 @@ src/
     geo.ts           great-circle maths, resampling, interpolation
     elevation.ts     smoothing and hysteresis ascent accumulation
     routeSearch.ts   candidate generation, refinement, scoring   <- the core
+    turns.ts         which maneuvers count as a turn worth remembering
     effort.ts        grade-adjusted finish-time estimate
     gpx.ts           GPX 1.1 export
+    share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
     __fixtures__/    synthetic grid city used by the tests
   services/          OSRM, Open-Meteo, Nominatim + shared fair-use HTTP client
@@ -108,15 +139,16 @@ src/
 
 ## Tests
 
-93 unit tests covering the geodesy, ascent accumulation, unit conversion, GPX
-output, the OSRM adapter, and the search algorithm end to end.
+138 unit tests covering the geodesy, ascent accumulation, turn classification,
+unit conversion, GPX output, sharing and its fallbacks, the OSRM adapter, and
+the search algorithm end to end.
 
 The search tests run against a synthetic city in `src/lib/__fixtures__` —
 streets on a 120 m lattice and terrain that climbs steadily to the east — so
 convergence on the target distance, the elevation constraint actually steering
-routes toward flat ground, determinism per seed, de-duplication, and graceful
-degradation when a routing or elevation service fails are all verified without
-touching the network.
+routes toward flat ground, the turn preference measurably lowering turn density,
+determinism per seed, de-duplication, and graceful degradation when a routing or
+elevation service fails are all verified without touching the network.
 
 ```bash
 npm test

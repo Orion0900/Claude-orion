@@ -13,6 +13,7 @@ const route: RouteResult = {
   distance: 1900,
   profile: buildProfile(path.filter((_, i) => i % 4 === 0), [10, 20, 35, 20, 10]),
   outboundBearing: 90,
+  turns: 6,
   meetsCriteria: true,
   distanceError: 0.01,
   score: 0.02,

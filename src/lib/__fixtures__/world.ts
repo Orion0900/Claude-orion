@@ -60,6 +60,20 @@ export interface GridRouterOptions {
   onRoute?: (waypoints: LatLng[], options?: RouteOptions) => void
 }
 
+/** Corners in a lattice path: every change of axis is a turn to remember. */
+function countCorners(points: XY[]): number {
+  let turns = 0
+  let axis: 'x' | 'y' | null = null
+  for (let i = 1; i < points.length; i++) {
+    const moved: 'x' | 'y' | null =
+      points[i].x !== points[i - 1].x ? 'x' : points[i].y !== points[i - 1].y ? 'y' : null
+    if (moved === null) continue
+    if (axis !== null && moved !== axis) turns++
+    axis = moved
+  }
+  return turns
+}
+
 /** Manhattan routing over the lattice: a realistic ~1.2-1.3x detour factor. */
 export function createGridRouter(options: GridRouterOptions = {}): RoutingProvider {
   return {
@@ -89,7 +103,7 @@ export function createGridRouter(options: GridRouterOptions = {}): RoutingProvid
       for (let i = 1; i < snapped.length; i++) walk(snapped[i - 1], snapped[i], points)
 
       const path = points.map(toLatLng)
-      return { path, distance: pathLength(path) }
+      return { path, distance: pathLength(path), turns: countCorners(points) }
     },
   }
 }

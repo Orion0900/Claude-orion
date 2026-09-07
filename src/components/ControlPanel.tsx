@@ -11,8 +11,16 @@ export interface CriteriaForm {
   maxGain: number
   elevationUnit: ElevationUnit
   shape: RouteShape
+  /** 0 = any route, 1 = as few turns as possible. */
+  simplicity: number
   pace: string
 }
+
+const SIMPLICITY_CHOICES: Array<{ label: string; value: number; hint: string }> = [
+  { label: 'Any', value: 0, hint: 'Best distance and climb match, however twisty.' },
+  { label: 'Fewer', value: 0.5, hint: 'Leans towards routes that are easier to follow.' },
+  { label: 'Fewest', value: 1, hint: 'Long straight stretches, as few turns as possible.' },
+]
 
 interface ControlPanelProps {
   form: CriteriaForm
@@ -207,6 +215,27 @@ export function ControlPanel({
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="field">
+          <div className="field-label">
+            <label htmlFor="turns">Turns to remember</label>
+          </div>
+          <div className="segmented" id="turns">
+            {SIMPLICITY_CHOICES.map((choice) => (
+              <button
+                key={choice.label}
+                type="button"
+                aria-pressed={form.simplicity === choice.value}
+                onClick={() => onChange({ simplicity: choice.value })}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            {SIMPLICITY_CHOICES.find((c) => c.value === form.simplicity)?.hint}
+          </p>
         </div>
 
         <div className="field">

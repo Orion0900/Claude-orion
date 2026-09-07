@@ -15,6 +15,8 @@
 
 * {
   box-sizing: border-box;
+  /* iOS paints a grey flash on every tap; focus rings below do the job better. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -29,6 +31,8 @@ body {
   color: var(--text);
   font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Stop the whole page rubber-banding behind the map on iOS. */
+  overscroll-behavior: none;
 }
 
 button {
@@ -39,7 +43,10 @@ button {
 .app {
   display: grid;
   grid-template-columns: 380px 1fr;
-  height: 100%;
+  height: 100vh;
+  /* Dynamic viewport units track Safari's collapsing URL bar; without this the
+     bottom of the panel sits under it on an iPhone. */
+  height: 100dvh;
 }
 
 .sidebar {
@@ -54,11 +61,15 @@ button {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  /* Keep a scroll that reaches the end of this panel from dragging the page. */
+  overscroll-behavior: contain;
 }
 
 /* The primary action stays reachable however long the results list grows. */
 .sidebar-footer {
   padding: 14px 20px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border);
   background: var(--panel);
 }
@@ -119,12 +130,17 @@ button {
 input[type='text'],
 input[type='number'] {
   width: 100%;
-  padding: 9px 11px;
+  padding: 11px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-  font: inherit;
+  font-family: inherit;
+  /* Anything under 16px makes iOS zoom the page when the field is focused. */
+  font-size: 16px;
+  min-height: 44px;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 input[type='text']:focus,
@@ -138,6 +154,9 @@ input[type='range'] {
   width: 100%;
   accent-color: var(--accent);
   margin: 0;
+  /* A bare range track is a ~4px tap target; padding makes it thumb-friendly. */
+  height: 40px;
+  background: transparent;
 }
 
 .row {
@@ -160,7 +179,8 @@ input[type='range'] {
 
 .segmented button {
   flex: 1;
-  padding: 6px 4px;
+  padding: 10px 4px;
+  min-height: 40px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -175,13 +195,19 @@ input[type='range'] {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
+  min-height: 44px;
   padding: 11px 14px;
   border: 0;
   border-radius: 9px;
   background: var(--accent);
   color: #06210f;
   font-weight: 650;
+  font-size: 14px;
+  text-decoration: none;
   transition: filter 0.12s ease;
 }
 
@@ -333,6 +359,12 @@ input[type='range'] {
   font-weight: 600;
 }
 
+.route-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .route-actions {
   display: flex;
   gap: 8px;
@@ -340,7 +372,7 @@ input[type='range'] {
 }
 
 .route-actions .btn {
-  padding: 7px 10px;
+  padding: 9px 10px;
   font-size: 12.5px;
 }
 
@@ -350,6 +382,8 @@ input[type='range'] {
   width: 100%;
   height: 72px;
   overflow: visible;
+  /* Dragging along the profile scrubs it rather than scrolling the panel. */
+  touch-action: none;
 }
 
 .profile-area {
@@ -398,7 +432,8 @@ input[type='range'] {
   position: absolute;
   z-index: 500;
   left: 50%;
-  top: 16px;
+  /* Clear the notch when the map sits at the top of a phone screen. */
+  top: calc(16px + env(safe-area-inset-top, 0px));
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: 999px;
@@ -455,7 +490,9 @@ input[type='range'] {
 @media (max-width: 860px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 45vh 55vh;
+    /* Map keeps a fixed share; the panel takes whatever the browser chrome
+       leaves, so the action button never falls off the bottom. */
+    grid-template-rows: 42dvh 1fr;
   }
 
   .sidebar {
@@ -466,6 +503,26 @@ input[type='range'] {
 
   .map {
     order: 1;
+  }
+
+  .brand {
+    padding: 14px 18px 12px;
+  }
+
+  .panel-section,
+  .results {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .sidebar-footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  /* Two actions side by side get cramped on a narrow phone. */
+  .route-actions {
+    flex-direction: column;
   }
 }
 

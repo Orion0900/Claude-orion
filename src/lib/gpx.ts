@@ -42,15 +42,3 @@ ${points}
 </gpx>
 `
 }
-
-export function downloadGpx(route: RouteResult, name: string): void {
-  const blob = new Blob([toGpx(route, name)], { type: 'application/gpx+xml' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${name.replace(/[^\w-]+/g, '-').toLowerCase()}.gpx`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}

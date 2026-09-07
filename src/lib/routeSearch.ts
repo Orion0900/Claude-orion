@@ -1,10 +1,13 @@
 import { bounds, destination, pathLength, resample, type LatLng } from './geo'
 import { buildProfile, type ElevationProfile } from './elevation'
+import { turnDensity } from './turns'
 
 export interface RouteGeometry {
   path: LatLng[]
   /** Routed distance in meters, as reported by the routing engine. */
   distance: number
+  /** Turns a runner has to remember, when the engine reports its steps. */
+  turns?: number
 }
 
 export interface RouteOptions {
@@ -34,6 +37,11 @@ export interface RouteCriteria {
   distanceTolerance: number
   /** Max total ascent in meters, or null for no limit. */
   maxGain: number | null
+  /**
+   * How much to favour routes with fewer turns, 0 (don't care) to 1 (fewest
+   * turns above all). Also flattens the generated loops into simpler shapes.
+   */
+  simplicity: number
   shape: RouteShape
   /** How many independent directions to explore. */
   candidates: number
@@ -50,6 +58,8 @@ export interface RouteResult {
   profile: ElevationProfile
   /** Compass bearing the route heads out on, for labelling. */
   outboundBearing: number
+  /** Turns to remember; null when the engine didn't report its steps. */
+  turns: number | null
   /** True when the route satisfies every stated constraint. */
   meetsCriteria: boolean
   distanceError: number
@@ -60,6 +70,7 @@ export const DEFAULT_CRITERIA: Omit<RouteCriteria, 'start'> = {
   targetDistance: 8046.72, // 5 miles
   distanceTolerance: 0.08,
   maxGain: 152.4, // 500 ft
+  simplicity: 0.5,
   shape: 'loop',
   candidates: 8,
   results: 4,
@@ -77,17 +88,31 @@ export function mulberry32(seed: number): () => number {
   }
 }
 
-const VERTICES = 5 // waypoints forming the loop, including the start
+/**
+ * Waypoints forming the loop, including the start. Fewer corners means longer
+ * legs along single roads, which is the most direct way to cut the number of
+ * turns — so simplicity reaches into the shape itself, not just the ranking.
+ */
+export function loopVertices(simplicity: number): number {
+  if (simplicity >= 0.66) return 3
+  if (simplicity >= 0.33) return 4
+  return 5
+}
 
 /**
- * Radius of a circle whose inscribed `VERTICES`-gon has the given perimeter,
- * scaled down by an assumed street-network detour factor. Roads never follow
- * the ideal polygon, so the first guess deliberately undershoots and the
+ * Radius of a circle whose inscribed polygon has the given perimeter, scaled
+ * down by an assumed street-network detour factor. Roads never follow the
+ * ideal polygon, so the first guess deliberately undershoots and the
  * refinement loop grows it to fit.
  */
-export function initialRadius(targetDistance: number, shape: RouteShape): number {
+export function initialRadius(
+  targetDistance: number,
+  shape: RouteShape,
+  simplicity = 0,
+): number {
   if (shape === 'out-and-back') return (targetDistance / 2) * 0.75
-  const perimeterPerRadius = 2 * VERTICES * Math.sin(Math.PI / VERTICES)
+  const vertices = loopVertices(simplicity)
+  const perimeterPerRadius = 2 * vertices * Math.sin(Math.PI / vertices)
   return targetDistance / (perimeterPerRadius * 1.2)
 }
 
@@ -102,6 +127,7 @@ export function buildWaypoints(
   bearing: number,
   shape: RouteShape,
   jitter: (magnitude: number) => number = () => 0,
+  simplicity = 0,
 ): LatLng[] {
   if (shape === 'out-and-back') {
     const heading = bearing + jitter(10)
@@ -115,11 +141,14 @@ export function buildWaypoints(
 
   // Place the loop's centre one radius away along `bearing`, then walk
   // vertices around that centre so the run leaves and returns from the start.
+  const vertices = loopVertices(simplicity)
+  // Simple routes want regular shapes, so wander less from the ideal polygon.
+  const wander = 1 - simplicity * 0.7
   const centre = destination(start, bearing, radius)
   const waypoints: LatLng[] = [start]
-  for (let i = 1; i < VERTICES; i++) {
-    const angle = bearing + 180 + (360 / VERTICES) * i + jitter(18)
-    waypoints.push(destination(centre, angle, radius * (1 + jitter(0.18))))
+  for (let i = 1; i < vertices; i++) {
+    const angle = bearing + 180 + (360 / vertices) * i + jitter(18 * wander)
+    waypoints.push(destination(centre, angle, radius * (1 + jitter(0.18 * wander))))
   }
   waypoints.push(start)
   return waypoints
@@ -143,14 +172,21 @@ export function scoreRoute(
   distance: number,
   gain: number,
   criteria: RouteCriteria,
+  turns: number | null = null,
 ): { distanceError: number; meetsCriteria: boolean; score: number } {
   const distanceError = Math.abs(distance - criteria.targetDistance) / criteria.targetDistance
   const overage =
     criteria.maxGain === null ? 0 : Math.max(0, gain - criteria.maxGain) / Math.max(criteria.maxGain, 1)
+  // Distance and climbing are stated limits, so they alone decide whether a
+  // route qualifies. Turns are a preference: they order the routes that do.
   const meetsCriteria = distanceError <= criteria.distanceTolerance && overage === 0
-  // Distance is the constraint runners feel most, so it dominates the score;
-  // climbing over the cap is penalised harder still because it's a hard "no".
-  return { distanceError, meetsCriteria, score: distanceError * 2 + overage * 3 }
+
+  // Roughly five turns per kilometre is a busy urban loop; that maps to the
+  // full penalty, so the weighting stays meaningful in any kind of street grid.
+  const turnPenalty =
+    turns === null ? 0 : criteria.simplicity * 0.5 * Math.min(2, turnDensity(turns, distance) / 5)
+
+  return { distanceError, meetsCriteria, score: distanceError * 2 + overage * 3 + turnPenalty }
 }
 
 export interface SearchProgress {
@@ -182,13 +218,20 @@ async function exploreCandidate(
   const maxRefinements = options.maxRefinements ?? 4
   const jitter = (magnitude: number) => (rng() * 2 - 1) * magnitude
 
-  let radius = initialRadius(criteria.targetDistance, criteria.shape)
+  let radius = initialRadius(criteria.targetDistance, criteria.shape, criteria.simplicity)
   let best: RouteGeometry | null = null
   let bestError = Infinity
 
   for (let attempt = 0; attempt < maxRefinements; attempt++) {
     if (signal?.aborted) break
-    const waypoints = buildWaypoints(criteria.start, radius, bearing, criteria.shape, jitter)
+    const waypoints = buildWaypoints(
+      criteria.start,
+      radius,
+      bearing,
+      criteria.shape,
+      jitter,
+      criteria.simplicity,
+    )
 
     let geometry: RouteGeometry
     try {
@@ -287,7 +330,13 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
     }
 
     const distance = geometry.distance || pathLength(geometry.path)
-    const { distanceError, meetsCriteria, score } = scoreRoute(distance, profile.gain, criteria)
+    const turns = geometry.turns ?? null
+    const { distanceError, meetsCriteria, score } = scoreRoute(
+      distance,
+      profile.gain,
+      criteria,
+      turns,
+    )
 
     found.push({
       id: `${criteria.seed}-${Math.round(bearing)}`,
@@ -295,6 +344,7 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
       distance,
       profile,
       outboundBearing: bearing,
+      turns,
       meetsCriteria,
       distanceError,
       score,
