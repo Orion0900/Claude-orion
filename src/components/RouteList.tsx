@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { compassLabel, type RouteResult } from '../lib/routeSearch'
-import { downloadGpx } from '../lib/gpx'
+import { appleMapsUrl, isAppleDevice, shareRoute } from '../lib/share'
+import { simplicityLabel } from '../lib/turns'
 import { estimateDuration } from '../lib/effort'
 import {
   formatDistance,
@@ -19,6 +21,29 @@ interface RouteListProps {
   scrub: number | null
   onSelect: (id: string) => void
   onScrub: (fraction: number | null) => void
+}
+
+/** Share sheet on a phone, plain download everywhere else. */
+function ShareButton({ route, name }: { route: RouteResult; name: string }) {
+  const [status, setStatus] = useState<'idle' | 'working' | 'saved'>('idle')
+  const onPhone = typeof navigator !== 'undefined' && isAppleDevice()
+
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary"
+      disabled={status === 'working'}
+      onClick={async (event) => {
+        event.stopPropagation()
+        setStatus('working')
+        const outcome = await shareRoute(route, name)
+        setStatus(outcome === 'downloaded' ? 'saved' : 'idle')
+        if (outcome === 'downloaded') setTimeout(() => setStatus('idle'), 2500)
+      }}
+    >
+      {status === 'saved' ? 'GPX saved' : onPhone ? 'Send to phone' : 'Download GPX'}
+    </button>
+  )
 }
 
 export function RouteList({
@@ -75,7 +100,16 @@ export function RouteList({
                   )}
                 </strong>
               </span>
+              {route.turns === null ? null : (
+                <span>
+                  <strong>{route.turns}</strong> turns
+                </span>
+              )}
             </div>
+
+            {route.turns === null ? null : (
+              <p className="route-note">{simplicityLabel(route.turns, route.distance)} to follow</p>
+            )}
 
             {isSelected ? (
               <>
@@ -87,16 +121,16 @@ export function RouteList({
                   onScrub={onScrub}
                 />
                 <div className="route-actions">
-                  <button
-                    type="button"
+                  <ShareButton route={route} name={name} />
+                  <a
                     className="btn btn-secondary"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      downloadGpx(route, name)
-                    }}
+                    href={appleMapsUrl(route.path[0], 'Run start')}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(event) => event.stopPropagation()}
                   >
-                    Download GPX
-                  </button>
+                    Directions to start
+                  </a>
                 </div>
               </>
             ) : null}

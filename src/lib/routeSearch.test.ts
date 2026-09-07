@@ -7,6 +7,7 @@ import {
   findRoutes,
   initialRadius,
   isDuplicate,
+  loopVertices,
   mulberry32,
   scoreRoute,
   type RouteCriteria,
@@ -337,5 +338,99 @@ describe('U-turn handling', () => {
 
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((allowed) => allowed === true)).toBe(true)
+  })
+})
+
+describe('route simplicity', () => {
+  it('uses fewer corners as the simplicity preference rises', () => {
+    expect(loopVertices(0)).toBeGreaterThan(loopVertices(1))
+    expect(loopVertices(0.5)).toBeLessThan(loopVertices(0))
+    expect(loopVertices(1)).toBe(3)
+  })
+
+  it('builds loops with fewer waypoints when simplicity is high', () => {
+    const complex = buildWaypoints(ORIGIN, 900, 0, 'loop', () => 0, 0)
+    const simple = buildWaypoints(ORIGIN, 900, 0, 'loop', () => 0, 1)
+    expect(simple.length).toBeLessThan(complex.length)
+  })
+
+  it('grows the radius for simpler shapes so distance still lands on target', () => {
+    // A triangle has a shorter perimeter per unit radius than a pentagon, so
+    // hitting the same distance needs a wider loop.
+    expect(initialRadius(8000, 'loop', 1)).toBeGreaterThan(initialRadius(8000, 'loop', 0))
+  })
+
+  it('ignores turns entirely when simplicity is zero', () => {
+    const criteria = criteriaFor({ targetDistance: 8000, simplicity: 0 })
+    const few = scoreRoute(8000, 50, criteria, 4)
+    const many = scoreRoute(8000, 50, criteria, 60)
+    expect(few.score).toBe(many.score)
+  })
+
+  it('prefers the simpler of two otherwise identical routes', () => {
+    const criteria = criteriaFor({ targetDistance: 8000, simplicity: 1 })
+    expect(scoreRoute(8000, 50, criteria, 4).score).toBeLessThan(
+      scoreRoute(8000, 50, criteria, 60).score,
+    )
+  })
+
+  it('never lets a turn preference disqualify a route', () => {
+    const criteria = criteriaFor({ targetDistance: 8000, simplicity: 1, maxGain: 200 })
+    expect(scoreRoute(8000, 50, criteria, 200).meetsCriteria).toBe(true)
+  })
+
+  it('judges turns per distance, not raw count', () => {
+    const criteria = criteriaFor({ targetDistance: 16000, simplicity: 1, distanceTolerance: 0.5 })
+    // 20 turns over 16 km is easier going than 20 turns over 8 km.
+    const spreadOut = scoreRoute(16000, 0, criteria, 20)
+    const packedIn = scoreRoute(8000, 0, criteria, 20)
+    expect(spreadOut.score).toBeLessThan(packedIn.score)
+  })
+
+  it('returns measurably simpler routes end to end', async () => {
+    const base = { targetDistance: milesToMeters(5), maxGain: null, candidates: 8, results: 3 }
+    const complex = await findRoutes({ ...world(), criteria: criteriaFor({ ...base, simplicity: 0 }) })
+    const simple = await findRoutes({ ...world(), criteria: criteriaFor({ ...base, simplicity: 1 }) })
+
+    const avgDensity = (routes: RouteResult[]) =>
+      routes.reduce((sum, r) => sum + (r.turns ?? 0) / (r.distance / 1000), 0) / routes.length
+
+    expect(simple.length).toBeGreaterThan(0)
+    expect(complex.length).toBeGreaterThan(0)
+    expect(avgDensity(simple)).toBeLessThan(avgDensity(complex))
+  })
+
+  it('still hits the distance target when simplicity is maxed', async () => {
+    const criteria = criteriaFor({
+      targetDistance: milesToMeters(5),
+      maxGain: null,
+      simplicity: 1,
+    })
+    const routes = await findRoutes({ ...world(), criteria })
+
+    expect(routes.length).toBeGreaterThan(0)
+    for (const route of routes) {
+      expect(route.distanceError).toBeLessThanOrEqual(criteria.distanceTolerance)
+    }
+  })
+
+  it('reports turns on every result the engine describes', async () => {
+    const criteria = criteriaFor({ targetDistance: milesToMeters(5), maxGain: null })
+    const routes = await findRoutes({ ...world(), criteria })
+
+    for (const route of routes) {
+      expect(route.turns).toBeGreaterThan(0)
+    }
+  })
+
+  it('copes with a router that reports no turn information', async () => {
+    const routing = {
+      route: async () => ({ path: [ORIGIN, { lat: 42.37, lng: -71.05 }], distance: milesToMeters(5) }),
+    }
+    const criteria = criteriaFor({ targetDistance: milesToMeters(5), maxGain: null, simplicity: 1 })
+    const routes = await findRoutes({ routing, elevation: createTerrainElevation(), criteria })
+
+    expect(routes.length).toBeGreaterThan(0)
+    expect(routes[0].turns).toBeNull()
   })
 })

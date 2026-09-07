@@ -22,6 +22,7 @@ const INITIAL_FORM: CriteriaForm = {
   maxGain: 500,
   elevationUnit: 'ft',
   shape: 'loop',
+  simplicity: 0.5,
   pace: '9:00',
 }
 
@@ -82,6 +83,7 @@ export default function App() {
         start,
         targetDistance: distanceToMeters(form.distance, form.distanceUnit),
         maxGain: form.limitGain ? elevationToMeters(form.maxGain, form.elevationUnit) : null,
+        simplicity: form.simplicity,
         shape: form.shape,
         seed: nextSeed,
       }
