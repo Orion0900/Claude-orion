@@ -247,28 +247,61 @@ async function fetchTrackSegments(track: CaptionTrack, fetchImpl: Fetch): Promis
 }
 
 /**
- * The pre-Innertube caption endpoint. It needs no player response and no
- * signature, and is occasionally served to IPs the modern ones refuse.
+ * The pre-Innertube caption endpoint, which needs no player response and no
+ * signature. Measured from a blocked cloud host: the watch page and Innertube
+ * are refused outright, but this host still answers 200 — so it is worth
+ * asking it directly rather than only after a track listing.
+ *
+ * `type=list` was retired and now returns an empty document, so the language
+ * cannot be discovered here; instead the likely combinations are tried in
+ * order. `kind=asr` selects YouTube's auto-generated track, which is what a
+ * podcast usually has.
  */
 async function fetchLegacyTimedText(videoId: string, fetchImpl: Fetch, preferred: string): Promise<Segment[] | undefined> {
-  const listRes = await fetchImpl(`https://www.youtube.com/api/timedtext?type=list&v=${videoId}`, { headers: { 'user-agent': UA } })
-  if (!listRes.ok) throw new Error(`legacy list returned ${listRes.status}`)
-  const xml = await listRes.text()
-  const tracks: CaptionTrack[] = [...xml.matchAll(/<track\b([^>]*)\/?>/g)].map((m) => ({
-    url: '',
-    languageCode: m[1].match(/lang_code="([^"]*)"/)?.[1] ?? '',
-    name: m[1].match(/name="([^"]*)"/)?.[1],
-    kind: /kind="asr"/.test(m[1]) ? 'asr' : undefined,
-  }))
-  const track = pickTrack(tracks.filter((t) => t.languageCode), preferred)
-  if (!track) return undefined
-  const params = new URLSearchParams({ v: videoId, lang: track.languageCode, fmt: 'json3' })
-  if (track.name) params.set('name', track.name)
-  if (track.kind) params.set('kind', track.kind)
-  const res = await fetchImpl(`https://www.youtube.com/api/timedtext?${params}`, { headers: { 'user-agent': UA } })
-  if (!res.ok) throw new Error(`legacy captions returned ${res.status}`)
-  const segments = parseCaptionBody(await res.text())
-  return segments.length > 0 ? segments : undefined
+  const langs = [preferred, 'en', 'en-US', 'en-GB'].filter((l, i, a) => a.indexOf(l) === i)
+  const attempts: Record<string, string>[] = []
+  for (const lang of langs) {
+    // Human captions first, then auto-generated, matching pickTrack's order.
+    attempts.push({ v: videoId, lang, fmt: 'json3' })
+    attempts.push({ v: videoId, lang, kind: 'asr', fmt: 'json3' })
+  }
+  // A listing still helps on the rare video that has it; ask once, ignore failure.
+  try {
+    const listRes = await fetchImpl(`https://www.youtube.com/api/timedtext?type=list&v=${videoId}`, { headers: { 'user-agent': UA } })
+    if (listRes.ok) {
+      const xml = await listRes.text()
+      const tracks: CaptionTrack[] = [...xml.matchAll(/<track\b([^>]*)\/?>/g)].map((m) => ({
+        url: '',
+        languageCode: m[1].match(/lang_code="([^"]*)"/)?.[1] ?? '',
+        name: m[1].match(/name="([^"]*)"/)?.[1],
+        kind: /kind="asr"/.test(m[1]) ? 'asr' : undefined,
+      }))
+      const track = pickTrack(tracks.filter((t) => t.languageCode), preferred)
+      if (track) {
+        const listed: Record<string, string> = { v: videoId, lang: track.languageCode, fmt: 'json3' }
+        if (track.name) listed.name = track.name
+        if (track.kind) listed.kind = track.kind
+        attempts.unshift(listed)
+      }
+    }
+  } catch {
+    /* the listing is a bonus, not a requirement */
+  }
+
+  let lastStatus: number | undefined
+  for (const params of attempts) {
+    const res = await fetchImpl(`https://www.youtube.com/api/timedtext?${new URLSearchParams(params)}`, { headers: { 'user-agent': UA } })
+    if (!res.ok) {
+      lastStatus = res.status
+      continue
+    }
+    const body = await res.text()
+    if (!body.trim()) continue
+    const segments = parseCaptionBody(body)
+    if (segments.length > 0) return segments
+  }
+  if (lastStatus !== undefined) throw new Error(`timedtext returned ${lastStatus}`)
+  return undefined
 }
 
 /** Default public mirrors; override with YOUTUBE_MIRRORS (comma-separated origins). */
@@ -314,6 +347,8 @@ export async function discoverMirrors(fetchImpl: Fetch): Promise<string[]> {
       .filter(([, info]) => info.type === 'https' && info.api !== false && info.uri)
       .filter(([, info]) => (info.monitor?.uptime ?? 100) > 90)
       .map(([, info]) => (info.uri as string).replace(/\/+$/, ''))
+      // Yggdrasil, onion and i2p addresses do not resolve from a normal host.
+      .filter((uri) => uri.startsWith('https://') && !/\.(ygg|onion|i2p)$/.test(new URL(uri).hostname))
       .slice(0, 5)
   } catch {
     return []

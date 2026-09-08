@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseJsonTranscript, parseSrtOrVtt, parseTranscriptFile, renderTranscript, wordCount } from './transcribe.js'
+import { parseJsonTranscript, parseSrtOrVtt, parseTranscriptFile, parseYouTubePanel, renderTranscript, wordCount } from './transcribe.js'
 
 describe('transcript parsing', () => {
   it('parses SRT with speakers', () => {
@@ -22,6 +22,35 @@ describe('transcript parsing', () => {
   it('routes by type and falls back to plain text', () => {
     expect(parseTranscriptFile('<p>Just words here</p>', 'text/html')).toEqual([{ start: 0, text: 'Just words here' }])
     expect(parseTranscriptFile('1\n00:00:00,000 --> 00:00:01,000\nx', undefined, 'https://x/y.srt')).toHaveLength(1)
+  })
+})
+
+describe('parseYouTubePanel', () => {
+  it('reads timestamps on their own line', () => {
+    expect(parseYouTubePanel('0:00\nWelcome back\n0:04\nToday we talk\n1:02:05\nAn hour in')).toEqual([
+      { start: 0, text: 'Welcome back' },
+      { start: 4, text: 'Today we talk' },
+      { start: 3725, text: 'An hour in' },
+    ])
+  })
+  it('reads inline timestamps', () => {
+    expect(parseYouTubePanel('0:00 Welcome back\n0:04 Today we talk')).toEqual([
+      { start: 0, text: 'Welcome back' },
+      { start: 4, text: 'Today we talk' },
+    ])
+  })
+  it('joins wrapped continuation lines', () => {
+    expect(parseYouTubePanel('0:00\nWelcome back\nto the show\n0:10\nNext')).toEqual([
+      { start: 0, text: 'Welcome back to the show' },
+      { start: 10, text: 'Next' },
+    ])
+  })
+  it('is used by parseTranscriptFile in preference to flattening', () => {
+    const segs = parseTranscriptFile('0:00\nOne\n0:05\nTwo')
+    expect(segs).toHaveLength(2)
+    expect(segs[1]).toEqual({ start: 5, text: 'Two' })
+    // Prose with no timings still falls back to a single segment.
+    expect(parseTranscriptFile('Just some prose about things.')).toEqual([{ start: 0, text: 'Just some prose about things.' }])
   })
 })
 

@@ -79,6 +79,47 @@ export function parseJsonTranscript(text: string): Segment[] {
     .map((s) => ({ start: Number(s.startTime ?? 0), end: s.endTime, speaker: s.speaker, text: (s.body as string).trim() }))
 }
 
+/**
+ * What you get by copying YouTube's "Show transcript" panel. Timestamps sit
+ * either on their own line above the text, or inline before it:
+ *
+ *   0:00            |   0:00 Welcome back
+ *   Welcome back    |   0:04 Today we are talking
+ *
+ * Keeping those timestamps matters: they are what lets the summary point at
+ * the moment a claim was made.
+ */
+export function parseYouTubePanel(text: string): Segment[] {
+  const stamp = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/
+  const inline = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\s+(.*\S)$/
+  const toSeconds = (h: string | undefined, m: string, s: string) => Number(h ?? 0) * 3600 + Number(m) * 60 + Number(s)
+  const segments: Segment[] = []
+  let pending: number | undefined
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const both = line.match(inline)
+    if (both) {
+      segments.push({ start: toSeconds(both[1], both[2], both[3]), text: both[4] })
+      pending = undefined
+      continue
+    }
+    const only = line.match(stamp)
+    if (only) {
+      pending = toSeconds(only[1], only[2], only[3])
+      continue
+    }
+    if (pending !== undefined) {
+      segments.push({ start: pending, text: line })
+      pending = undefined
+    } else if (segments.length > 0) {
+      // A wrapped continuation of the line before it.
+      segments[segments.length - 1].text += ` ${line}`
+    }
+  }
+  return segments
+}
+
 export function parseTranscriptFile(text: string, type?: string, url?: string): Segment[] {
   const t = (type ?? '').toLowerCase()
   const u = (url ?? '').toLowerCase()
@@ -86,6 +127,9 @@ export function parseTranscriptFile(text: string, type?: string, url?: string): 
   if (t.includes('subrip') || t.includes('vtt') || t.includes('srt') || u.endsWith('.srt') || u.endsWith('.vtt') || text.includes('-->')) {
     return parseSrtOrVtt(text)
   }
+  // A paste from YouTube's transcript panel still carries timings; keep them.
+  const panel = parseYouTubePanel(text)
+  if (panel.length > 1) return panel
   // Plain text or HTML: one segment, no timing.
   const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   return plain ? [{ start: 0, text: plain }] : []
