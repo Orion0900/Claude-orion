@@ -10,6 +10,8 @@ interface MapViewProps {
   selectedId: string | null
   /** Point highlighted while scrubbing an elevation profile. */
   cursor: LatLng | null
+  /** Live GPS position while following a route. */
+  position: LatLng | null
   onSelect: (id: string) => void
   onPickStart: (point: LatLng) => void
   status: string | null
@@ -17,12 +19,22 @@ interface MapViewProps {
 
 const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
 
-export function MapView({ start, routes, selectedId, cursor, onSelect, onPickStart, status }: MapViewProps) {
+export function MapView({
+  start,
+  routes,
+  selectedId,
+  cursor,
+  position,
+  onSelect,
+  onPickStart,
+  status,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const startMarkerRef = useRef<L.CircleMarker | null>(null)
   const cursorMarkerRef = useRef<L.CircleMarker | null>(null)
+  const positionMarkerRef = useRef<L.CircleMarker | null>(null)
   // Handlers change every render; a ref keeps the Leaflet listener stable.
   const onPickStartRef = useRef(onPickStart)
   const onSelectRef = useRef(onSelect)
@@ -54,6 +66,7 @@ export function MapView({ start, routes, selectedId, cursor, onSelect, onPickSta
       routeLayerRef.current = null
       startMarkerRef.current = null
       cursorMarkerRef.current = null
+      positionMarkerRef.current = null
     }
   }, [])
 
@@ -137,6 +150,31 @@ export function MapView({ start, routes, selectedId, cursor, onSelect, onPickSta
       }).addTo(map)
     }
   }, [cursor])
+
+  // While following, the map tracks the runner rather than the whole route.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (!position) {
+      positionMarkerRef.current?.remove()
+      positionMarkerRef.current = null
+      return
+    }
+    const latlng = L.latLng(position.lat, position.lng)
+    if (positionMarkerRef.current) {
+      positionMarkerRef.current.setLatLng(latlng)
+    } else {
+      positionMarkerRef.current = L.circleMarker(latlng, {
+        radius: 9,
+        color: '#ffffff',
+        weight: 3,
+        fillColor: '#3b82f6',
+        fillOpacity: 1,
+      }).addTo(map)
+    }
+    positionMarkerRef.current.bringToFront()
+    map.panTo(latlng, { animate: true })
+  }, [position])
 
   return (
     <div className="map">

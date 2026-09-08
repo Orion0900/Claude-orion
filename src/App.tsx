@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
+import { FollowMode } from './components/FollowMode'
 import { MapView } from './components/MapView'
 import { RouteList } from './components/RouteList'
 import { pointAtFraction, type LatLng } from './lib/geo'
@@ -39,6 +40,8 @@ export default function App() {
   const [locationError, setLocationError] = useState<string | null>(null)
   const [scrub, setScrub] = useState<number | null>(null)
   const [seed, setSeed] = useState(1)
+  const [followingId, setFollowingId] = useState<string | null>(null)
+  const [livePosition, setLivePosition] = useState<LatLng | null>(null)
 
   const searchRef = useRef<AbortController | null>(null)
   const routing = useMemo(() => createOsrmProvider(), [])
@@ -126,6 +129,7 @@ export default function App() {
   useEffect(() => () => searchRef.current?.abort(), [])
 
   const selected = routes.find((route) => route.id === selectedId) ?? null
+  const following = routes.find((route) => route.id === followingId) ?? null
   const cursor = selected && scrub !== null ? pointAtFraction(selected.path, scrub) : null
 
   const status = searching
@@ -142,6 +146,18 @@ export default function App() {
             <h1>LoopMaker</h1>
             <p>Runs that start and finish at your door, sized to your legs.</p>
           </header>
+
+          {following ? (
+            <FollowMode
+              route={following}
+              distanceUnit={form.distanceUnit}
+              onPosition={setLivePosition}
+              onExit={() => {
+                setFollowingId(null)
+                setLivePosition(null)
+              }}
+            />
+          ) : null}
 
           <ControlPanel
             form={form}
@@ -170,6 +186,11 @@ export default function App() {
                 setScrub(null)
               }}
               onScrub={setScrub}
+              followingId={followingId}
+              onFollow={(id) => {
+                setFollowingId(id)
+                setSelectedId(id)
+              }}
             />
           ) : (
             <p className="empty">
@@ -202,6 +223,7 @@ export default function App() {
         routes={routes}
         selectedId={selectedId}
         cursor={cursor}
+        position={livePosition}
         status={status}
         onSelect={(id) => {
           setSelectedId(id)
