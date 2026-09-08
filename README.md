@@ -149,13 +149,14 @@ src/
     navigation.ts    turn instructions, distances and what to say next
     effort.ts        grade-adjusted finish-time estimate
     gestures.ts      double-tap detection, kept away from the DOM to be tested
+    heading.ts       angle arithmetic, and choosing between compass and course
     runSummary.ts    what actually happened on a run, measured not estimated
     savedRoutes.ts   keeping routes, and recognising one you already have
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
     __fixtures__/    synthetic grid city used by the tests
-  services/          OSRM, Open-Meteo, Nominatim + shared fair-use HTTP client
+  services/          OSRM, Open-Meteo, Nominatim, compass + fair-use HTTP client
   components/        MapView, ControlPanel, RouteList, SavedRoutes, ElevationProfile, NavigationView
 public/
   manifest.webmanifest, sw.js, icons     the installable-app layer
@@ -175,6 +176,23 @@ assumed wrong (signal lost under a bridge, or you rejoined the loop elsewhere)
 and the whole route is searched again.
 
 The screen is held awake while following, where the browser allows it.
+
+### Which way you're facing
+
+Satellites report *course over ground* — the direction you are travelling. It is
+null while you stand still and only catches up after several fixes, so a map
+driven by it alone lags behind you and ignores turning on the spot entirely.
+
+The compass answers the question that actually matters: which way the phone is
+pointing, right now. It is the primary source here, with course over ground as
+a fallback for devices without a magnetometer — and even then only above a slow
+walking pace, below which its direction is mostly noise.
+
+iOS gates the magnetometer behind a permission request that only works when
+called straight from a tap, so the ask happens on the button that starts the
+run rather than when the navigation view appears. Readings arrive far faster
+than a screen can redraw, so the newest is kept and applied once per frame,
+eased the short way round.
 
 ### Turn-by-turn
 
@@ -262,7 +280,7 @@ still needs a connection.
 
 ## Tests
 
-257 unit tests covering the geodesy, ascent accumulation, turn classification,
+299 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
