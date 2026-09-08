@@ -3,17 +3,28 @@ import { AdvisorCard } from './components/AdvisorCard'
 import { HoleHeader } from './components/HoleHeader'
 import { MapView, type TapMode } from './components/MapView'
 import { SettingsView } from './components/SettingsView'
+import { SetupView, type SetupStep } from './components/SetupView'
 import { ShotTracker } from './components/ShotTracker'
 import { StatsView } from './components/StatsView'
 import { advise, type Advice } from './lib/advisor'
 import { defaultBag, type ClubId, type SkillLevel } from './lib/clubs'
-import { greenDepth, hazardsAlongLine, manualCourse, setHolePar, setHoleTarget, setHoleTee, targetOf, type Course } from './lib/course'
+import {
+  greenDepth,
+  hazardsAlongLine,
+  manualCourse,
+  nearestHole,
+  setHolePar,
+  setHoleTarget,
+  setHoleTee,
+  targetOf,
+  type Course,
+} from './lib/course'
 import { haversine, type LatLng } from './lib/geo'
 import { DEFAULT_PROFILE, normalizeProfile, type Aggressiveness, type Profile } from './lib/profile'
 import { holeOut, markShot, newId, setManualDistance, shotsOnHole, undoLastShot, type Lie, type Round, type Shot } from './lib/shots'
 import { readJson, writeJson } from './lib/storage'
 import { useGeolocation } from './services/geolocation'
-import { loadNearbyCourse } from './services/overpass'
+import { findNearbyCourses, type NearbyCourse } from './services/overpass'
 
 type Tab = 'play' | 'stats' | 'settings'
 
@@ -42,6 +53,13 @@ export default function App() {
   const [pickedClub, setPickedClub] = useState<ClubId | null>(null)
   const [courseStatus, setCourseStatus] = useState<string | null>(null)
   const [frameKey, setFrameKey] = useState(0)
+  // Setup asks two questions before play: which course, then which hole. It
+  // opens itself when there's no course yet, and can be re-entered later.
+  const [setupStep, setSetupStep] = useState<SetupStep | null>(() =>
+    readJson<Course | null>(KEYS.course, null) === null ? 'course' : null,
+  )
+  const [candidates, setCandidates] = useState<NearbyCourse[] | null>(null)
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => writeJson(KEYS.profile, profile), [profile])
   useEffect(() => writeJson(KEYS.course, course), [course])
@@ -106,24 +124,43 @@ export default function App() {
     [tapMode, holeNumber],
   )
 
-  const findCourse = async () => {
+  const searchCourses = async () => {
     if (!position) return
-    setCourseStatus('Looking for holes around you…')
+    setSearching(true)
+    setCourseStatus(null)
     try {
-      const found = await loadNearbyCourse(position)
-      if (!found) {
-        setCourseStatus('No mapped holes within a mile and a half. Set flags by hand instead.')
-        return
-      }
-      setCourse(found)
-      setRound(newRound(found.name))
-      const nearest = found.holes.reduce((a, b) => (haversine(position, b.tee ?? b.green) < haversine(position, a.tee ?? a.green) ? b : a))
-      goToHole(nearest.number)
-      setCourseStatus(`${found.name}: ${found.holes.length} holes, ${found.hazards.length} hazards.`)
-      setTab('play')
+      const found = await findNearbyCourses(position)
+      setCandidates(found)
+      if (found.length === 0) setCourseStatus(null)
     } catch (error) {
+      setCandidates([])
       setCourseStatus(`Course lookup failed: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setSearching(false)
     }
+  }
+
+  /** The hole the player is standing closest to on the course being set up. */
+  const suggestedHole = useMemo(() => {
+    if (!course || !position) return course?.holes[0]?.number ?? null
+    return nearestHole(course, position)?.number ?? null
+  }, [course, position])
+
+  const pickCourse = (chosen: Course) => {
+    setCourse(chosen)
+    setCourseStatus(null)
+    setSetupStep('hole')
+  }
+
+  /** Setup is finished: the round starts here, on this hole. */
+  const startRound = (hole: number) => {
+    setRound(newRound(course?.name ?? null))
+    goToHole(hole)
+    setSetupStep(null)
+    setTab('play')
+    setFrameKey((k) => k + 1)
+    // A hand-built course has no flag for this hole yet; ask for it straight away.
+    if (course && !course.holes.some((h) => h.number === hole)) setTapMode('pin')
   }
 
   const clubForShot = pickedClub ?? advice?.club ?? profile.bag[0]
@@ -181,6 +218,14 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
+        {setupStep !== null ? (
+          <header className="hole-header setup-header">
+            <div className="brand">
+              <strong>CaddieIQ</strong>
+              <span>A caddie that learns what you actually hit</span>
+            </div>
+          </header>
+        ) : (
         <HoleHeader
           hole={hole}
           holeCount={holeCount}
@@ -192,31 +237,33 @@ export default function App() {
           onNext={nextHole}
           onFrame={() => setFrameKey((k) => k + 1)}
         />
+        )}
         <div className="sidebar-scroll">
-          {tab === 'play' && (
+          {setupStep !== null && (
+            <SetupView
+              step={setupStep}
+              candidates={candidates}
+              searching={searching}
+              error={courseStatus}
+              hasPosition={position !== null}
+              course={course}
+              suggested={suggestedHole}
+              unit={profile.unit}
+              canCancel={course !== null}
+              onSearch={searchCourses}
+              onPickCourse={pickCourse}
+              onManual={() => {
+                setCourse(manualCourse())
+                setSetupStep('hole')
+              }}
+              onPlaceByTap={() => setTapMode('me')}
+              onPickHole={startRound}
+              onBack={() => setSetupStep('course')}
+              onCancel={() => setSetupStep(null)}
+            />
+          )}
+          {setupStep === null && tab === 'play' && (
             <div className="stack">
-              {!course && (
-                <section className="card welcome">
-                  <h3>First, the course</h3>
-                  <p>
-                    {position ? 'Load the holes around you from OpenStreetMap, or tap the map to set each flag yourself.' : 'Allow location so the caddie knows where you stand.'}
-                  </p>
-                  <div className="button-row">
-                    <button type="button" className="primary" onClick={findCourse} disabled={!position}>
-                      Find the course I'm on
-                    </button>
-                    <button type="button" onClick={() => setTapMode('pin')}>
-                      Set flag by tap
-                    </button>
-                    {!position && (
-                      <button type="button" onClick={() => setTapMode('me')}>
-                        Place me by tap
-                      </button>
-                    )}
-                  </div>
-                  {courseStatus && <p className="status">{courseStatus}</p>}
-                </section>
-              )}
               {course && !hole && (
                 <section className="card welcome">
                   <p>Hole {holeNumber} isn't set yet.</p>
@@ -231,23 +278,21 @@ export default function App() {
               {tracker}
             </div>
           )}
-          {tab === 'stats' && <StatsView shots={shots} profile={profile} />}
-          {tab === 'settings' && (
+          {setupStep === null && tab === 'stats' && <StatsView shots={shots} profile={profile} />}
+          {setupStep === null && tab === 'settings' && (
             <SettingsView
               profile={profile}
               course={course}
               courseStatus={courseStatus}
-              canFindCourse={position !== null}
+              hasPosition={position !== null}
               tapMode={tapMode}
               holeNumber={holeNumber}
               usingManualPosition={manualPosition !== null}
               onProfile={updateProfile}
-              onFindCourse={findCourse}
-              onNewManualCourse={() => {
-                setCourse(manualCourse())
-                setRound(newRound('My course'))
-                goToHole(1)
-                setTapMode('pin')
+              onChangeCourse={() => {
+                setCandidates(null)
+                setCourseStatus(null)
+                setSetupStep('course')
                 setTab('play')
               }}
               onTapMode={(mode) => {
@@ -258,8 +303,7 @@ export default function App() {
               onPar={(par) => setCourse((c) => (c ? setHolePar(c, holeNumber, par) : c))}
               onUseGps={() => setManualPosition(null)}
               onNewRound={() => {
-                setRound(newRound(course?.name ?? null))
-                goToHole(course?.holes[0]?.number ?? 1)
+                setSetupStep(course ? 'hole' : 'course')
                 setTab('play')
               }}
               onClearHistory={() => {
@@ -268,7 +312,7 @@ export default function App() {
             />
           )}
         </div>
-        <nav className="tabs">
+        <nav className="tabs" hidden={setupStep !== null}>
           {(['play', 'stats', 'settings'] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
               {t === 'play' ? 'Play' : t === 'stats' ? 'Coach' : 'Settings'}
