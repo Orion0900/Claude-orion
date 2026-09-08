@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cumulativeDistances, type LatLng } from '../lib/geo'
 import { hasFinished, isOffRoute, locateOnRoute, type RouteProgress } from '../lib/follow'
 import {
@@ -10,6 +10,8 @@ import {
   nextStep,
   turnAngle,
 } from '../lib/navigation'
+import { chooseHeading, headingChanged, smoothHeading } from '../lib/heading'
+import { watchCompass } from '../services/compass'
 import { estimateDuration } from '../lib/effort'
 import { buildRunSummary, summaryHeadline } from '../lib/runSummary'
 import { formatPace } from '../lib/units'
@@ -81,6 +83,12 @@ export function NavigationView({
 
   const segmentRef = useRef<number | undefined>(undefined)
   const lastFixRef = useRef<LatLng | null>(null)
+  // The latest reading from each source, and the smoothed value on screen.
+  const compassRef = useRef<number | null>(null)
+  const courseRef = useRef<number | null>(null)
+  const speedRef = useRef<number | null>(null)
+  const derivedRef = useRef<number | null>(null)
+  const shownHeadingRef = useRef<number | null>(null)
   // Which maneuver has been announced at which band, so nothing repeats.
   const spokenRef = useRef(new Map<number, number>())
   const mutedRef = useRef(muted)
@@ -99,6 +107,36 @@ export function NavigationView({
     return () => clearInterval(timer)
   }, [])
 
+  /**
+   * Settle on a heading from whichever source is most trustworthy, ease toward
+   * it the short way round, and only redraw when it has actually moved.
+   */
+  const publishHeading = useCallback(() => {
+    const target = chooseHeading({
+      compass: compassRef.current,
+      course: courseRef.current,
+      speed: speedRef.current,
+      derived: derivedRef.current,
+    })
+    if (target === null) return
+    const smoothed = smoothHeading(shownHeadingRef.current, target)
+    if (!headingChanged(shownHeadingRef.current, smoothed)) return
+    shownHeadingRef.current = smoothed
+    onHeading(smoothed)
+  }, [onHeading])
+
+  // The compass is what makes the map turn as you turn, standing still
+  // included. Permission was asked for on the tap that started the run.
+  useEffect(() => {
+    const stop = watchCompass({
+      onHeading: (heading) => {
+        compassRef.current = heading
+        publishHeading()
+      },
+    })
+    return stop
+  }, [publishHeading])
+
   useEffect(() => {
     if (!('geolocation' in navigator)) {
       setError('This browser cannot follow your position.')
@@ -115,12 +153,15 @@ export function NavigationView({
         onPosition(here)
         onProgress(next.fraction)
 
-        // Prefer the device's own heading; fall back to the way you just moved.
-        const derived = lastFixRef.current ? headingBetween(lastFixRef.current, here) : null
-        const heading = typeof fix.coords.heading === 'number' && !Number.isNaN(fix.coords.heading)
-          ? fix.coords.heading
-          : derived
-        if (heading !== null) onHeading(heading)
+        // Satellites only contribute course over ground here; which way the
+        // runner is facing comes from the compass, below.
+        courseRef.current =
+          typeof fix.coords.heading === 'number' && !Number.isNaN(fix.coords.heading)
+            ? fix.coords.heading
+            : null
+        speedRef.current = typeof fix.coords.speed === 'number' ? fix.coords.speed : null
+        derivedRef.current = lastFixRef.current ? headingBetween(lastFixRef.current, here) : null
+        publishHeading()
         lastFixRef.current = here
       },
       () => setError('Lost your location. Check that location access is allowed.'),

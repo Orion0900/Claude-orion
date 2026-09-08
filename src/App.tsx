@@ -9,6 +9,7 @@ import {
   type SavedRoute,
 } from './lib/savedRoutes'
 import { SavedRoutes } from './components/SavedRoutes'
+import { requestCompassPermission } from './services/compass'
 import { compassLabel } from './lib/routeSearch'
 import { formatDistance } from './lib/units'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
@@ -254,6 +255,9 @@ export default function App() {
               onToggleSaved={toggleSaved}
               followingId={followingId}
               onFollow={(id) => {
+                // iOS only grants the compass from inside a gesture, so the ask
+                // happens here rather than once the navigation view mounts.
+                void requestCompassPermission()
                 setFollowingId(id)
                 setSelectedId(id)
               }}

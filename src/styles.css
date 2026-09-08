@@ -589,7 +589,10 @@ input[type='range'] {
   width: var(--nav-rotor-size, 260%);
   height: var(--nav-rotor-size, 260%);
   transform-origin: 50% 50%;
-  transition: transform 0.45s ease-out;
+  /* Headings are already eased in JS and arrive every frame, so this is just
+     enough to take the edge off — any longer and the map visibly trails the
+     runner as they turn. */
+  transition: transform 0.12s linear;
   will-change: transform;
 }
 
