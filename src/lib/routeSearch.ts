@@ -1,6 +1,7 @@
 import { bounds, destination, pathLength, resample, type LatLng } from './geo'
 import { buildProfile, type ElevationProfile } from './elevation'
 import { turnDensity } from './turns'
+import { placeSteps, type RawStep, type RouteStep } from './navigation'
 
 export interface RouteGeometry {
   path: LatLng[]
@@ -8,6 +9,8 @@ export interface RouteGeometry {
   distance: number
   /** Turns a runner has to remember, when the engine reports its steps. */
   turns?: number
+  /** Turn-by-turn maneuvers, when the engine describes them. */
+  steps?: RawStep[]
 }
 
 export interface RouteOptions {
@@ -60,6 +63,8 @@ export interface RouteResult {
   outboundBearing: number
   /** Turns to remember; null when the engine didn't report its steps. */
   turns: number | null
+  /** Turn-by-turn instructions, each placed at its distance along the route. */
+  steps: RouteStep[]
   /** True when the route satisfies every stated constraint. */
   meetsCriteria: boolean
   distanceError: number
@@ -345,6 +350,7 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
       profile,
       outboundBearing: bearing,
       turns,
+      steps: geometry.steps ? placeSteps(geometry.path, geometry.steps) : [],
       meetsCriteria,
       distanceError,
       score,

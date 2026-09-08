@@ -12,6 +12,10 @@ interface MapViewProps {
   cursor: LatLng | null
   /** Live GPS position while following a route. */
   position: LatLng | null
+  /** True while a run is in progress: tilts the view and takes the map off the finger. */
+  navigating: boolean
+  /** Heading to point the map along, in degrees. Null until the runner moves. */
+  heading: number | null
   onSelect: (id: string) => void
   onPickStart: (point: LatLng) => void
   status: string | null
@@ -25,6 +29,8 @@ export function MapView({
   selectedId,
   cursor,
   position,
+  navigating,
+  heading,
   onSelect,
   onPickStart,
   status,
@@ -151,6 +157,17 @@ export function MapView({
     }
   }, [cursor])
 
+  // Navigating takes the map away from the finger and gives it to the route.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const handlers = [map.dragging, map.scrollWheelZoom, map.doubleClickZoom, map.touchZoom]
+    handlers.forEach((handler) => (navigating ? handler.disable() : handler.enable()))
+    // The rotor around the map changes size when navigation starts.
+    map.invalidateSize({ animate: false })
+    if (navigating) map.setZoom(17)
+  }, [navigating])
+
   // While following, the map tracks the runner rather than the whole route.
   useEffect(() => {
     const map = mapRef.current
@@ -176,10 +193,31 @@ export function MapView({
     map.panTo(latlng, { animate: true })
   }, [position])
 
-  return (
-    <div className="map">
-      <div ref={containerRef} className="map-canvas" role="application" aria-label="Route map" />
-      {status ? <div className="map-overlay">{status}</div> : null}
-    </div>
-  )
+  return renderMap()
+
+  function renderMap() {
+    return (
+      <div className="map">
+        <div className={navigating ? 'map-viewport navigating' : 'map-viewport'}>
+          <div
+            className="map-rotor"
+            style={
+              navigating
+                ? {
+                    // Shift the map down so the runner sits low on screen with
+                    // the road ahead filling the view. North-up until a heading
+                    // is known, then the map turns to face the way you're going.
+                    transform: `translate(-50%, -50%) translateY(12%) rotateX(52deg) rotate(${-(heading ?? 0)}deg)`,
+                  }
+                : undefined
+            }
+          >
+            <div ref={containerRef} className="map-canvas" role="application" aria-label="Route map" />
+          </div>
+        </div>
+        {status ? <div className="map-overlay">{status}</div> : null}
+      </div>
+    )
+  }
 }
+

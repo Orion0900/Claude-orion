@@ -134,7 +134,7 @@ export function RouteList({
                       onFollow(route.id)
                     }}
                   >
-                    {followingId === route.id ? 'Following…' : 'Follow this route'}
+                    {followingId === route.id ? 'Run in progress' : 'Start run'}
                   </button>
                   <ShareButton route={route} name={name} />
                   <a

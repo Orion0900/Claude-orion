@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
-import { FollowMode } from './components/FollowMode'
+import { NavigationView } from './components/NavigationView'
 import { MapView } from './components/MapView'
 import { RouteList } from './components/RouteList'
 import { pointAtFraction, type LatLng } from './lib/geo'
@@ -42,6 +42,7 @@ export default function App() {
   const [seed, setSeed] = useState(1)
   const [followingId, setFollowingId] = useState<string | null>(null)
   const [livePosition, setLivePosition] = useState<LatLng | null>(null)
+  const [heading, setHeading] = useState<number | null>(null)
 
   const searchRef = useRef<AbortController | null>(null)
   const routing = useMemo(() => createOsrmProvider(), [])
@@ -138,26 +139,20 @@ export default function App() {
       ? 'Tap the map to set where your run starts'
       : null
 
+  const stopRun = () => {
+    setFollowingId(null)
+    setLivePosition(null)
+    setHeading(null)
+  }
+
   return (
-    <div className="app">
+    <div className={following ? 'app navigating' : 'app'}>
       <aside className="sidebar">
         <div className="sidebar-scroll">
           <header className="brand">
             <h1>LoopMaker</h1>
             <p>Runs that start and finish at your door, sized to your legs.</p>
           </header>
-
-          {following ? (
-            <FollowMode
-              route={following}
-              distanceUnit={form.distanceUnit}
-              onPosition={setLivePosition}
-              onExit={() => {
-                setFollowingId(null)
-                setLivePosition(null)
-              }}
-            />
-          ) : null}
 
           <ControlPanel
             form={form}
@@ -218,12 +213,25 @@ export default function App() {
         </div>
       </aside>
 
+      {following ? (
+        <NavigationView
+          route={following}
+          distanceUnit={form.distanceUnit}
+          paceSeconds={paceSeconds}
+          onPosition={setLivePosition}
+          onHeading={setHeading}
+          onExit={stopRun}
+        />
+      ) : null}
+
       <MapView
         start={start}
         routes={routes}
         selectedId={selectedId}
         cursor={cursor}
         position={livePosition}
+        navigating={following !== null}
+        heading={heading}
         status={status}
         onSelect={(id) => {
           setSelectedId(id)
