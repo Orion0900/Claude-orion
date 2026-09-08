@@ -1,0 +1,17 @@
+{
+  "name": "CaddieIQ",
+  "short_name": "CaddieIQ",
+  "description": "A GPS caddie that tells you what club to hit, draws the line to the hole, and learns your real distances shot by shot.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "categories": ["sports", "navigation", "fitness"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

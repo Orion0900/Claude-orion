@@ -17,6 +17,10 @@ end at your door.
 > get every point from the episode summarized (YouTube captions make it free),
 > installable on an iPhone. See
 > [podcast-summarizer/README.md](podcast-summarizer/README.md).
+> [CaddieIQ](caddie/) — a GPS golf caddie that draws the line to the flag,
+> tells you what club to hit for your level and mindset, and learns your real
+> distances shot by shot. Ships at `/caddie/`. See
+> [caddie/README.md](caddie/README.md).
 
 ## What it does
 
