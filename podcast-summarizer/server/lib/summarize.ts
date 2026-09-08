@@ -9,7 +9,17 @@ import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { z } from 'zod/v4'
 
-export const DEFAULT_MODEL = 'claude-opus-5'
+export const DEFAULT_MODEL = 'claude-haiku-4-5'
+
+/** `output_config.effort` exists on Opus 4.5+ / Sonnet 4.6+ / Fable; Haiku and older models reject it. */
+export function supportsEffort(model: string): boolean {
+  return !/haiku|claude-3|sonnet-4-5|opus-4-[01]\b/.test(model)
+}
+
+/** Server-side refusal fallbacks are a Fable / Opus 5 feature. */
+export function supportsFallbacks(model: string): boolean {
+  return /fable|mythos|opus-5/.test(model)
+}
 
 const TimestampedPoint = z.object({
   point: z.string().describe('One key point, stated as a complete sentence the listener could act on or repeat.'),
@@ -81,8 +91,7 @@ export function createSummarizer(opts: { apiKey?: string; model?: string } = {})
       const stream = client.beta.messages.stream({
         model,
         max_tokens: 32000,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
+        ...(supportsFallbacks(model) ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
         system: SYSTEM,
         messages: [
           {
@@ -90,7 +99,7 @@ export function createSummarizer(opts: { apiKey?: string; model?: string } = {})
             content: `${header}\n\nTranscript:\n\n${input.transcript}\n\nProduce the structured briefing for this episode.`,
           },
         ],
-        output_config: { effort: 'high', format: betaZodOutputFormat(SummarySchema) },
+        output_config: { ...(supportsEffort(model) ? { effort: 'high' as const } : {}), format: betaZodOutputFormat(SummarySchema) },
       })
       stream.on('text', () => onProgress?.('Writing the summary…'))
       const message = await stream.finalMessage()

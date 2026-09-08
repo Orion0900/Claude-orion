@@ -82,7 +82,7 @@ secure origins (and `localhost`).
 | Variable | Purpose |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Required. Claude writes the summaries. |
-| `CLAUDE_MODEL` | Defaults to `claude-opus-5`. |
+| `CLAUDE_MODEL` | Defaults to `claude-haiku-4-5` (~$0.06 per two-hour episode). Set `claude-opus-5` for the most thorough summaries (~$0.30). |
 | `ASSEMBLYAI_API_KEY` | Transcription from the audio URL; no size limit. Recommended. |
 | `OPENAI_API_KEY` | Whisper transcription. Downloads the file; needs ffmpeg over 25 MB. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Optional. Uses the Spotify Web API for episode lookup instead of reading the public page. |
@@ -130,6 +130,6 @@ web/
   transcribe. The app will ask for a source it can't find.
 - Episode lookup without Spotify API credentials reads the public episode
   page, which Spotify can change. Credentials make it robust.
-- Transcription is the slow and (with a paid provider) costly part: budget a
-  few minutes and a few cents per hour of audio. The Claude call on a two-hour
-  transcript is typically well under a dollar.
+- Transcription is the slow part: budget a few minutes per hour of audio.
+  AssemblyAI gives signup credits, then charges per hour. The Claude call on a
+  two-hour transcript costs a few cents on Haiku and about thirty on Opus.
