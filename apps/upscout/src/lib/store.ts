@@ -12,6 +12,7 @@
  */
 import { DEFAULT_AUTO_APPLY } from './autoApply'
 import { EMPTY_CRITERIA } from './criteria'
+import { DEFAULT_REFRESH_MINUTES } from './refresh'
 import { DEFAULT_WEIGHTS } from './scoring'
 import { STARTER_TEMPLATE } from './template'
 import type { Application, Criteria, Job, Profile, SourceConfig, Template, Weights, AutoApplySettings } from './types'
@@ -28,6 +29,8 @@ export interface AppState {
   /** The last pull, kept so the list is there before the network is. */
   jobs: Job[]
   lastFetchedAt?: string
+  /** Minutes before the app refreshes by itself. 0 turns that off. */
+  autoRefreshMinutes: number
 }
 
 export const STATE_VERSION = 1
@@ -69,6 +72,7 @@ export function defaultState(): AppState {
     autoApply: { ...DEFAULT_AUTO_APPLY },
     applications: [],
     jobs: [],
+    autoRefreshMinutes: DEFAULT_REFRESH_MINUTES,
   }
 }
 
@@ -99,6 +103,10 @@ export function mergeState(stored: unknown): AppState {
       : [],
     jobs: Array.isArray(stored.jobs) ? (stored.jobs as Job[]).filter(isJob).slice(0, MAX_JOBS) : [],
     lastFetchedAt: typeof stored.lastFetchedAt === 'string' ? stored.lastFetchedAt : undefined,
+    autoRefreshMinutes:
+      typeof stored.autoRefreshMinutes === 'number' && stored.autoRefreshMinutes >= 0
+        ? stored.autoRefreshMinutes
+        : base.autoRefreshMinutes,
     version: STATE_VERSION,
   }
 
@@ -187,15 +195,19 @@ export function createLocalStore(key = STORAGE_KEY): StateStore {
 
 /**
  * The whole state as a file, so a phone and a laptop can be kept in step
- * without an account existing anywhere. Tokens are left out: they belong to
- * the device they were typed on.
+ * without an account existing anywhere.
+ *
+ * Tokens are left out by default — they're keys to your bridge, and an export
+ * gets pasted into chat windows and note apps. `includeTokens` is for the case
+ * that matters in practice: moving to your own second device, where leaving
+ * them out means setting the bridge up twice.
  */
-export function exportState(state: AppState): string {
+export function exportState(state: AppState, { includeTokens = false }: { includeTokens?: boolean } = {}): string {
   return JSON.stringify(
     {
       ...state,
-      sources: state.sources.map(({ token: _token, ...rest }) => rest),
-      autoApply: { ...state.autoApply, submitToken: undefined },
+      sources: state.sources.map(({ token, ...rest }) => (includeTokens ? { ...rest, token } : rest)),
+      autoApply: { ...state.autoApply, submitToken: includeTokens ? state.autoApply.submitToken : undefined },
       jobs: [],
     },
     null,

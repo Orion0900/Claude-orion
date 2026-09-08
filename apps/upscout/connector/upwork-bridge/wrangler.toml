@@ -1,0 +1,22 @@
+name = "upscout-bridge"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Where the Upwork tokens live. Create it once with:
+#   wrangler kv namespace create UPSCOUT
+# then paste the id it prints here.
+[[kv_namespaces]]
+binding = "UPSCOUT"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Optional: the search UpScout's Refresh uses when the app sends no query.
+DEFAULT_QUERY = ""
+# Optional: only some Upwork accounts need this. Leave empty unless the API
+# answers with a tenant error.
+UPWORK_TENANT_ID = ""
+
+# Secrets are not kept in this file. Set them once with:
+#   wrangler secret put UPWORK_CLIENT_ID
+#   wrangler secret put UPWORK_CLIENT_SECRET
+#   wrangler secret put UPSCOUT_TOKEN

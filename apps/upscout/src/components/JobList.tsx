@@ -6,6 +6,7 @@
  * whole-card tap targets: on a phone this gets read one-handed.
  */
 import { describeCriteria, type FilterResult } from '../lib/criteria'
+import { describeFetchedAt } from '../lib/refresh'
 import { explain, TIER_LABEL, type ScoredJob } from '../lib/scoring'
 import { formatBudget } from '../lib/template'
 import { truncate } from '../lib/text'
@@ -16,6 +17,7 @@ export default function JobList({
   filtered,
   appliedIds,
   lastFetchedAt,
+  now,
   fetching,
   criteria,
   onRefresh,
@@ -26,6 +28,7 @@ export default function JobList({
   filtered: FilterResult
   appliedIds: Set<string>
   lastFetchedAt?: string
+  now: Date
   fetching: boolean
   criteria: Criteria
   onRefresh: () => void
@@ -43,8 +46,7 @@ export default function JobList({
         <div>
           <h1>{ranked.length ? `${ranked.length} worth a look` : 'No jobs yet'}</h1>
           <p className="sub">
-            {describeCriteria(criteria)}
-            {lastFetchedAt ? ` · updated ${new Date(lastFetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+            {describeCriteria(criteria)} · {fetching ? 'fetching…' : describeFetchedAt(lastFetchedAt, now)}
           </p>
         </div>
         <button className="primary" onClick={onRefresh} disabled={fetching}>
@@ -74,7 +76,10 @@ export default function JobList({
             </>
           ) : (
             <>
-              <p>Nothing here yet. Pull from a source, or paste a search in and start from that.</p>
+              <p>
+                Nothing here yet. Set up the bridge once under <strong>You → Sources</strong> and Refresh will pull live
+                jobs from then on — or paste a search in and start from that.
+              </p>
               <button className="ghost" onClick={onEditCriteria}>
                 Set up a search
               </button>

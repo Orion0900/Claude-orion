@@ -1,13 +1,16 @@
 /**
  * Pulling jobs in, from wherever you've told it to look.
  *
- * Four kinds of source, one result:
+ * Five kinds of source, one result:
  *
- * - **rss** — an Upwork saved-search feed URL. Zero setup if you can reach it.
- * - **json** — any endpoint returning `{ "jobs": [...] }` in the documented
- *   shape. This is the hook for your own bridge or worker.
- * - **upwork-api** — the official GraphQL API, through a proxy that holds
- *   your OAuth token.
+ * - **bridge** — the UpScout bridge in `connector/upwork-bridge`: set up once,
+ *   holds the Upwork connection, and answers `/jobs` and `/status`. This is
+ *   the one that makes Refresh work by itself, and the one to use.
+ * - **rss** — an Upwork saved-search feed URL, if you have one that's reachable.
+ * - **json** — any other endpoint returning `{ "jobs": [...] }` in the
+ *   documented shape.
+ * - **upwork-api** — the GraphQL API direct, through a proxy that holds your
+ *   OAuth token but does nothing else.
  * - **manual** — text you paste in. Nothing to configure, works offline,
  *   and it's what makes the app usable the minute you install it.
  *
@@ -21,11 +24,13 @@
  * it's why the manual and bridge paths exist.
  */
 import type { Criteria, Job, SourceConfig } from '../../lib/types'
+import { fetchBridgeJobs } from './bridge'
 import { requestJson, requestText } from '../http'
 import { dedupeJobs, normaliseJob, type RawJob } from './normalise'
 import { looksLikeFeed, parseFeed } from './rss'
 import { fetchFromApi } from './upworkApi'
 
+export { bridgeBase, bridgeLink, fetchBridgeStatus, type BridgeStatus } from './bridge'
 export { dedupeJobs, normaliseJob } from './normalise'
 export { parseFeed, looksLikeFeed } from './rss'
 
@@ -73,6 +78,8 @@ export function parsePasted(text: string, sourceId = 'manual', now = new Date())
 
 async function fetchOne(source: SourceConfig, criteria: Criteria, signal?: AbortSignal, now = new Date()): Promise<Job[]> {
   switch (source.kind) {
+    case 'bridge':
+      return fetchBridgeJobs(source.url, criteria, { token: source.token, signal, sourceId: source.id, now })
     case 'rss': {
       // The feed is its own saved search, so the app's query is not forced
       // onto it. A token is sent when set, for a feed served via your bridge.

@@ -43,12 +43,18 @@ No account, no server: everything stays on the device.
   it waits for you rather than going out half-written.
 - **Tells you when it declined.** Every job it passed over says why: under your
   score, too many bids, already applied, out of connects.
-- **Works with nothing set up.** Paste a search or a feed in and everything
-  works. Sources are for when you want it to fetch by itself.
+- **Set up once, then just refresh.** Deploy the bridge worker and press
+  Connect once; it holds the Upwork connection and renews it, so from then on
+  the app fetches when you open it, when you come back to it, on a timer while
+  you're looking, and whenever you press Refresh. Nothing to copy, paste or
+  re-authorise — on either device.
+- **Works before that, too.** Paste a search or a feed in and everything
+  downstream behaves identically.
 - **Offline.** Jobs, letters, queue and history are on the device, so the app
   opens and stays useful in a tunnel.
 - **Moves between devices.** Copy your settings on the laptop, paste them on
-  the phone. Tokens stay on the device they were typed on.
+  the phone — bridge token included if you ask, so the second device needs no
+  setup of its own.
 
 ## Running it
 
@@ -56,22 +62,29 @@ No account, no server: everything stays on the device.
 cd apps/upscout
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 100 unit tests over the ranking, filters, letters and limits
+npm test         # 113 unit tests over the ranking, filters, letters and limits
 npm run build
 ```
 
 ## Getting jobs in
 
-The quickest start: **Search → Paste jobs in**, and paste your Upwork search
-page source or saved-search feed. Works immediately, works on a phone, works
-offline.
+**The setup worth doing once** is the bridge in
+[`connector/upwork-bridge`](connector/upwork-bridge): a ~250-line Cloudflare
+Worker that holds your Upwork API connection — the OAuth dance, the daily token
+renewals, the rotating refresh tokens — and answers `/jobs`. Deploy it, press
+**Connect Upwork** on its page, add it under **You → Sources**, press **Check
+connection**. After that, Refresh is the whole workflow, and the app also
+fetches by itself when you open it, when you come back to it, and every ten
+minutes while you're looking (**You → Refreshing** to change or switch off).
 
-For automatic fetching you need a small bridge you run yourself — a browser
-page is not allowed to fetch from `upwork.com`, which is a rule of the web
-rather than something this app can code around. There's a complete one
-(about forty lines, Cloudflare Workers) in [`connector/worker.js`](connector/worker.js),
-and the setup, the JSON contract and the Upwork API route are in
-[`docs/connector.md`](docs/connector.md).
+A browser page cannot fetch `upwork.com` directly — that's a rule of the web,
+not something this app can code around — which is why the bridge exists rather
+than a URL box. Its README has the exact commands, and
+[`docs/connector.md`](docs/connector.md) covers the JSON contract and the other
+source kinds.
+
+**Before that's up:** **Search → Paste jobs in** takes your Upwork search page
+or feed, needs no setup at all, and everything downstream is identical.
 
 ## Sending
 
@@ -95,12 +108,15 @@ src/lib/          the parts that decide things, all pure and all tested
   template.ts     the little {{placeholder}} language and letter drafting
   autoApply.ts    the plan: what would be sent, what wouldn't, and why
   store.ts        device storage, defensive about anything read back
+  refresh.ts      when to fetch without being asked
   text.ts         word matching that survives "Node.js" vs "nodejs"
 src/services/     talking to the outside world
-  sources/        RSS, JSON bridges, the Upwork API, pasted text → one shape
+  sources/        the bridge, RSS, JSON, the Upwork API, pasted text → one shape
   submit.ts       manual and bridge sending
 src/components/   the screens
-connector/        a bridge you can deploy
+connector/
+  upwork-bridge/  the worker that holds the Upwork connection
+  feed-passthrough-worker.js   the CORS half of it, for a plain feed
 ```
 
 The rule the layout follows: anything that makes a decision is a pure function

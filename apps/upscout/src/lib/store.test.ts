@@ -60,4 +60,14 @@ describe('export and import', () => {
     expect(back.sources[0].token).toBeUndefined()
     expect(back.jobs).toEqual([])
   })
+
+  it('carries the tokens when asked, for your own second device', () => {
+    const state = defaultState()
+    state.sources = [{ id: 's1', kind: 'bridge', label: 'Bridge', enabled: true, url: 'https://example.com', token: 'secret' }]
+    state.autoApply.submitToken = 'secret'
+
+    const back = importState(exportState(state, { includeTokens: true }))
+    expect(back.sources[0].token).toBe('secret')
+    expect(back.autoApply.submitToken).toBe('secret')
+  })
 })

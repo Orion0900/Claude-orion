@@ -16,6 +16,7 @@ import TemplateEditor from './components/TemplateEditor'
 import Toast from './components/Toast'
 import { applicationsFromPlan, draftApplication, planAutoApply } from './lib/autoApply'
 import { filterJobs } from './lib/criteria'
+import { liveSources, shouldAutoRefresh } from './lib/refresh'
 import { rankJobs, type ScoredJob } from './lib/scoring'
 import { createLocalStore, MAX_APPLICATIONS, type AppState } from './lib/store'
 import type { Application, Job } from './lib/types'
@@ -45,6 +46,10 @@ export default function App() {
   const [clock, setClock] = useState(() => Date.now())
   const inFlight = useRef<AbortController | null>(null)
   const contentRef = useRef<HTMLElement>(null)
+  // When a fetch was last *attempted*, success or not, so a bridge that's
+  // down is retried on the same schedule rather than every tick.
+  const attemptedAt = useRef(0)
+  const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState === 'visible')
 
   useEffect(() => {
     try {
@@ -57,6 +62,17 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => setClock(Date.now()), 60_000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Coming back to the app is the moment a stale list matters most, so it
+  // counts as a tick as well as a change of visibility.
+  useEffect(() => {
+    const onVisibility = () => {
+      setVisible(document.visibilityState === 'visible')
+      setClock(Date.now())
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
 
   // A new tab starts at its top, rather than wherever the last one was left.
@@ -95,13 +111,21 @@ export default function App() {
     [state.applications],
   )
 
-  const refresh = useCallback(async () => {
-    const usable = state.sources.filter((source) => source.enabled && source.kind !== 'manual' && source.url.trim())
+  /**
+   * Fetch everything. `silent` is for the automatic runs: they say nothing
+   * unless something actually arrived or a source broke, because a toast
+   * every ten minutes is just noise.
+   */
+  const refresh = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+    const usable = liveSources(state.sources)
     if (usable.length === 0) {
-      setToast({ text: 'No live source set up yet — add one, or paste jobs in Search.', tone: 'bad' })
+      if (silent) return
+      setToast({ text: 'No live source set up yet — set up the bridge, or paste jobs in Search.', tone: 'bad' })
       setTab('settings')
       return
     }
+    attemptedAt.current = Date.now()
     inFlight.current?.abort()
     const controller = new AbortController()
     inFlight.current = controller
@@ -117,15 +141,41 @@ export default function App() {
       const added = outcome.jobs.filter((job) => !before.has(job.id)).length
       update({ jobs: outcome.jobs, lastFetchedAt: new Date().toISOString() })
       const failed = outcome.results.filter((result) => result.error)
-      setToast(
-        failed.length
-          ? { text: `${failed.length} source${failed.length > 1 ? 's' : ''} failed — see Settings.`, tone: 'bad' }
-          : { text: added ? `${added} new job${added === 1 ? '' : 's'}.` : 'Nothing new since last time.', tone: 'ok' },
-      )
+      if (failed.length) {
+        setToast({ text: `${failed.length} source${failed.length > 1 ? 's' : ''} failed — see You → Sources.`, tone: 'bad' })
+      } else if (added) {
+        setToast({ text: `${added} new job${added === 1 ? '' : 's'}.`, tone: 'ok' })
+      } else if (!silent) {
+        setToast({ text: 'Nothing new since last time.', tone: 'ok' })
+      }
     } finally {
       if (!controller.signal.aborted) setFetching(false)
     }
-  }, [state.sources, state.criteria, state.jobs, update])
+  },
+    [state.sources, state.criteria, state.jobs, update],
+  )
+
+  /**
+   * The automatic pull. Everything about whether it's due lives in
+   * shouldAutoRefresh; this only adds "and we didn't just try", so a bridge
+   * that's down is retried on the interval rather than on every tick.
+   */
+  useEffect(() => {
+    const due = shouldAutoRefresh({
+      sources: state.sources,
+      lastFetchedAt: state.lastFetchedAt,
+      everyMinutes: state.autoRefreshMinutes,
+      fetching,
+      visible,
+      now: new Date(clock),
+    })
+    if (!due) return
+    if (Date.now() - attemptedAt.current < state.autoRefreshMinutes * 60_000) return
+    // Not while you're editing a source: a half-typed URL would fetch and
+    // fail, and be reported as though something were wrong.
+    if (tab === 'settings') return
+    void refresh({ silent: true })
+  }, [clock, visible, fetching, tab, state.sources, state.lastFetchedAt, state.autoRefreshMinutes, refresh])
 
   const addJobs = useCallback(
     (jobs: Job[]) => {
@@ -237,7 +287,7 @@ export default function App() {
           </span>
           <span className="brand-name">UpScout</span>
         </div>
-        <button className="ghost" onClick={refresh} disabled={fetching}>
+        <button className="ghost" onClick={() => void refresh()} disabled={fetching}>
           {fetching ? 'Fetching…' : 'Refresh'}
         </button>
       </header>
@@ -268,7 +318,8 @@ export default function App() {
             lastFetchedAt={state.lastFetchedAt}
             fetching={fetching}
             criteria={state.criteria}
-            onRefresh={refresh}
+            onRefresh={() => void refresh()}
+            now={new Date(clock)}
             onOpen={setOpenJobId}
             onEditCriteria={() => setTab('search')}
           />

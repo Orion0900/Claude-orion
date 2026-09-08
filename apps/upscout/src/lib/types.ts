@@ -138,7 +138,7 @@ export interface Weights {
   fit: number
 }
 
-export type SourceKind = 'rss' | 'json' | 'upwork-api' | 'manual'
+export type SourceKind = 'bridge' | 'rss' | 'json' | 'upwork-api' | 'manual'
 
 export interface SourceConfig {
   id: string

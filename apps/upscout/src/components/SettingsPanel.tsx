@@ -6,10 +6,11 @@
  * first thing worth changing when the order looks wrong.
  */
 import { useState } from 'react'
+import { REFRESH_CHOICES } from '../lib/refresh'
 import { exportState, importState, type AppState } from '../lib/store'
 import { parseTerms } from '../lib/text'
 import type { SourceConfig, SourceKind, Weights } from '../lib/types'
-import type { SourceResult } from '../services/sources'
+import { bridgeLink, fetchBridgeStatus, type SourceResult } from '../services/sources'
 
 const WEIGHT_LABELS: { key: keyof Weights; label: string; describes: string }[] = [
   { key: 'pay', label: 'Pay', describes: 'Rate or budget against your target' },
@@ -21,9 +22,10 @@ const WEIGHT_LABELS: { key: keyof Weights; label: string; describes: string }[] 
 ]
 
 const SOURCE_KINDS: { value: SourceKind; label: string }[] = [
+  { value: 'bridge', label: 'UpScout bridge — set up once, then it just refreshes' },
   { value: 'rss', label: 'Saved-search feed (RSS)' },
-  { value: 'json', label: 'Bridge returning JSON' },
-  { value: 'upwork-api', label: 'Upwork API (through a proxy)' },
+  { value: 'json', label: 'Any endpoint returning JSON jobs' },
+  { value: 'upwork-api', label: 'Upwork GraphQL API through a plain proxy' },
 ]
 
 export default function SettingsPanel({
@@ -40,11 +42,34 @@ export default function SettingsPanel({
   onNotify: (text: string, tone: 'ok' | 'bad') => void
 }) {
   const [importText, setImportText] = useState('')
+  // Connection checks, per source, so one bridge saying "not connected yet"
+  // doesn't look like a verdict on the others.
+  const [checks, setChecks] = useState<Record<string, { text: string; tone: 'ok' | 'bad' | 'busy' }>>({})
+  const [includeTokens, setIncludeTokens] = useState(false)
   const { profile, weights, sources, autoApply } = state
 
   const setProfile = (change: Partial<typeof profile>) => onChange({ profile: { ...profile, ...change } })
   const setSource = (id: string, change: Partial<SourceConfig>) =>
     onChange({ sources: sources.map((source) => (source.id === id ? { ...source, ...change } : source)) })
+
+  /** Asks the bridge whether it's connected to Upwork, and says so plainly. */
+  const check = async (source: SourceConfig) => {
+    setChecks((previous) => ({ ...previous, [source.id]: { text: 'Checking…', tone: 'busy' } }))
+    try {
+      const status = await fetchBridgeStatus(source.url, source.token)
+      setChecks((previous) => ({
+        ...previous,
+        [source.id]: status.connected
+          ? { text: 'Connected to Upwork. Refresh will pull live jobs.', tone: 'ok' }
+          : { text: 'The bridge is up but not connected to Upwork yet — press Connect.', tone: 'bad' },
+      }))
+    } catch (error) {
+      setChecks((previous) => ({
+        ...previous,
+        [source.id]: { text: error instanceof Error ? error.message : String(error), tone: 'bad' },
+      }))
+    }
+  }
 
   const addSource = () =>
     onChange({
@@ -52,7 +77,7 @@ export default function SettingsPanel({
         ...sources,
         {
           id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-          kind: 'rss',
+          kind: 'bridge',
           label: `Source ${sources.length + 1}`,
           enabled: true,
           url: '',
@@ -61,7 +86,7 @@ export default function SettingsPanel({
     })
 
   const copyExport = async () => {
-    const json = exportState(state)
+    const json = exportState(state, { includeTokens })
     try {
       await navigator.clipboard.writeText(json)
       onNotify('Settings copied — paste them into the other device.', 'ok')
@@ -197,9 +222,10 @@ export default function SettingsPanel({
       <fieldset>
         <legend>Sources</legend>
         <p className="hint">
-          A browser can only fetch from a server that allows it, and upwork.com doesn't — so a feed URL pasted straight
-          in will usually be blocked. Either run a small bridge (there's one in <code>connector/worker.js</code>, about
-          forty lines) or use the paste box under Search, which needs nothing at all.
+          A browser may only fetch from a server that permits it, and upwork.com permits nobody — so an Upwork URL
+          pasted straight in will be blocked. The way round it is the bridge in
+          <code>connector/upwork-bridge</code>: deploy it once, press Connect once, and Refresh works by itself from
+          then on, here and on your phone. Until it's up, <strong>Search → Paste jobs in</strong> needs no setup at all.
         </p>
 
         {sources.map((source) => {
@@ -244,8 +270,39 @@ export default function SettingsPanel({
                   placeholder={source.kind === 'rss' ? 'only if your bridge asks for one' : 'sent as a bearer token'}
                   onChange={(event) => setSource(source.id, { token: event.target.value })}
                 />
-                <small>Kept on this device, and left out of exported settings.</small>
+                <small>Kept on this device. Exported settings leave it out unless you ask for it below.</small>
               </label>
+              {source.kind === 'bridge' && (
+                <>
+                  <div className="actions">
+                    <button className="ghost small" onClick={() => void check(source)} disabled={!source.url.trim()}>
+                      Check connection
+                    </button>
+                    <a
+                      className="ghost small"
+                      href={bridgeLink(source.url, '/connect', source.token)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Connect Upwork
+                    </a>
+                    <a
+                      className="link"
+                      href={bridgeLink(source.url, '', source.token)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open bridge
+                    </a>
+                  </div>
+                  {checks[source.id] && (
+                    <p className={checks[source.id].tone === 'ok' ? 'hint ok' : checks[source.id].tone === 'busy' ? 'hint' : 'flag'}>
+                      {checks[source.id].text}
+                    </p>
+                  )}
+                </>
+              )}
+
               {result && (
                 <p className={result.error ? 'flag' : 'hint'}>
                   {result.error ? result.error : `Last pull: ${result.jobs.length} job${result.jobs.length === 1 ? '' : 's'}.`}
@@ -260,6 +317,27 @@ export default function SettingsPanel({
         <button className="ghost" onClick={addSource}>
           Add a source
         </button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Refreshing</legend>
+        <label className="field">
+          <span>Fetch by itself</span>
+          <select
+            value={state.autoRefreshMinutes}
+            onChange={(event) => onChange({ autoRefreshMinutes: Number(event.target.value) })}
+          >
+            {REFRESH_CHOICES.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes === 0 ? 'Only when I press Refresh' : `Every ${minutes} minutes`}
+              </option>
+            ))}
+          </select>
+          <small>
+            Also when you open the app or come back to it. Nothing is fetched while the app is in the background, so
+            this costs you nothing when you're not looking.
+          </small>
+        </label>
       </fieldset>
 
       <fieldset>
@@ -291,14 +369,24 @@ export default function SettingsPanel({
       <fieldset>
         <legend>Move this to another device</legend>
         <p className="hint">
-          Settings, letters and history as a block of text — copy it on the laptop, paste it on the phone. Tokens and
-          cached jobs are left out.
+          Settings, letters and history as a block of text — copy it on the laptop, paste it on the phone. Cached jobs
+          are left out; they belong to the device that fetched them.
         </p>
         <div className="actions">
           <button className="ghost" onClick={copyExport}>
             Copy my settings
           </button>
+          <label className="check">
+            <input type="checkbox" checked={includeTokens} onChange={(event) => setIncludeTokens(event.target.checked)} />
+            <span>Include bridge tokens</span>
+          </label>
         </div>
+        {includeTokens && (
+          <p className="flag">
+            This copy contains the key to your bridge. Fine for pasting into your own phone; not something to leave
+            lying around.
+          </p>
+        )}
         <textarea
           className="paste"
           rows={4}

@@ -3,6 +3,7 @@ import { EMPTY_CRITERIA } from '../../lib/criteria'
 import type { Job } from '../../lib/types'
 import { dedupeJobs, dedupeKey, normaliseJob } from './normalise'
 import { looksLikeFeed, parseFeed, parseMoneyRange } from './rss'
+import { bridgeBase, bridgeLink } from './bridge'
 import { mapApiNode } from './upworkApi'
 import { parsePasted, withQuery } from './index'
 
@@ -224,5 +225,32 @@ describe('withQuery', () => {
 
   it('leaves a URL it cannot parse alone', () => {
     expect(withQuery('not a url', EMPTY_CRITERIA)).toBe('not a url')
+  })
+})
+
+describe('bridgeBase', () => {
+  it('accepts every shape of the same URL', () => {
+    for (const written of [
+      'https://b.workers.dev',
+      'https://b.workers.dev/',
+      'https://b.workers.dev/jobs',
+      '  https://b.workers.dev/status  ',
+      'https://b.workers.dev/connect',
+    ]) {
+      expect(bridgeBase(written)).toBe('https://b.workers.dev')
+    }
+  })
+
+  it('leaves a path that isn’t one of the bridge’s own routes', () => {
+    expect(bridgeBase('https://b.workers.dev/upwork/')).toBe('https://b.workers.dev/upwork')
+  })
+})
+
+describe('bridgeLink', () => {
+  it('carries the secret on a link, since a redirect cannot carry a header', () => {
+    expect(bridgeLink('https://b.workers.dev/jobs', '/connect', 'hunter2')).toBe(
+      'https://b.workers.dev/connect?key=hunter2',
+    )
+    expect(bridgeLink('https://b.workers.dev', '')).toBe('https://b.workers.dev')
   })
 })
