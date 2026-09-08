@@ -36,6 +36,12 @@ app.use('/api', (req, res, next) => {
   res.setHeader('access-control-allow-origin', req.headers.origin ?? '*')
   res.setHeader('access-control-allow-methods', 'GET,POST,DELETE,OPTIONS')
   res.setHeader('access-control-allow-headers', 'content-type')
+  // The bookmarklet calls this API from youtube.com. When PodBrief is hosted
+  // on a home machine, that is a public page reaching a private address, which
+  // Chrome blocks under Private Network Access unless this is answered.
+  if (req.headers['access-control-request-private-network'] === 'true') {
+    res.setHeader('access-control-allow-private-network', 'true')
+  }
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
 })

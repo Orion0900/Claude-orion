@@ -29,7 +29,12 @@ with timestamps, in a couple of minutes — on your phone, as an app.
    timestamped transcript produces: a TL;DR, every key point with detail and a
    timestamp, chapters, quotes, action items, and everything mentioned.
    Timestamps deep-link back into YouTube or Spotify at that moment.
-4. **Installs on an iPhone.** It's a Progressive Web App: Safari → Share →
+4. **One tap from YouTube, once set up.** Settings offers a bookmarklet: with
+   an episode's transcript panel open in Safari, tapping it reads the
+   transcript, creates the job, and opens the finished summary. No copying,
+   no app switching. It works because the API allows the cross-origin call
+   from youtube.com.
+5. **Installs on an iPhone.** It's a Progressive Web App: Safari → Share →
    Add to Home Screen. Full screen, its own icon, and finished summaries are
    kept on the device so they open offline.
 
@@ -140,6 +145,7 @@ server/
 web/
   src/              React PWA: paste, progress, summary, history, settings
   src/captions.ts   phone-side caption fetch through mirrors when the server is blocked
+  src/bookmarklet.ts the one-tap grab that runs on youtube.com
   public/           manifest, service worker, icons (scripts/make-icons.mjs)
 ```
 

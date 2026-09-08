@@ -99,7 +99,10 @@ export function TranscriptForm({
         autoCapitalize="off"
         autoCorrect="off"
       />
-      <p className="muted small">Timestamps are kept, so the summary can still point at the moment.</p>
+      <p className="muted small">
+        Timestamps are kept, so the summary can still point at the moment. Tired of copying?{' '}
+        <a href="#/settings">Set up the one-tap bookmarklet</a>.
+      </p>
       <button className="primary wide" disabled={text.trim().length < 200 || auto === 'sending'} onClick={() => void submitManual()}>
         Summarize this transcript
       </button>

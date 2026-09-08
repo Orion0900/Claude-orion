@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, getApiBase, setApiBase } from '../api'
 import type { Health } from '../types'
+import { Bookmarklet } from './Bookmarklet'
 
 export function Settings() {
   const [base, setBase] = useState(getApiBase())
@@ -60,6 +61,8 @@ export function Settings() {
           <p className="muted small">Model: {health.model}</p>
         </section>
       )}
+
+      <Bookmarklet />
 
       <section className="card">
         <h3>Install on iPhone</h3>
