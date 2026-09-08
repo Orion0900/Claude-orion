@@ -5,6 +5,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { JobStore } from './jobs.js'
 import type { Summarizer } from './lib/summarize.js'
 
+const YT = 'dQw4w9WgXcQ'
+const ytPlayer = {
+  playabilityStatus: { status: 'OK' },
+  videoDetails: { videoId: YT, title: 'Why We Sleep (video)', author: 'Huberman Lab', lengthSeconds: '3600', shortDescription: 'Sleep on YouTube.', thumbnail: { thumbnails: [{ url: 'thumb', width: 320 }] } },
+  captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ baseUrl: 'https://www.youtube.com/api/timedtext?v=x&lang=en', languageCode: 'en' }] } },
+}
+const ytJson3 = JSON.stringify({ events: Array.from({ length: 80 }, (_, i) => ({ tStartMs: i * 30000, dDurationMs: 4000, segs: [{ utf8: `Sleep fact number ${i} about glucose and memory consolidation.` }] })) })
+
 const EP = '4rOoJ6Egrf8K2IrywzwOMk'
 
 const pageHtml = `<html><head>
@@ -38,7 +46,7 @@ function fakeFetch(routes: Record<string, string | (() => Response)>): typeof fe
 const summarizer: Summarizer = {
   async summarize(input) {
     expect(input.showName).toBe('Huberman Lab')
-    expect(input.transcript).toContain('[0:00] Host: Sleep fact number 0')
+    expect(input.transcript).toMatch(/\[0:00\] (Host: )?Sleep fact number 0/)
     return {
       model: 'test-model',
       usage: { input: 1, output: 1 },
@@ -58,16 +66,24 @@ async function waitFor(store: JobStore, id: string, stages: string[]) {
 
 describe('JobStore pipeline', () => {
   let dir: string
+  let stores: JobStore[]
+  const mk = (opts: Omit<ConstructorParameters<typeof JobStore>[0], 'file'>) => {
+    const store = new JobStore({ file: join(dir, 'jobs.json'), ...opts })
+    stores.push(store)
+    return store
+  }
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'jobs-'))
+    stores = []
   })
   afterEach(async () => {
+    // Let any in-flight save land before the directory goes away.
+    await Promise.all(stores.map((s) => s.flush()))
     await rm(dir, { recursive: true, force: true })
   })
 
   it('goes from Spotify link to summary using a feed transcript', async () => {
-    const store = new JobStore({
-      file: join(dir, 'jobs.json'),
+    const store = mk({
       summarizer,
       fetch: fakeFetch({
         [`https://open.spotify.com/episode/${EP}`]: pageHtml,
@@ -91,13 +107,12 @@ describe('JobStore pipeline', () => {
     await store.flush()
     const persisted = JSON.parse(await readFile(join(dir, 'jobs.json'), 'utf8'))
     expect(persisted).toHaveLength(1)
-    const again = new JobStore({ file: join(dir, 'jobs.json'), summarizer, fetch: fakeFetch({}) })
+    const again = mk({ summarizer, fetch: fakeFetch({}) })
     expect((await again.get(job.id))?.stage).toBe('done')
   })
 
   it('asks for a source when the directory has no match, then continues', async () => {
-    const store = new JobStore({
-      file: join(dir, 'jobs.json'),
+    const store = mk({
       summarizer,
       fetch: fakeFetch({
         [`https://open.spotify.com/episode/${EP}`]: pageHtml,
@@ -117,17 +132,57 @@ describe('JobStore pipeline', () => {
     expect(done.stage).toBe('done')
   })
 
+  it('summarizes a YouTube link from its captions with no transcription service', async () => {
+    const store = mk({
+      summarizer,
+      youtubeMirrors: [],
+      fetch: fakeFetch({
+        'https://www.youtube.com/watch': `<script>var ytInitialPlayerResponse = ${JSON.stringify(ytPlayer)};</script>`,
+        'https://www.youtube.com/api/timedtext': ytJson3,
+      }),
+    })
+    const job = await store.create(`https://youtu.be/${YT}?si=share`)
+    const done = await waitFor(store, job.id, ['done', 'failed'])
+    expect(done.error).toBeUndefined()
+    expect(done.stage).toBe('done')
+    expect(done.episode).toMatchObject({ source: 'youtube', id: YT, title: 'Why We Sleep (video)', showName: 'Huberman Lab', url: `https://www.youtube.com/watch?v=${YT}` })
+    expect(done.transcriptSource).toBe('youtube')
+    expect(done.transcriptWords).toBeGreaterThan(500)
+  })
+
+  it('pauses for a transcript when YouTube blocks the server, then accepts one from the phone', async () => {
+    const store = mk({
+      summarizer,
+      youtubeMirrors: [],
+      fetch: fakeFetch({
+        'https://www.youtube.com/watch': () => new Response('', { status: 429 }),
+        'https://www.youtube.com/youtubei': () => new Response('', { status: 429 }),
+        'https://www.youtube.com/oembed': JSON.stringify({ title: 'Why We Sleep (video)', author_name: 'Huberman Lab' }),
+      }),
+    })
+    const job = await store.create(`https://www.youtube.com/watch?v=${YT}`)
+    const waiting = await waitFor(store, job.id, ['needs_transcript', 'failed'])
+    expect(waiting.stage).toBe('needs_transcript')
+    expect(waiting.episode?.title).toBe('Why We Sleep (video)')
+
+    await expect(store.provideTranscript(job.id, 'too short', undefined, 'phone')).rejects.toThrow(/too short/)
+    const vtt = 'WEBVTT\n\n' + Array.from({ length: 80 }, (_, i) => `00:${String(i).padStart(2, '0')}:00.000 --> 00:${String(i).padStart(2, '0')}:04.000\nSleep fact number ${i} about glucose and memory consolidation.\n`).join('\n')
+    await store.provideTranscript(job.id, vtt, 'vtt', 'phone')
+    const done = await waitFor(store, job.id, ['done', 'failed'])
+    expect(done.stage).toBe('done')
+    expect(done.transcriptSource).toBe('phone')
+  })
+
   it('fails clearly on non-episode links', async () => {
-    const store = new JobStore({ file: join(dir, 'jobs.json'), summarizer, fetch: fakeFetch({}) })
+    const store = mk({ summarizer, fetch: fakeFetch({}) })
     const show = await store.create(`https://open.spotify.com/show/${EP}`)
     expect((await waitFor(store, show.id, ['failed'])).error).toMatch(/whole show/)
     const junk = await store.create('https://example.com/nothing')
-    expect((await waitFor(store, junk.id, ['failed'])).error).toMatch(/Spotify link/)
+    expect((await waitFor(store, junk.id, ['failed'])).error).toMatch(/YouTube or Spotify link/)
   })
 
   it('fails when there is no transcript and no transcription service', async () => {
-    const store = new JobStore({
-      file: join(dir, 'jobs.json'),
+    const store = mk({
       summarizer,
       fetch: fakeFetch({
         [`https://open.spotify.com/episode/${EP}`]: pageHtml,

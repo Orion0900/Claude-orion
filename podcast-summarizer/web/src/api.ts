@@ -40,5 +40,7 @@ export const api = {
   createJob: (url: string) => request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify({ url }) }),
   provideSource: (id: string, source: { feedUrl?: string; audioUrl?: string }) =>
     request<Job>(`/api/jobs/${id}/source`, { method: 'POST', body: JSON.stringify(source) }),
+  provideTranscript: (id: string, text: string, format: string | undefined, source: 'phone' | 'manual') =>
+    request<Job>(`/api/jobs/${id}/transcript`, { method: 'POST', body: JSON.stringify({ text, format, source }) }),
   deleteJob: (id: string) => request<void>(`/api/jobs/${id}`, { method: 'DELETE' }),
 }

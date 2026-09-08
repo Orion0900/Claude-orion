@@ -20,11 +20,13 @@ const store = new JobStore({
   spotify,
   assemblyAiKey: process.env.ASSEMBLYAI_API_KEY,
   openAiKey: process.env.OPENAI_API_KEY,
+  youtubeMirrors: process.env.YOUTUBE_MIRRORS?.split(',').map((s) => s.trim()).filter(Boolean),
 })
 
 const app = express()
 app.disable('x-powered-by')
-app.use(express.json({ limit: '64kb' }))
+// Pasted transcripts of long episodes can run to a few MB.
+app.use(express.json({ limit: '8mb' }))
 
 // The PWA may be served from elsewhere (GitHub Pages, a dev server); let it call us.
 app.use('/api', (req, res, next) => {
@@ -80,6 +82,20 @@ app.post('/api/jobs/:id/source', async (req, res) => {
   }
 })
 
+app.post('/api/jobs/:id/transcript', async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text : ''
+  const format = typeof req.body?.format === 'string' ? req.body.format : undefined
+  const source = req.body?.source === 'phone' ? 'phone' : 'manual'
+  if (text.trim().length < 200) return res.status(400).json({ error: 'Send the transcript as { "text": "…" }' })
+  try {
+    const job = await store.provideTranscript(req.params.id, text, format, source)
+    if (!job) return res.status(404).json({ error: 'No such job' })
+    res.status(202).json(job)
+  } catch (err) {
+    res.status(409).json({ error: (err as Error).message })
+  }
+})
+
 app.delete('/api/jobs/:id', async (req, res) => {
   res.status((await store.remove(req.params.id)) ? 204 : 404).end()
 })
@@ -97,5 +113,5 @@ if (existsSync(join(webDir, 'index.html'))) {
 app.listen(port, '0.0.0.0', () => {
   console.log(`Podcast summarizer listening on http://0.0.0.0:${port}`)
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) console.warn('ANTHROPIC_API_KEY is not set; summaries will fail.')
-  if (!process.env.ASSEMBLYAI_API_KEY && !process.env.OPENAI_API_KEY) console.warn('No transcription key set; only feeds that publish transcripts will work.')
+  if (!process.env.ASSEMBLYAI_API_KEY && !process.env.OPENAI_API_KEY) console.warn('No transcription key set; YouTube links work, Spotify links only when the feed publishes transcripts.')
 })

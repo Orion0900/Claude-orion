@@ -13,8 +13,9 @@ end at your door.
 > [EasyPedal](easypedal/) — the easiest bike ride from A to B, on bike lanes or
 > away from hills, never a highway, with LoopMaker's map and navigation. Ships
 > at `/easypedal/` on the same site. See [easypedal/README.md](easypedal/README.md).
-> [PodBrief](podcast-summarizer/) — paste a Spotify podcast link, get every
-> point from the episode summarized, installable on an iPhone. See
+> [PodBrief](podcast-summarizer/) — paste a YouTube or Spotify podcast link,
+> get every point from the episode summarized (YouTube captions make it free),
+> installable on an iPhone. See
 > [podcast-summarizer/README.md](podcast-summarizer/README.md).
 
 ## What it does

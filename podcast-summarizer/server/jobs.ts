@@ -1,21 +1,42 @@
 /**
- * A job is one "summarize this Spotify link" request. Jobs run in the
- * background and the phone polls for progress; that keeps a slow transcription
- * from being tied to an HTTP request that iOS Safari would happily drop the
- * moment the screen locks.
+ * A job is one "summarize this link" request. Jobs run in the background and
+ * the phone polls for progress; that keeps a slow step from being tied to an
+ * HTTP request that iOS Safari would drop the moment the screen locks.
+ *
+ * Two kinds of link are accepted:
+ *   - YouTube: captions are read straight from YouTube. Free, no audio.
+ *   - Spotify: the episode's RSS feed is found and the audio transcribed.
  *
  * Finished jobs are written to a JSON file so summaries survive a restart.
  */
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { EpisodeMeta } from './lib/spotify.js'
 import { expandShortLink, fetchEpisodeMeta, isSpotifyShortLink, parseSpotifyUrl, type SpotifyCredentials } from './lib/spotify.js'
 import { fetchFeed, matchEpisode, pickFeed, searchFeeds, type FeedItem } from './lib/feeds.js'
-import { fetchFeedTranscript, renderTranscript, transcribeWithAssemblyAI, transcribeWithOpenAI, wordCount, type Transcript } from './lib/transcribe.js'
+import { fetchFeedTranscript, parseTranscriptFile, renderTranscript, transcribeWithAssemblyAI, transcribeWithOpenAI, wordCount, type Segment } from './lib/transcribe.js'
+import { fetchYouTube, parseYouTubeUrl } from './lib/youtube.js'
 import type { Summarizer, Summary } from './lib/summarize.js'
 
-export type Stage = 'queued' | 'resolving' | 'finding_audio' | 'needs_source' | 'transcribing' | 'summarizing' | 'done' | 'failed'
+export type Stage = 'queued' | 'resolving' | 'finding_audio' | 'needs_source' | 'needs_transcript' | 'transcribing' | 'summarizing' | 'done' | 'failed'
+
+export type TranscriptSource = 'youtube' | 'feed' | 'assemblyai' | 'openai' | 'phone' | 'manual'
+
+/** What the UI needs to know about the thing being summarized, whatever its origin. */
+export interface Episode {
+  source: 'youtube' | 'spotify'
+  id: string
+  title: string
+  description: string
+  /** Podcast show, or YouTube channel. */
+  showName?: string
+  publisher?: string
+  publishedAt?: string
+  durationMs?: number
+  imageUrl?: string
+  /** Link back to the episode. Timestamps are appended by the client. */
+  url: string
+}
 
 export interface Job {
   id: string
@@ -25,10 +46,10 @@ export interface Job {
   stage: Stage
   /** Human-readable line for the progress screen. */
   message: string
-  episode?: EpisodeMeta
+  episode?: Episode
   feedUrl?: string
   audioUrl?: string
-  transcriptSource?: Transcript['source']
+  transcriptSource?: TranscriptSource
   transcriptWords?: number
   summary?: Summary
   model?: string
@@ -41,12 +62,22 @@ export interface JobStoreOptions {
   spotify?: SpotifyCredentials
   assemblyAiKey?: string
   openAiKey?: string
+  youtubeMirrors?: string[]
   fetch?: typeof fetch
 }
+
+interface Resume {
+  feedUrl?: string
+  audioUrl?: string
+  transcript?: { segments: Segment[]; source: TranscriptSource }
+}
+
+const WAITING: Stage[] = ['needs_source', 'needs_transcript']
 
 export class JobStore {
   private jobs = new Map<string, Job>()
   private loaded: Promise<void>
+  private writing: Promise<void> = Promise.resolve()
 
   constructor(private opts: JobStoreOptions) {
     this.loaded = this.load()
@@ -57,7 +88,7 @@ export class JobStore {
       const raw = JSON.parse(await readFile(this.opts.file, 'utf8')) as Job[]
       for (const job of raw) {
         // Anything that was mid-flight when the process died is not coming back.
-        if (job.stage !== 'done' && job.stage !== 'failed' && job.stage !== 'needs_source') {
+        if (job.stage !== 'done' && job.stage !== 'failed' && !WAITING.includes(job.stage)) {
           job.stage = 'failed'
           job.error = 'The server restarted while this was running.'
         }
@@ -67,8 +98,6 @@ export class JobStore {
       /* first run */
     }
   }
-
-  private writing: Promise<void> = Promise.resolve()
 
   /**
    * Saves are serialized and written to a temp file first, so two updates
@@ -128,34 +157,97 @@ export class JobStore {
   async provideSource(id: string, source: { feedUrl?: string; audioUrl?: string }): Promise<Job | undefined> {
     const job = await this.get(id)
     if (!job) return undefined
-    if (job.stage !== 'needs_source' && job.stage !== 'failed') throw new Error('This job is not waiting for a source.')
+    if (!WAITING.includes(job.stage) && job.stage !== 'failed') throw new Error('This job is not waiting for input.')
     this.update(job, { stage: 'finding_audio', message: 'Using the link you provided…', error: undefined })
     void this.run(job, source)
     return job
   }
 
-  private async run(job: Job, provided?: { feedUrl?: string; audioUrl?: string }) {
+  /**
+   * A transcript arrived from outside: fetched by the phone from a mirror
+   * when this server was blocked, or pasted by hand.
+   */
+  async provideTranscript(id: string, text: string, format: string | undefined, source: TranscriptSource): Promise<Job | undefined> {
+    const job = await this.get(id)
+    if (!job) return undefined
+    if (!WAITING.includes(job.stage) && job.stage !== 'failed') throw new Error('This job is not waiting for input.')
+    const segments = parseTranscriptFile(text, format)
+    if (wordCount(segments) < 50) throw new Error('That transcript is too short to be the episode.')
+    this.update(job, { stage: 'summarizing', message: 'Got the transcript…', error: undefined })
+    void this.run(job, { transcript: { segments, source } })
+    return job
+  }
+
+  private async run(job: Job, resume: Resume = {}) {
     const fetchImpl = this.opts.fetch ?? fetch
     try {
-      // 1. What episode is this?
+      let transcript = resume.transcript
+      let item: FeedItem | undefined
+
+      // 1. What is this, and (for YouTube) can we read its captions right away?
       if (!job.episode) {
-        this.update(job, { stage: 'resolving', message: 'Reading the Spotify link…' })
+        this.update(job, { stage: 'resolving', message: 'Reading the link…' })
         let input = job.input
         if (isSpotifyShortLink(input)) input = await expandShortLink(input, fetchImpl)
-        const ref = parseSpotifyUrl(input)
-        if (!ref) throw new Error('That does not look like a Spotify link. Paste a link to a podcast episode.')
-        if (ref.kind === 'show') throw new Error('That is a link to a whole show. Open an episode and share that link instead.')
-        const episode = await fetchEpisodeMeta(ref.id, { fetch: fetchImpl, credentials: this.opts.spotify })
-        this.update(job, { episode, message: `Found “${episode.title}”` })
+        const yt = parseYouTubeUrl(input)
+        const sp = parseSpotifyUrl(input)
+        if (yt) {
+          const result = await fetchYouTube(yt.videoId, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors })
+          const m = result.meta
+          const episode: Episode = {
+            source: 'youtube',
+            id: m.videoId,
+            title: m.title,
+            description: m.description ?? '',
+            showName: m.channel,
+            publishedAt: m.publishedAt,
+            durationMs: m.durationMs,
+            imageUrl: m.thumbnailUrl,
+            url: m.url,
+          }
+          this.update(job, { episode, message: `Found “${episode.title}”` })
+          if (result.segments) transcript = { segments: result.segments, source: 'youtube' }
+          else {
+            this.update(job, { stage: 'needs_transcript', message: result.blocked ?? 'Captions unavailable.' })
+            return
+          }
+        } else if (sp) {
+          if (sp.kind === 'show') throw new Error('That is a link to a whole show. Open an episode and share that link instead.')
+          const m = await fetchEpisodeMeta(sp.id, { fetch: fetchImpl, credentials: this.opts.spotify })
+          const episode: Episode = {
+            source: 'spotify',
+            id: m.spotifyId,
+            title: m.title,
+            description: m.description,
+            showName: m.showName,
+            publisher: m.publisher,
+            publishedAt: m.publishedAt,
+            durationMs: m.durationMs,
+            imageUrl: m.imageUrl,
+            url: m.spotifyUrl,
+          }
+          this.update(job, { episode, message: `Found “${episode.title}”` })
+        } else {
+          throw new Error('That does not look like a YouTube or Spotify link. Share an episode from either app and paste the link.')
+        }
       }
       const episode = job.episode!
 
-      // 2. Where is the audio?
-      let item: FeedItem | undefined
-      let audioUrl = provided?.audioUrl ?? job.audioUrl
-      if (!audioUrl) {
+      if (!transcript && episode.source === 'youtube') {
+        // Resumed without a transcript: the caller wants another server-side try.
+        const result = await fetchYouTube(episode.id, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors })
+        if (!result.segments) {
+          this.update(job, { stage: 'needs_transcript', message: result.blocked ?? 'Captions unavailable.' })
+          return
+        }
+        transcript = { segments: result.segments, source: 'youtube' }
+      }
+
+      // 2. Spotify: where is the audio?
+      let audioUrl = resume.audioUrl ?? job.audioUrl
+      if (!transcript && !audioUrl) {
         this.update(job, { stage: 'finding_audio', message: 'Looking up the show’s RSS feed…' })
-        let feedUrl = provided?.feedUrl ?? job.feedUrl
+        let feedUrl = resume.feedUrl ?? job.feedUrl
         if (!feedUrl && episode.showName) {
           const candidates = await searchFeeds(episode.showName, fetchImpl)
           feedUrl = pickFeed(candidates, episode.showName, episode.publisher)?.feedUrl
@@ -184,22 +276,30 @@ export class JobStore {
       }
 
       // 3. Words.
-      this.update(job, { stage: 'transcribing', message: 'Checking for a published transcript…' })
-      let transcript: Transcript | undefined
-      if (item && item.transcripts.length > 0) transcript = await fetchFeedTranscript(item.transcripts, fetchImpl)
       const onProgress = (message: string) => this.update(job, { message })
       if (!transcript) {
-        if (this.opts.assemblyAiKey) {
-          onProgress('Sending audio for transcription…')
-          transcript = await transcribeWithAssemblyAI(audioUrl, this.opts.assemblyAiKey, { fetch: fetchImpl, onProgress })
-        } else if (this.opts.openAiKey) {
-          transcript = await transcribeWithOpenAI(audioUrl, this.opts.openAiKey, { fetch: fetchImpl, onProgress })
-        } else {
-          throw new Error('No transcript in the feed and no transcription service configured. Set ASSEMBLYAI_API_KEY or OPENAI_API_KEY on the server.')
+        this.update(job, { stage: 'transcribing', message: 'Checking for a published transcript…' })
+        if (item && item.transcripts.length > 0) {
+          const t = await fetchFeedTranscript(item.transcripts, fetchImpl)
+          if (t) transcript = { segments: t.segments, source: 'feed' }
+        }
+        if (!transcript) {
+          if (this.opts.assemblyAiKey) {
+            onProgress('Sending audio for transcription…')
+            const t = await transcribeWithAssemblyAI(audioUrl!, this.opts.assemblyAiKey, { fetch: fetchImpl, onProgress })
+            transcript = { segments: t.segments, source: 'assemblyai' }
+          } else if (this.opts.openAiKey) {
+            const t = await transcribeWithOpenAI(audioUrl!, this.opts.openAiKey, { fetch: fetchImpl, onProgress })
+            transcript = { segments: t.segments, source: 'openai' }
+          } else {
+            throw new Error(
+              'No transcript in the feed and no transcription service configured. Share the YouTube version of this episode instead (captions are free), or set ASSEMBLYAI_API_KEY or OPENAI_API_KEY on the server.',
+            )
+          }
         }
       }
       const words = wordCount(transcript.segments)
-      if (words < 50) throw new Error('The transcript came back nearly empty. The audio link may be wrong or protected.')
+      if (words < 50) throw new Error('The transcript came back nearly empty.')
       this.update(job, { transcriptSource: transcript.source, transcriptWords: words })
 
       // 4. The summary.

@@ -52,8 +52,9 @@ export function Settings() {
           <h3>Status</h3>
           <ul className="plain status-list">
             <Row label="Claude" ok={health.providers.anthropic} note="ANTHROPIC_API_KEY missing" />
-            <Row label="Transcription (AssemblyAI)" ok={health.providers.assemblyai} />
-            <Row label="Transcription (OpenAI Whisper)" ok={health.providers.openai} />
+            <Row label="YouTube captions" ok={true} />
+            <Row label="Spotify transcription (AssemblyAI)" ok={health.providers.assemblyai} note="optional" />
+            <Row label="Spotify transcription (OpenAI Whisper)" ok={health.providers.openai} note="optional" />
             <Row label="Spotify Web API" ok={health.providers.spotifyApi} note="optional; page scraping in use" />
           </ul>
           <p className="muted small">Model: {health.model}</p>
