@@ -1,0 +1,17 @@
+{
+  "name": "PodBrief",
+  "short_name": "PodBrief",
+  "description": "Paste a Spotify podcast link, get every point from the episode summarized.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#181626",
+  "theme_color": "#181626",
+  "categories": ["productivity", "news", "education"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
