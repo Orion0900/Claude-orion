@@ -995,3 +995,16 @@ input[type='range'] {
 .finish-continue {
   margin-top: 14px;
 }
+
+/* A quiet note, for something the app did rather than something gone wrong. */
+.nav-note {
+  margin: 10px 14px 0;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: rgba(74, 222, 128, 0.16);
+  border: 1px solid rgba(74, 222, 128, 0.32);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  align-self: flex-start;
+}
