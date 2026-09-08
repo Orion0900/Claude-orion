@@ -44,6 +44,17 @@ jobs:
           mkdir -p dist/easypedal
           cp -r easypedal/dist/. dist/easypedal/
 
+      - name: Build CaddieIQ
+        working-directory: caddie
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add CaddieIQ to the site
+        run: |
+          mkdir -p dist/caddie
+          cp -r caddie/dist/. dist/caddie/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
