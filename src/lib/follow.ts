@@ -20,19 +20,36 @@ export interface RouteProgress {
   snapped: LatLng
   /** Index of the matched segment, to seed the next fix. */
   segment: number
+  /**
+   * True when this fix was matched by searching the whole route rather than
+   * near the previous one. A caller should want more than one of these in a row
+   * before believing it.
+   */
+  relocated: boolean
 }
 
 /** Beyond this you're not on the route any more, you're near it. */
 export const OFF_ROUTE_METERS = 35
 
 /**
- * When the best match near your last fix is this far away, the window is
- * probably wrong rather than you: GPS dropped out under a bridge and came back
- * half a mile along, or you rejoined the loop somewhere else entirely. At that
- * point it's better to search the whole route again than to stay anchored to a
- * position you've long since left.
+ * When the best match near your last fix is this far away, the window may be
+ * wrong rather than you: GPS dropped out under a bridge and came back half a
+ * mile along, or you rejoined the loop somewhere else entirely.
+ *
+ * The bar is high on purpose. A city loop runs along streets a block apart and
+ * often crosses itself, so a poor fix near a junction can genuinely sit closer
+ * to a different part of the route than to the part you are on. Relocating on
+ * that is what throws a runner blocks away from themselves.
  */
-export const RELOCATE_METERS = 60
+export const RELOCATE_METERS = 130
+
+/**
+ * A relocation also has to be a decisive improvement, not a marginal one — the
+ * far-off candidate must be this much closer than staying put, and close enough
+ * in absolute terms to be a real match rather than the least bad guess.
+ */
+export const RELOCATE_IMPROVEMENT = 0.4
+export const RELOCATE_MAX_DISTANCE = 45
 
 const R_EARTH = 6371008.8
 const toRad = (deg: number) => (deg * Math.PI) / 180
@@ -90,6 +107,7 @@ export function locateOnRoute(
       fraction: 0,
       snapped: path[0] ?? position,
       segment: 0,
+      relocated: false,
     }
   }
 
@@ -125,11 +143,19 @@ export function locateOnRoute(
 
   let best = search(first, last)
 
-  // Nothing near the last fix fits: re-acquire against the whole route.
+  // Nothing near the last fix fits: consider re-acquiring against the whole
+  // route, but only on overwhelming evidence.
+  let relocated = false
   const windowed = first > 0 || last < path.length - 2
   if (windowed && best.distance > RELOCATE_METERS) {
     const global = search(0, path.length - 2)
-    if (global.distance < best.distance) best = global
+    if (
+      global.distance < RELOCATE_MAX_DISTANCE &&
+      global.distance < best.distance * RELOCATE_IMPROVEMENT
+    ) {
+      best = global
+      relocated = true
+    }
   }
 
   const segmentLength = cumulative[best.index + 1] - cumulative[best.index]
@@ -142,6 +168,7 @@ export function locateOnRoute(
     fraction: total === 0 ? 0 : distanceAlong / total,
     snapped: best.snapped,
     segment: best.index,
+    relocated,
   }
 }
 

@@ -153,6 +153,7 @@ src/
     heading.ts       angle arithmetic, and choosing between compass and course
     runSummary.ts    what actually happened on a run, measured not estimated
     savedRoutes.ts   keeping routes, and recognising one you already have
+    gpsFilter.ts     refusing fixes that cannot be true
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
@@ -201,6 +202,30 @@ The check declines to answer in two cases: when the two directions are too alike
 to tell apart, which is what an out-and-back looks like; and when the runner is
 heading somewhere that is neither way round, which means they are off the route
 rather than running it backwards.
+
+### Not believing every fix
+
+Satellite accuracy collapses between tall buildings, which is exactly where
+junctions are — so the worst fixes arrive at the moment a runner turns. Three
+things keep that off the screen.
+
+Fixes the receiver is unsure of are dropped, as are jumps that would need
+impossible speed. A run of bad ones cannot freeze the map forever: after several
+refusals the next fix is taken regardless, because a stale position is worse
+than an uncertain one. Speed is only judged over intervals a real receiver
+reports at; below that the figure is arithmetic on noise.
+
+Deciding the runner is somewhere else on the route takes far more than one fix.
+A city loop runs along streets a block apart and often crosses itself, so a poor
+fix near a junction can genuinely sit closer to a different part of the route
+than the part you are on — which is how a runner ends up thrown blocks away. A
+relocation now has to be a decisive improvement, close enough in absolute terms
+to be a real match, and confirmed by a second fix that agrees.
+
+While on the route the runner is drawn *on* it rather than at the raw fix. Even
+good fixes jitter by a few metres, and a marker that twitches off the line reads
+as broken. Stray far enough and the snapping stops, which is what the off-route
+warning is for.
 
 ### Which way you're facing
 
@@ -305,7 +330,7 @@ still needs a connection.
 
 ## Tests
 
-328 unit tests covering the geodesy, ascent accumulation, turn classification,
+345 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
