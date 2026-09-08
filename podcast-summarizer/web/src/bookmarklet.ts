@@ -59,12 +59,12 @@ const SOURCE = `(async () => {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     }).then((r) => r.json());
 
-    const job = await post('/api/jobs', { url: 'https://www.youtube.com/watch?v=' + id });
-    if (!job || !job.id) throw new Error((job && job.error) || 'PodBrief did not accept the link');
-    // Give the server a moment to resolve the video before handing it words.
-    await new Promise((r) => setTimeout(r, 1500));
-    const res = await post('/api/jobs/' + job.id + '/transcript', { text: text, source: 'phone' });
-    if (res && res.error) throw new Error(res.error);
+    const job = await post('/api/jobs', {
+      url: 'https://www.youtube.com/watch?v=' + id,
+      transcript: text,
+      transcriptSource: 'phone',
+    });
+    if (!job || !job.id) throw new Error((job && job.error) || 'PodBrief did not accept the transcript');
     note('Done. Opening PodBrief…');
     location.href = BASE + '/#/job/' + job.id;
   } catch (err) {

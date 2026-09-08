@@ -19,8 +19,11 @@ describe('bookmarkletUrl', () => {
   it('leaves no placeholder behind and calls both API steps', () => {
     const code = decode('https://x.example.com')
     expect(code).not.toContain('__API_BASE__')
+    // One request carries link and transcript together, so nothing races the
+    // server's caption hunt.
     expect(code).toContain("post('/api/jobs'")
-    expect(code).toContain("'/api/jobs/' + job.id + '/transcript'")
+    expect(code).toContain('transcript: text')
+    expect(code).not.toContain("'/transcript'")
     // Newlines between a timestamp and its line must be real, not escaped:
     // the server's panel parser keys off them.
     expect(code).toContain("t.trim() + '\\n' + x.trim()")

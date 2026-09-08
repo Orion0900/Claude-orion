@@ -378,6 +378,16 @@ export interface YouTubeResult {
 }
 
 /**
+ * Title and channel only, for when the caller already has the transcript.
+ * oEmbed is public, cheap and — measured from a blocked cloud host — still
+ * served, so this costs one request instead of the whole ladder.
+ */
+export async function fetchYouTubeMeta(videoId: string, fetchImpl: Fetch = fetch): Promise<YouTubeResult> {
+  const meta = (await fetchOEmbed(videoId, fetchImpl)) ?? {}
+  return { meta: finalizeMeta({ ...meta, videoId, url: `https://www.youtube.com/watch?v=${videoId}` }), reasons: ['metadata only: transcript supplied'] }
+}
+
+/**
  * Everything we can get about a video from the server side. Always returns
  * metadata when any source responds; returns segments when captions could
  * be fetched, and otherwise a `blocked` reason so the client can take over.

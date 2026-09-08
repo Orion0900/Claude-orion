@@ -15,7 +15,7 @@ import { dirname } from 'node:path'
 import { expandShortLink, fetchEpisodeMeta, isSpotifyShortLink, parseSpotifyUrl, type SpotifyCredentials } from './lib/spotify.js'
 import { fetchFeed, matchEpisode, pickFeed, searchFeeds, type FeedItem } from './lib/feeds.js'
 import { fetchFeedTranscript, parseTranscriptFile, renderTranscript, transcribeWithAssemblyAI, transcribeWithOpenAI, wordCount, type Segment } from './lib/transcribe.js'
-import { fetchYouTube, parseYouTubeUrl, type YouTubeResult } from './lib/youtube.js'
+import { fetchYouTube, fetchYouTubeMeta, parseYouTubeUrl, type YouTubeResult } from './lib/youtube.js'
 import type { Summarizer, Summary } from './lib/summarize.js'
 
 export type Stage = 'queued' | 'resolving' | 'finding_audio' | 'needs_source' | 'needs_transcript' | 'transcribing' | 'summarizing' | 'done' | 'failed'
@@ -143,13 +143,24 @@ export class JobStore {
     void this.persist()
   }
 
-  async create(input: string): Promise<Job> {
+  /**
+   * Start a job. A caller that already holds the transcript (the bookmarklet,
+   * reading YouTube's own panel) passes it here: the caption hunt is skipped
+   * entirely, which is both faster and immune to racing the hunt.
+   */
+  async create(input: string, seed?: { text: string; format?: string; source?: TranscriptSource }): Promise<Job> {
     await this.loaded
     const now = new Date().toISOString()
     const job: Job = { id: randomUUID(), input: input.trim(), createdAt: now, updatedAt: now, stage: 'queued', message: 'Queued' }
+    let resume: Resume | undefined
+    if (seed) {
+      const segments = parseTranscriptFile(seed.text, seed.format)
+      if (wordCount(segments) < 50) throw new Error('That transcript is too short to be the episode.')
+      resume = { transcript: { segments, source: seed.source ?? 'manual' } }
+    }
     this.jobs.set(job.id, job)
     await this.persist()
-    void this.run(job)
+    void this.run(job, resume)
     return job
   }
 
@@ -170,7 +181,8 @@ export class JobStore {
   async provideTranscript(id: string, text: string, format: string | undefined, source: TranscriptSource): Promise<Job | undefined> {
     const job = await this.get(id)
     if (!job) return undefined
-    if (!WAITING.includes(job.stage) && job.stage !== 'failed') throw new Error('This job is not waiting for input.')
+    if (job.stage === 'done') throw new Error('This job already has a summary.')
+    if (job.stage === 'summarizing') throw new Error('This job is already being summarized.')
     const segments = parseTranscriptFile(text, format)
     if (wordCount(segments) < 50) throw new Error('That transcript is too short to be the episode.')
     this.update(job, { stage: 'summarizing', message: 'Got the transcript…', error: undefined })
@@ -194,7 +206,10 @@ export class JobStore {
         if (yt) {
           // A thrown error here (DNS, TLS, a mirror hanging) must still leave
           // the user with the paste route, so treat it as "blocked", not failed.
-          const result: YouTubeResult = await fetchYouTube(yt.videoId, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors }).catch((err: Error) => ({
+          const result: YouTubeResult = await (transcript
+            ? fetchYouTubeMeta(yt.videoId, fetchImpl)
+            : fetchYouTube(yt.videoId, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors })
+          ).catch((err: Error) => ({
             meta: { videoId: yt.videoId, title: `YouTube video ${yt.videoId}`, url: `https://www.youtube.com/watch?v=${yt.videoId}` },
             reasons: [err.message],
             blocked: `Couldn’t reach YouTube from the server (${err.message}).`,
@@ -213,7 +228,7 @@ export class JobStore {
           }
           this.update(job, { episode, message: `Found “${episode.title}”` })
           if (result.segments) transcript = { segments: result.segments, source: 'youtube' }
-          else {
+          else if (!transcript) {
             this.update(job, { stage: 'needs_transcript', message: result.blocked ?? 'Captions unavailable.' })
             return
           }
