@@ -31,6 +31,19 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # EasyPedal ships from the same site, one folder down, so both apps
+      # deploy from a single push with nothing to configure.
+      - name: Build EasyPedal
+        working-directory: easypedal
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add EasyPedal to the site
+        run: |
+          mkdir -p dist/easypedal
+          cp -r easypedal/dist/. dist/easypedal/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
