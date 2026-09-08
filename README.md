@@ -149,6 +149,7 @@ src/
     navigation.ts    turn instructions, distances and what to say next
     effort.ts        grade-adjusted finish-time estimate
     gestures.ts      double-tap detection, kept away from the DOM to be tested
+    direction.ts     running a loop backwards: reversing a route and spotting it
     heading.ts       angle arithmetic, and choosing between compass and course
     runSummary.ts    what actually happened on a run, measured not estimated
     savedRoutes.ts   keeping routes, and recognising one you already have
@@ -176,6 +177,30 @@ assumed wrong (signal lost under a bridge, or you rejoined the loop elsewhere)
 and the whole route is searched again.
 
 The screen is held awake while following, where the browser allows it.
+
+### Running the loop the other way
+
+A loop can be run in either direction, but it is generated in one. Set off the
+opposite way and every instruction is wrong: the turns arrive in the wrong
+order, point the wrong way, and name the wrong roads.
+
+The direction is worked out from the first real movement away from the start,
+by comparing how the runner actually moved against the two ways the route leaves
+home. When it comes out backwards the whole route is swapped for the same run
+described in reverse, and the runner is told it happened rather than left to
+wonder why the directions changed.
+
+Reversing instructions is not reversing a list. A routing engine's step carries
+a maneuver *and* the road travelled after it, so going backwards a turn keeps
+its junction but takes the *previous* step's road, and left becomes right.
+Climbing and descent swap too, since what you went up one way you come down the
+other. A roundabout's exit number is dropped rather than guessed, because
+counted from the other side it is a different exit.
+
+The check declines to answer in two cases: when the two directions are too alike
+to tell apart, which is what an out-and-back looks like; and when the runner is
+heading somewhere that is neither way round, which means they are off the route
+rather than running it backwards.
 
 ### Which way you're facing
 
@@ -280,7 +305,7 @@ still needs a connection.
 
 ## Tests
 
-299 unit tests covering the geodesy, ascent accumulation, turn classification,
+328 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.

@@ -11,6 +11,7 @@ import {
   turnAngle,
 } from '../lib/navigation'
 import { chooseHeading, headingChanged, smoothHeading } from '../lib/heading'
+import { detectDirection, type RunDirection } from '../lib/direction'
 import { watchCompass } from '../services/compass'
 import { estimateDuration } from '../lib/effort'
 import { buildRunSummary, summaryHeadline } from '../lib/runSummary'
@@ -35,6 +36,10 @@ interface NavigationViewProps {
   /** True while the runner has dragged the map away to look around. */
   browsing: boolean
   onRecenter: () => void
+  /** Told which way round the loop the runner actually set off. */
+  onDirection: (direction: RunDirection) => void
+  /** True once the instructions have been flipped to match. */
+  reversed: boolean
   /** Whether this route is already kept, and how to keep it. */
   isRouteSaved: boolean
   onToggleSaved: () => void
@@ -69,6 +74,8 @@ export function NavigationView({
   onProgress,
   browsing,
   onRecenter,
+  onDirection,
+  reversed,
   isRouteSaved,
   onToggleSaved,
   onExit,
@@ -89,6 +96,9 @@ export function NavigationView({
   const speedRef = useRef<number | null>(null)
   const derivedRef = useRef<number | null>(null)
   const shownHeadingRef = useRef<number | null>(null)
+  // Where the run began, and whether the way round has been settled yet.
+  const originRef = useRef<LatLng | null>(null)
+  const directionSettledRef = useRef(false)
   // Which maneuver has been announced at which band, so nothing repeats.
   const spokenRef = useRef(new Map<number, number>())
   const mutedRef = useRef(muted)
@@ -96,10 +106,26 @@ export function NavigationView({
 
   const cumulative = useMemo(() => cumulativeDistances(route.path), [route])
 
+  /**
+   * Once per run, not per route.
+   *
+   * Flipping the loop hands back a route with a different id. If that reset the
+   * detector, it would immediately decide the runner was going "forwards" along
+   * the flipped route and flip it back, over and over. The run is one mount of
+   * this component, so mount is the right scope.
+   */
   useEffect(() => {
     startedAtRef.current = Date.now()
     setDismissedSummary(false)
-  }, [route])
+    originRef.current = null
+    directionSettledRef.current = false
+  }, [])
+
+  // New geometry does mean progress has to be re-acquired from scratch.
+  useEffect(() => {
+    segmentRef.current = undefined
+    lastFixRef.current = null
+  }, [route.id])
 
   // A ticking clock, so elapsed time moves even when GPS is quiet.
   useEffect(() => {
@@ -146,6 +172,21 @@ export function NavigationView({
     const watch = navigator.geolocation.watchPosition(
       (fix) => {
         const here = { lat: fix.coords.latitude, lng: fix.coords.longitude }
+
+        // Which way round the loop are we actually going? Decided once, from
+        // the first real movement away from the start.
+        if (originRef.current === null) originRef.current = here
+        if (!directionSettledRef.current) {
+          const direction = detectDirection(route.path, originRef.current, here)
+          if (direction !== null) {
+            directionSettledRef.current = true
+            onDirection(direction)
+            // The route may be about to be swapped underneath us, so this fix
+            // is left to the next render rather than measured against the old one.
+            if (direction === 'reverse') return
+          }
+        }
+
         const next = locateOnRoute(route.path, here, { fromSegment: segmentRef.current }, cumulative)
         segmentRef.current = next.segment
         setError(null)
@@ -173,7 +214,7 @@ export function NavigationView({
       onPosition(null)
       onHeading(null)
     }
-  }, [route, cumulative, onPosition, onHeading, onProgress])
+  }, [route, cumulative, onPosition, onHeading, onProgress, onDirection])
 
   // Keep the screen on; not every browser allows it.
   useEffect(() => {
@@ -318,6 +359,10 @@ export function NavigationView({
           </div>
         )}
       </div>
+
+      {reversed ? (
+        <p className="nav-note">Going round the other way — directions flipped</p>
+      ) : null}
 
       {strayed && progress ? (
         <p className="nav-alert">

@@ -10,6 +10,7 @@ import {
 } from './lib/savedRoutes'
 import { SavedRoutes } from './components/SavedRoutes'
 import { requestCompassPermission } from './services/compass'
+import { reverseRoute, type RunDirection } from './lib/direction'
 import { compassLabel } from './lib/routeSearch'
 import { formatDistance } from './lib/units'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
@@ -58,6 +59,7 @@ export default function App() {
   const [heading, setHeading] = useState<number | null>(null)
   const [traveled, setTraveled] = useState(0)
   const [browsing, setBrowsing] = useState(false)
+  const [runDirection, setRunDirection] = useState<RunDirection>('forward')
 
   const store = useMemo(() => createLocalStore(), [])
   const [saved, setSaved] = useState<SavedRoute[]>(() => store.read())
@@ -184,7 +186,13 @@ export default function App() {
   useEffect(() => () => searchRef.current?.abort(), [])
 
   const selected = routes.find((route) => route.id === selectedId) ?? null
-  const following = routes.find((route) => route.id === followingId) ?? null
+  const chosen = routes.find((route) => route.id === followingId) ?? null
+  // Setting off the other way round the loop swaps in the same run described
+  // backwards, so instructions, elevation and the map all follow suit.
+  const following = useMemo(
+    () => (chosen && runDirection === 'reverse' ? reverseRoute(chosen) : chosen),
+    [chosen, runDirection],
+  )
   const cursor = selected && scrub !== null ? pointAtFraction(selected.path, scrub) : null
 
   const status = searching
@@ -199,6 +207,7 @@ export default function App() {
     setHeading(null)
     setTraveled(0)
     setBrowsing(false)
+    setRunDirection('forward')
   }
 
   return (
@@ -258,6 +267,7 @@ export default function App() {
                 // iOS only grants the compass from inside a gesture, so the ask
                 // happens here rather than once the navigation view mounts.
                 void requestCompassPermission()
+                setRunDirection('forward')
                 setFollowingId(id)
                 setSelectedId(id)
               }}
@@ -300,6 +310,8 @@ export default function App() {
           onProgress={setTraveled}
           browsing={browsing}
           onRecenter={() => setBrowsing(false)}
+          onDirection={setRunDirection}
+          reversed={runDirection === 'reverse'}
           isRouteSaved={isSaved(saved, following)}
           onToggleSaved={() => toggleSaved(following)}
           onExit={stopRun}
