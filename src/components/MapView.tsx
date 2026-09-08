@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { splitPath, type LatLng } from '../lib/geo'
+import { createDoubleTapDetector } from '../lib/gestures'
 import type { RouteResult } from '../lib/routeSearch'
 
 interface MapViewProps {
@@ -18,6 +19,15 @@ interface MapViewProps {
   heading: number | null
   /** How far through the route the runner is, 0-1, for dimming ground covered. */
   traveled: number
+  /**
+   * True once the runner has panned away to look around. The map flattens and
+   * stops chasing them until they re-centre.
+   */
+  browsing: boolean
+  /** Fired when a pan or pinch begins, so navigation can let go of the map. */
+  onBrowse: () => void
+  /** Fired on a double tap, which puts the runner back in the middle. */
+  onRecenter: () => void
   onSelect: (id: string) => void
   onPickStart: (point: LatLng) => void
   status: string | null
@@ -50,6 +60,9 @@ export function MapView({
   navigating,
   heading,
   traveled,
+  browsing,
+  onBrowse,
+  onRecenter,
   onSelect,
   onPickStart,
   status,
@@ -63,8 +76,12 @@ export function MapView({
   // Handlers change every render; a ref keeps the Leaflet listener stable.
   const onPickStartRef = useRef(onPickStart)
   const onSelectRef = useRef(onSelect)
+  const onBrowseRef = useRef(onBrowse)
+  const onRecenterRef = useRef(onRecenter)
   onPickStartRef.current = onPickStart
   onSelectRef.current = onSelect
+  onBrowseRef.current = onBrowse
+  onRecenterRef.current = onRecenter
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -82,10 +99,58 @@ export function MapView({
       onPickStartRef.current({ lat: event.latlng.lat, lng: event.latlng.lng })
     })
 
+    // A pan or pinch means "let me look around"; navigation hands over the map.
+    // Leaflet's own dragstart covers the mouse, but a finger is watched
+    // directly rather than trusting the library's internals to fire first.
+    map.on('dragstart', () => onBrowseRef.current())
+    const container = map.getContainer()
+    const PAN_SLOP_PX = 10
+    let touchOrigin: { x: number; y: number } | null = null
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        onBrowseRef.current()
+        touchOrigin = null
+        return
+      }
+      const touch = event.touches[0]
+      touchOrigin = touch ? { x: touch.clientX, y: touch.clientY } : null
+    }
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      if (!touchOrigin || !touch) return
+      if (Math.hypot(touch.clientX - touchOrigin.x, touch.clientY - touchOrigin.y) > PAN_SLOP_PX) {
+        onBrowseRef.current()
+        touchOrigin = null
+      }
+    }
+    const onTouchEnd = () => {
+      touchOrigin = null
+    }
+    const onWheel = () => onBrowseRef.current()
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: true })
+    container.addEventListener('touchend', onTouchEnd, { passive: true })
+    container.addEventListener('wheel', onWheel, { passive: true })
+
+    // Double tap re-centres rather than zooming, which is the more useful
+    // gesture once the map has been dragged away mid-run.
+    const detector = createDoubleTapDetector()
+    const onPointerDown = (event: PointerEvent) => {
+      if (detector.tap(event.clientX, event.clientY, event.timeStamp)) onRecenterRef.current()
+    }
+    container.addEventListener('pointerdown', onPointerDown)
+
     routeLayerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
 
     return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('wheel', onWheel)
+      container.removeEventListener('pointerdown', onPointerDown)
       map.remove()
       mapRef.current = null
       routeLayerRef.current = null
@@ -199,12 +264,17 @@ export function MapView({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const handlers = [map.dragging, map.scrollWheelZoom, map.doubleClickZoom, map.touchZoom]
-    handlers.forEach((handler) => (navigating ? handler.disable() : handler.enable()))
-    // The rotor around the map changes size when navigation starts.
+    // Dragging and pinching stay enabled while navigating so the runner can
+    // look ahead; only double-click zoom is taken over, for re-centring.
+    if (navigating) map.doubleClickZoom.disable()
+    else map.doubleClickZoom.enable()
+    // The rotor is oversized while the tilted camera is on and normal size
+    // otherwise, so Leaflet has to be told the container changed shape —
+    // both when navigation starts and each time the runner flattens it to
+    // look around.
     map.invalidateSize({ animate: false })
-    if (navigating) map.setZoom(17)
-  }, [navigating])
+    if (navigating && !browsing) map.setZoom(17)
+  }, [navigating, browsing])
 
   // While following, the map tracks the runner rather than the whole route.
   useEffect(() => {
@@ -222,7 +292,7 @@ export function MapView({
     if (navigating) {
       positionMarkerRef.current?.remove()
       positionMarkerRef.current = null
-      map.panTo(latlng, { animate: true, duration: 0.4 })
+      if (!browsing) map.panTo(latlng, { animate: true, duration: 0.4 })
       return
     }
 
@@ -239,14 +309,20 @@ export function MapView({
     }
     positionMarkerRef.current.bringToFront()
     map.panTo(latlng, { animate: true })
-  }, [position, navigating])
+  }, [position, navigating, browsing])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !navigating || browsing || !position) return
+    map.setView([position.lat, position.lng], 17, { animate: true })
+  }, [browsing, navigating, position])
 
   return renderMap()
 
   function renderMap() {
     return (
       <div
-        className="map"
+        className={navigating ? 'map in-run' : 'map'}
         style={
           navigating
             ? ({
@@ -256,11 +332,15 @@ export function MapView({
             : undefined
         }
       >
-        <div className={navigating ? 'map-viewport navigating' : 'map-viewport'}>
+        <div
+          className={
+            navigating && !browsing ? 'map-viewport navigating' : 'map-viewport'
+          }
+        >
           <div
             className="map-rotor"
             style={
-              navigating
+              navigating && !browsing
                 ? {
                     // Shift the map down so the runner sits low on screen with
                     // the road ahead filling the view. North-up until a heading
@@ -273,7 +353,7 @@ export function MapView({
             <div ref={containerRef} className="map-canvas" role="application" aria-label="Route map" />
           </div>
         </div>
-        {navigating && position ? (
+        {navigating && !browsing && position ? (
           <div className="nav-puck" aria-hidden="true">
             <span className="nav-puck-halo" />
             <svg viewBox="0 0 32 32">

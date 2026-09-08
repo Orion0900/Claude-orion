@@ -44,6 +44,7 @@ export default function App() {
   const [livePosition, setLivePosition] = useState<LatLng | null>(null)
   const [heading, setHeading] = useState<number | null>(null)
   const [traveled, setTraveled] = useState(0)
+  const [browsing, setBrowsing] = useState(false)
 
   const searchRef = useRef<AbortController | null>(null)
   const routing = useMemo(() => createOsrmProvider(), [])
@@ -145,6 +146,7 @@ export default function App() {
     setLivePosition(null)
     setHeading(null)
     setTraveled(0)
+    setBrowsing(false)
   }
 
   return (
@@ -223,6 +225,8 @@ export default function App() {
           onPosition={setLivePosition}
           onHeading={setHeading}
           onProgress={setTraveled}
+          browsing={browsing}
+          onRecenter={() => setBrowsing(false)}
           onExit={stopRun}
         />
       ) : null}
@@ -236,6 +240,11 @@ export default function App() {
         navigating={following !== null}
         heading={heading}
         traveled={traveled}
+        browsing={browsing}
+        onBrowse={() => {
+          if (following) setBrowsing(true)
+        }}
+        onRecenter={() => setBrowsing(false)}
         status={status}
         onSelect={(id) => {
           setSelectedId(id)

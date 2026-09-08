@@ -144,6 +144,7 @@ src/
     follow.ts        matching a live GPS fix to a point on the route
     navigation.ts    turn instructions, distances and what to say next
     effort.ts        grade-adjusted finish-time estimate
+    gestures.ts      double-tap detection, kept away from the DOM to be tested
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
@@ -214,6 +215,19 @@ which is how the runner ends up hidden behind the bottom card.
 The route ahead is drawn bright and thick, the ground already covered dimmed
 behind, so "which way now" reads without thinking.
 
+### Looking around mid-run
+
+Dragging or pinching the map hands it over: it flattens to north-up, stops
+chasing you, and offers a **Re-centre** button. A double tap anywhere does the
+same thing.
+
+Flattening isn't cosmetic. Leaflet's pointer maths knows nothing about the CSS
+tilt and rotation, so a drag under the tilted camera would move the map in the
+wrong direction and by the wrong amount. Dropping the transform the moment a pan
+begins is what makes dragging behave the way a finger expects. The container
+changes size when it flattens, so Leaflet is told to remeasure — otherwise the
+map quietly re-centres on the wrong point.
+
 ## Offline
 
 The service worker caches the app shell and the map tiles you've already
@@ -224,7 +238,7 @@ still needs a connection.
 
 ## Tests
 
-216 unit tests covering the geodesy, ascent accumulation, turn classification,
+224 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
