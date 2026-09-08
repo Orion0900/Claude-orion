@@ -246,6 +246,31 @@ async function fetchTrackSegments(track: CaptionTrack, fetchImpl: Fetch): Promis
   return segments
 }
 
+/**
+ * The pre-Innertube caption endpoint. It needs no player response and no
+ * signature, and is occasionally served to IPs the modern ones refuse.
+ */
+async function fetchLegacyTimedText(videoId: string, fetchImpl: Fetch, preferred: string): Promise<Segment[] | undefined> {
+  const listRes = await fetchImpl(`https://www.youtube.com/api/timedtext?type=list&v=${videoId}`, { headers: { 'user-agent': UA } })
+  if (!listRes.ok) throw new Error(`legacy list returned ${listRes.status}`)
+  const xml = await listRes.text()
+  const tracks: CaptionTrack[] = [...xml.matchAll(/<track\b([^>]*)\/?>/g)].map((m) => ({
+    url: '',
+    languageCode: m[1].match(/lang_code="([^"]*)"/)?.[1] ?? '',
+    name: m[1].match(/name="([^"]*)"/)?.[1],
+    kind: /kind="asr"/.test(m[1]) ? 'asr' : undefined,
+  }))
+  const track = pickTrack(tracks.filter((t) => t.languageCode), preferred)
+  if (!track) return undefined
+  const params = new URLSearchParams({ v: videoId, lang: track.languageCode, fmt: 'json3' })
+  if (track.name) params.set('name', track.name)
+  if (track.kind) params.set('kind', track.kind)
+  const res = await fetchImpl(`https://www.youtube.com/api/timedtext?${params}`, { headers: { 'user-agent': UA } })
+  if (!res.ok) throw new Error(`legacy captions returned ${res.status}`)
+  const segments = parseCaptionBody(await res.text())
+  return segments.length > 0 ? segments : undefined
+}
+
 /** Default public mirrors; override with YOUTUBE_MIRRORS (comma-separated origins). */
 export const DEFAULT_MIRRORS = ['https://inv.nadeko.net', 'https://yewtu.be', 'https://invidious.nerdvpn.de', 'https://pipedapi.kavin.rocks']
 
@@ -275,6 +300,26 @@ async function fetchViaMirror(origin: string, videoId: string, fetchImpl: Fetch,
   return { segments: parseSrtOrVtt(body) }
 }
 
+/**
+ * The public mirror list changes constantly. Ask the Invidious directory for
+ * instances that are actually up and expose an API, newest health first, and
+ * fall back to the hardcoded list when the directory itself is unreachable.
+ */
+export async function discoverMirrors(fetchImpl: Fetch): Promise<string[]> {
+  try {
+    const res = await fetchImpl('https://api.invidious.io/instances.json?sort_by=type,health', { headers: { 'user-agent': UA } })
+    if (!res.ok) return []
+    const data = (await res.json()) as [string, { type?: string; api?: boolean; uri?: string; monitor?: { uptime?: number } | null }][]
+    return data
+      .filter(([, info]) => info.type === 'https' && info.api !== false && info.uri)
+      .filter(([, info]) => (info.monitor?.uptime ?? 100) > 90)
+      .map(([, info]) => (info.uri as string).replace(/\/+$/, ''))
+      .slice(0, 5)
+  } catch {
+    return []
+  }
+}
+
 export async function fetchOEmbed(videoId: string, fetchImpl: Fetch): Promise<Partial<VideoMeta> | undefined> {
   try {
     const res = await fetchImpl(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, { headers: { 'user-agent': UA } })
@@ -293,6 +338,8 @@ export interface YouTubeResult {
   via?: 'watch' | 'innertube' | 'mirror'
   /** Set when captions could not be fetched from this server. */
   blocked?: string
+  /** Every rung of the ladder and what it said. Shown by /api/diagnose. */
+  reasons: string[]
 }
 
 /**
@@ -333,18 +380,27 @@ export async function fetchYouTube(videoId: string, opts: { fetch?: Fetch; mirro
         continue
       }
       const segments = await fetchTrackSegments(track, fetchImpl)
-      return { meta: finalizeMeta(meta), segments, via: attempt.via }
+      return { meta: finalizeMeta(meta), segments, via: attempt.via, reasons }
     } catch (err) {
       reasons.push(`${attempt.via}: ${(err as Error).message}`)
     }
   }
 
-  for (const origin of opts.mirrors ?? DEFAULT_MIRRORS) {
+  try {
+    const segments = await fetchLegacyTimedText(videoId, fetchImpl, preferred)
+    if (segments) return { meta: finalizeMeta(meta), segments, via: 'watch', reasons }
+    reasons.push('legacy timedtext: no captions listed')
+  } catch (err) {
+    reasons.push(`legacy timedtext: ${(err as Error).message}`)
+  }
+
+  const mirrors = opts.mirrors ?? [...DEFAULT_MIRRORS, ...(await discoverMirrors(fetchImpl))]
+  for (const origin of mirrors) {
     try {
       const hit = await fetchViaMirror(origin, videoId, fetchImpl, preferred)
       if (hit?.segments.length) {
         meta = { ...stripUndefined(hit.meta ?? {}), ...stripUndefined(meta) }
-        return { meta: finalizeMeta(meta), segments: hit.segments, via: 'mirror' }
+        return { meta: finalizeMeta(meta), segments: hit.segments, via: 'mirror', reasons }
       }
       reasons.push(`${origin}: no captions`)
     } catch (err) {
@@ -355,6 +411,7 @@ export async function fetchYouTube(videoId: string, opts: { fetch?: Fetch; mirro
   if (!meta.title) meta = { ...meta, ...stripUndefined((await fetchOEmbed(videoId, fetchImpl)) ?? {}) }
   return {
     meta: finalizeMeta(meta),
+    reasons,
     blocked: youtubeSaysNoCaptions
       ? 'This video has no captions on YouTube.'
       : `YouTube would not serve captions to this server (${reasons.slice(-2).join('; ')}).`,

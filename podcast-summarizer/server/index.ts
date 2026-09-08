@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JobStore } from './jobs.js'
 import { createSummarizer, DEFAULT_MODEL } from './lib/summarize.js'
+import { fetchYouTube, parseYouTubeUrl } from './lib/youtube.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const port = Number(process.env.PORT ?? 8787)
@@ -14,13 +15,15 @@ const spotify =
     ? { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET }
     : undefined
 
+const youtubeMirrors = process.env.YOUTUBE_MIRRORS?.split(',').map((s) => s.trim()).filter(Boolean)
+
 const store = new JobStore({
   file: join(dataDir, 'jobs.json'),
   summarizer: createSummarizer({ model: process.env.CLAUDE_MODEL ?? DEFAULT_MODEL }),
   spotify,
   assemblyAiKey: process.env.ASSEMBLYAI_API_KEY,
   openAiKey: process.env.OPENAI_API_KEY,
-  youtubeMirrors: process.env.YOUTUBE_MIRRORS?.split(',').map((s) => s.trim()).filter(Boolean),
+  youtubeMirrors,
 })
 
 const app = express()
@@ -48,6 +51,31 @@ app.get('/api/health', (_req, res) => {
       openai: Boolean(process.env.OPENAI_API_KEY),
     },
   })
+})
+
+/**
+ * Why did a link fail? Open this in a browser with ?url=… and it reports
+ * every rung of the caption ladder and what each one said.
+ */
+app.get('/api/diagnose', async (req, res) => {
+  const url = typeof req.query.url === 'string' ? req.query.url : ''
+  const ref = parseYouTubeUrl(url)
+  if (!ref) return res.status(400).json({ error: 'Add ?url=<a YouTube link> to this address.' })
+  try {
+    const result = await fetchYouTube(ref.videoId, { mirrors: youtubeMirrors })
+    res.json({
+      videoId: ref.videoId,
+      title: result.meta.title,
+      channel: result.meta.channel,
+      gotCaptions: Boolean(result.segments),
+      via: result.via,
+      segments: result.segments?.length ?? 0,
+      blocked: result.blocked,
+      tried: result.reasons,
+    })
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message })
+  }
 })
 
 app.get('/api/jobs', async (_req, res) => {
