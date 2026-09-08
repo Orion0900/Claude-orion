@@ -31,6 +31,17 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # UpScout is a second app in the same repository; it ships under
+      # /upscout/ so both are installable from one Pages site.
+      - name: Build UpScout
+        working-directory: apps/upscout
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Nest UpScout under /upscout/
+        run: cp -r apps/upscout/dist dist/upscout
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5

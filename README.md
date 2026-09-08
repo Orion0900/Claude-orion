@@ -354,3 +354,12 @@ npm test
   than survey data.
 - The router optimises for distance, not for pleasantness — it doesn't know
   which roads have sidewalks or traffic.
+
+## Also in this repository
+
+[**UpScout**](apps/upscout) (`apps/upscout/`) — an Upwork job finder and
+applier for the same phone and laptop: it pulls postings matching your
+criteria, ranks them by how worth bidding they are with the reasoning shown,
+drafts the proposal from your template, and queues applications behind a score
+floor, a daily cap and a connects budget. Separate app, separate build, its own
+tests; deployed alongside this one at `/upscout/`.

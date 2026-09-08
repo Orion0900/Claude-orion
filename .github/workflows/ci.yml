@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: Typecheck, build and test
+    name: LoopMaker — typecheck, build and test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +16,27 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - run: npm ci
+      - name: Typecheck and build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+
+  upscout:
+    name: UpScout — typecheck, build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/upscout
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/upscout/package-lock.json
 
       - run: npm ci
       - name: Typecheck and build
