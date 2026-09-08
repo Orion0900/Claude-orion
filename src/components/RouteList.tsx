@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { compassLabel, type RouteResult } from '../lib/routeSearch'
 import { appleMapsUrl, isAppleDevice, shareRoute } from '../lib/share'
 import { simplicityLabel } from '../lib/turns'
+import { isSaved, type SavedRoute } from '../lib/savedRoutes'
 import { estimateDuration } from '../lib/effort'
 import {
   formatDistance,
@@ -23,6 +24,8 @@ interface RouteListProps {
   onScrub: (fraction: number | null) => void
   followingId: string | null
   onFollow: (id: string) => void
+  savedRoutes: SavedRoute[]
+  onToggleSaved: (route: RouteResult) => void
 }
 
 /** Share sheet on a phone, plain download everywhere else. */
@@ -59,6 +62,8 @@ export function RouteList({
   onScrub,
   followingId,
   onFollow,
+  savedRoutes,
+  onToggleSaved,
 }: RouteListProps) {
   return (
     <div className="results">
@@ -66,54 +71,72 @@ export function RouteList({
         const isSelected = route.id === selectedId
         const name = `${formatDistance(route.distance, distanceUnit)} ${compassLabel(route.outboundBearing)} loop`
         return (
-          <div
-            key={route.id}
-            className="route-card"
-            aria-current={isSelected}
-            onClick={() => onSelect(route.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onSelect(route.id)
-              }
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="route-card-head">
-              <span className="route-name">
-                Option {index + 1} · {compassLabel(route.outboundBearing)}
-              </span>
+          <div key={route.id} className="route-card" aria-current={isSelected}>
+            {/* Badge and star sit outside the select button: a control inside
+                another control is ambiguous to assistive technology. */}
+            <div className="route-card-corner">
               <span className={route.meetsCriteria ? 'badge' : 'badge miss'}>
                 {route.meetsCriteria ? 'Matches' : 'Closest fit'}
               </span>
+              <button
+                type="button"
+                className="star"
+                aria-pressed={isSaved(savedRoutes, route)}
+                aria-label={
+                  isSaved(savedRoutes, route)
+                    ? `Remove ${name} from saved routes`
+                    : `Save ${name}`
+                }
+                onClick={() => onToggleSaved(route)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 3.5l2.7 5.6 6.1.85-4.4 4.3 1.05 6.1L12 17.5l-5.45 2.85L7.6 14.25 3.2 9.95l6.1-.85z"
+                    fill={isSaved(savedRoutes, route) ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
 
-            <div className="route-stats">
-              <span>
-                <strong>{formatDistance(route.distance, distanceUnit)}</strong>
+            <button
+              type="button"
+              className="route-select"
+              aria-pressed={isSelected}
+              onClick={() => onSelect(route.id)}
+            >
+              <span className="route-name">
+                Option {index + 1} · {compassLabel(route.outboundBearing)}
               </span>
-              <span>
-                <strong>{formatElevation(route.profile.gain, elevationUnit)}</strong> climb
-              </span>
-              <span>
-                ~
-                <strong>
-                  {formatDuration(
-                    estimateDuration(route.distance, route.profile.gain, paceSeconds, distanceUnit),
-                  )}
-                </strong>
-              </span>
-              {route.turns === null ? null : (
+
+              <span className="route-stats">
                 <span>
-                  <strong>{route.turns}</strong> turns
+                  <strong>{formatDistance(route.distance, distanceUnit)}</strong>
                 </span>
-              )}
-            </div>
+                <span>
+                  <strong>{formatElevation(route.profile.gain, elevationUnit)}</strong> climb
+                </span>
+                <span>
+                  ~
+                  <strong>
+                    {formatDuration(
+                      estimateDuration(route.distance, route.profile.gain, paceSeconds, distanceUnit),
+                    )}
+                  </strong>
+                </span>
+                {route.turns === null ? null : (
+                  <span>
+                    <strong>{route.turns}</strong> turns
+                  </span>
+                )}
+              </span>
 
-            {route.turns === null ? null : (
-              <p className="route-note">{simplicityLabel(route.turns, route.distance)} to follow</p>
-            )}
+              {route.turns === null ? null : (
+                <span className="route-note">{simplicityLabel(route.turns, route.distance)} to follow</span>
+              )}
+            </button>
 
             {isSelected ? (
               <>

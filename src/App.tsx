@@ -1,4 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  addRoute,
+  createLocalStore,
+  isSaved,
+  removeRoute,
+  StorageFullError,
+  suggestName,
+  type SavedRoute,
+} from './lib/savedRoutes'
+import { SavedRoutes } from './components/SavedRoutes'
+import { compassLabel } from './lib/routeSearch'
+import { formatDistance } from './lib/units'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
 import { NavigationView } from './components/NavigationView'
 import { MapView } from './components/MapView'
@@ -46,6 +58,10 @@ export default function App() {
   const [traveled, setTraveled] = useState(0)
   const [browsing, setBrowsing] = useState(false)
 
+  const store = useMemo(() => createLocalStore(), [])
+  const [saved, setSaved] = useState<SavedRoute[]>(() => store.read())
+  const [saveError, setSaveError] = useState<string | null>(null)
+
   const searchRef = useRef<AbortController | null>(null)
   const routing = useMemo(() => createOsrmProvider(), [])
   const elevation = useMemo(() => createOpenMeteoProvider(), [])
@@ -71,11 +87,46 @@ export default function App() {
     )
   }, [])
 
-  useEffect(() => {
-    locate()
-  }, [locate])
-
   const paceSeconds = parsePace(form.pace) ?? 540
+
+  const persist = useCallback(
+    (next: SavedRoute[]) => {
+      try {
+        store.write(next)
+        setSaved(next)
+        setSaveError(null)
+      } catch {
+        setSaveError('No room left to save routes. Remove one and try again.')
+      }
+    },
+    [store],
+  )
+
+  const routeLabel = useCallback(
+    (route: RouteResult) =>
+      `${formatDistance(route.distance, form.distanceUnit)} ${compassLabel(route.outboundBearing)} loop`,
+    [form.distanceUnit],
+  )
+
+  const toggleSaved = useCallback(
+    (route: RouteResult) => {
+      const existing = saved.find((item) => isSaved([item], route))
+      if (existing) {
+        persist(removeRoute(saved, existing.id))
+        return
+      }
+      try {
+        persist(addRoute(saved, route, suggestName(routeLabel(route))))
+      } catch (error) {
+        setSaveError(
+          error instanceof StorageFullError
+            ? 'That is as many routes as the app will keep. Remove one first.'
+            : 'Could not save that route.',
+        )
+      }
+    },
+    [persist, routeLabel, saved],
+  )
 
   const search = useCallback(
     async (nextSeed: number) => {
@@ -158,6 +209,20 @@ export default function App() {
             <p>Runs that start and finish at your door, sized to your legs.</p>
           </header>
 
+          <SavedRoutes
+            routes={saved}
+            distanceUnit={form.distanceUnit}
+            elevationUnit={form.elevationUnit}
+            onOpen={(route) => {
+              setRoutes([route])
+              setSelectedId(route.id)
+              setStart(route.path[0])
+              setStartLabel('Start of a saved route')
+              setScrub(null)
+            }}
+            onRemove={(id) => persist(removeRoute(saved, id))}
+          />
+
           <ControlPanel
             form={form}
             onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
@@ -185,6 +250,8 @@ export default function App() {
                 setScrub(null)
               }}
               onScrub={setScrub}
+              savedRoutes={saved}
+              onToggleSaved={toggleSaved}
               followingId={followingId}
               onFollow={(id) => {
                 setFollowingId(id)
@@ -214,6 +281,7 @@ export default function App() {
           </button>
           {!start ? <p className="hint">Set a start point first.</p> : null}
           {error ? <p className={routes.length ? 'notice info' : 'notice'}>{error}</p> : null}
+          {saveError ? <p className="notice">{saveError}</p> : null}
         </div>
       </aside>
 
@@ -221,12 +289,15 @@ export default function App() {
         <NavigationView
           route={following}
           distanceUnit={form.distanceUnit}
+          elevationUnit={form.elevationUnit}
           paceSeconds={paceSeconds}
           onPosition={setLivePosition}
           onHeading={setHeading}
           onProgress={setTraveled}
           browsing={browsing}
           onRecenter={() => setBrowsing(false)}
+          isRouteSaved={isSaved(saved, following)}
+          onToggleSaved={() => toggleSaved(following)}
           onExit={stopRun}
         />
       ) : null}

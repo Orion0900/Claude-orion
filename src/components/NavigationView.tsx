@@ -11,12 +11,21 @@ import {
   turnAngle,
 } from '../lib/navigation'
 import { estimateDuration } from '../lib/effort'
+import { buildRunSummary, summaryHeadline } from '../lib/runSummary'
+import { formatPace } from '../lib/units'
 import type { RouteResult } from '../lib/routeSearch'
-import { formatDistance, formatDuration, type DistanceUnit } from '../lib/units'
+import {
+  formatDistance,
+  formatDuration,
+  formatElevation,
+  type DistanceUnit,
+  type ElevationUnit,
+} from '../lib/units'
 
 interface NavigationViewProps {
   route: RouteResult
   distanceUnit: DistanceUnit
+  elevationUnit: ElevationUnit
   paceSeconds: number
   onHeading: (heading: number | null) => void
   onPosition: (position: LatLng | null) => void
@@ -24,6 +33,9 @@ interface NavigationViewProps {
   /** True while the runner has dragged the map away to look around. */
   browsing: boolean
   onRecenter: () => void
+  /** Whether this route is already kept, and how to keep it. */
+  isRouteSaved: boolean
+  onToggleSaved: () => void
   onExit: () => void
 }
 
@@ -48,17 +60,24 @@ function TurnArrow({ angle }: { angle: number }) {
 export function NavigationView({
   route,
   distanceUnit,
+  elevationUnit,
   paceSeconds,
   onHeading,
   onPosition,
   onProgress,
   browsing,
   onRecenter,
+  isRouteSaved,
+  onToggleSaved,
   onExit,
 }: NavigationViewProps) {
   const [progress, setProgress] = useState<RouteProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [muted, setMuted] = useState(false)
+  const [dismissedSummary, setDismissedSummary] = useState(false)
+  // Wall-clock start, so the summary reports time actually spent running.
+  const startedAtRef = useRef(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   const segmentRef = useRef<number | undefined>(undefined)
   const lastFixRef = useRef<LatLng | null>(null)
@@ -68,6 +87,17 @@ export function NavigationView({
   mutedRef.current = muted
 
   const cumulative = useMemo(() => cumulativeDistances(route.path), [route])
+
+  useEffect(() => {
+    startedAtRef.current = Date.now()
+    setDismissedSummary(false)
+  }, [route])
+
+  // A ticking clock, so elapsed time moves even when GPS is quiet.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -166,6 +196,67 @@ export function NavigationView({
     paceSeconds,
     distanceUnit,
   )
+
+  const elapsedSeconds = Math.max(0, (now - startedAtRef.current) / 1000)
+  const summary = buildRunSummary({
+    distanceCovered: progress?.distanceAlong ?? 0,
+    elapsedSeconds,
+    routeDistance: route.distance,
+    routeGain: route.profile.gain,
+    unit: distanceUnit,
+  })
+
+  // The end of a run is the one moment a runner is certain to look at the
+  // screen, so it gets the whole of it.
+  if (finished && !dismissedSummary) {
+    return (
+      <div className="nav nav-finished">
+        <div className="finish-card">
+          <p className="finish-eyebrow">{summaryHeadline(summary)}</p>
+          <h2 className="finish-distance">{formatDistance(summary.distance, distanceUnit)}</h2>
+
+          <dl className="finish-stats">
+            <div>
+              <dt>Time</dt>
+              <dd>{formatDuration(summary.elapsedSeconds)}</dd>
+            </div>
+            <div>
+              <dt>Pace</dt>
+              <dd>
+                {summary.paceSecondsPerUnit === null
+                  ? '—'
+                  : formatPace(summary.paceSecondsPerUnit, distanceUnit)}
+              </dd>
+            </div>
+            <div>
+              <dt>Climb</dt>
+              <dd>{formatElevation(summary.gain, elevationUnit)}</dd>
+            </div>
+          </dl>
+
+          <div className="finish-actions">
+            <button type="button" className="btn" onClick={onToggleSaved}>
+              {isRouteSaved ? 'Saved ✓' : 'Save this route'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setDismissedSummary(true)
+                onExit()
+              }}
+            >
+              Done
+            </button>
+          </div>
+
+          <button type="button" className="btn-link finish-continue" onClick={() => setDismissedSummary(true)}>
+            Keep running
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="nav">

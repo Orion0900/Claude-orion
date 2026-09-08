@@ -92,6 +92,13 @@ export function ControlPanel({
       <section className="panel-section">
         <h2>Start &amp; finish</h2>
 
+        {start ? null : (
+          <p className="hint" style={{ margin: '0 0 10px' }}>
+            Routes start and finish wherever you set. Your location is only requested when
+            you tap below, and never leaves your phone except to look up roads and hills.
+          </p>
+        )}
+
         <button type="button" className="btn btn-secondary" onClick={onLocate} disabled={locating}>
           {locating ? <span className="spinner" /> : null}
           {locating ? 'Locating…' : 'Use my current location'}
