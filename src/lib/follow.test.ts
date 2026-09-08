@@ -167,3 +167,46 @@ describe('recovering from a gap in GPS', () => {
     expect(isOffRoute(progress)).toBe(true)
   })
 })
+
+describe('refusing to teleport the runner', () => {
+  const path = squareLoop()
+  const cumulative = cumulativeDistances(path)
+
+  it('stays put for a poor fix near a parallel stretch of the same loop', () => {
+    // On the north leg heading east, a bad fix lands nearer the parallel south
+    // leg — a block away. Snapping there is what threw runners across town.
+    const onNorthLeg = destination(start, 0, 120)
+    const anchored = locateOnRoute(path, onNorthLeg, {}, cumulative)
+
+    const strayed = destination(onNorthLeg, 90, 90)
+    const next = locateOnRoute(path, strayed, { fromSegment: anchored.segment }, cumulative)
+
+    expect(next.relocated).toBe(false)
+    // Progress may nudge, but must not leap to the far side of the loop.
+    expect(Math.abs(next.distanceAlong - anchored.distanceAlong)).toBeLessThan(250)
+  })
+
+  it('still re-acquires after a genuine signal gap', () => {
+    const thirdCorner = destination(destination(start, 0, 250), 90, 250)
+    const reappeared = destination(thirdCorner, 180, 120)
+    const progress = locateOnRoute(path, reappeared, { fromSegment: 1 }, cumulative)
+
+    expect(progress.relocated).toBe(true)
+    expect(progress.distanceAlong).toBeCloseTo(620, -1)
+  })
+
+  it('reports plainly whether a fix was matched near the last one', () => {
+    const near = locateOnRoute(path, destination(start, 0, 40), { fromSegment: 0 }, cumulative)
+    expect(near.relocated).toBe(false)
+  })
+
+  it('refuses to relocate onto a point that is not really a match either', () => {
+    // Far from every part of the route: nowhere is a good candidate, so the
+    // runner is off route rather than somewhere else on it.
+    const lost = destination(start, 45, 900)
+    const progress = locateOnRoute(path, lost, { fromSegment: 2 }, cumulative)
+
+    expect(progress.relocated).toBe(false)
+    expect(isOffRoute(progress)).toBe(true)
+  })
+})

@@ -12,6 +12,7 @@ import {
 } from '../lib/navigation'
 import { chooseHeading, headingChanged, smoothHeading } from '../lib/heading'
 import { detectDirection, type RunDirection } from '../lib/direction'
+import { createFixFilter } from '../lib/gpsFilter'
 import { watchCompass } from '../services/compass'
 import { estimateDuration } from '../lib/effort'
 import { buildRunSummary, summaryHeadline } from '../lib/runSummary'
@@ -99,6 +100,10 @@ export function NavigationView({
   // Where the run began, and whether the way round has been settled yet.
   const originRef = useRef<LatLng | null>(null)
   const directionSettledRef = useRef(false)
+  // Bad fixes cluster at junctions, so they are screened before use.
+  const filterRef = useRef(createFixFilter())
+  // A single far-off match is not evidence; two in a row is.
+  const relocateStreakRef = useRef(0)
   // Which maneuver has been announced at which band, so nothing repeats.
   const spokenRef = useRef(new Map<number, number>())
   const mutedRef = useRef(muted)
@@ -119,12 +124,15 @@ export function NavigationView({
     setDismissedSummary(false)
     originRef.current = null
     directionSettledRef.current = false
+    filterRef.current.reset()
+    relocateStreakRef.current = 0
   }, [])
 
   // New geometry does mean progress has to be re-acquired from scratch.
   useEffect(() => {
     segmentRef.current = undefined
     lastFixRef.current = null
+    relocateStreakRef.current = 0
   }, [route.id])
 
   // A ticking clock, so elapsed time moves even when GPS is quiet.
@@ -173,6 +181,15 @@ export function NavigationView({
       (fix) => {
         const here = { lat: fix.coords.latitude, lng: fix.coords.longitude }
 
+        // Accuracy collapses between buildings, which is where junctions are —
+        // so the worst fixes arrive exactly when a runner turns.
+        const verdict = filterRef.current.accept({
+          position: here,
+          accuracy: typeof fix.coords.accuracy === 'number' ? fix.coords.accuracy : 0,
+          timestamp: fix.timestamp,
+        })
+        if (!verdict.accepted) return
+
         // Which way round the loop are we actually going? Decided once, from
         // the first real movement away from the start.
         if (originRef.current === null) originRef.current = here
@@ -188,10 +205,22 @@ export function NavigationView({
         }
 
         const next = locateOnRoute(route.path, here, { fromSegment: segmentRef.current }, cumulative)
+
+        // Wait for a second far-off match before believing the runner really is
+        // somewhere else on the route; one is usually a bad fix at a junction.
+        if (next.relocated) {
+          relocateStreakRef.current += 1
+          if (relocateStreakRef.current < 2) return
+        } else {
+          relocateStreakRef.current = 0
+        }
+
         segmentRef.current = next.segment
         setError(null)
         setProgress(next)
-        onPosition(here)
+        // On the route, the runner is drawn on it: raw fixes jitter by metres
+        // even when good, and a puck that twitches off the line reads as broken.
+        onPosition(isOffRoute(next) ? here : next.snapped)
         onProgress(next.fraction)
 
         // Satellites only contribute course over ground here; which way the
