@@ -60,12 +60,21 @@ export function gainAndLoss(
 export function buildProfile(
   samplePoints: LatLng[],
   rawElevations: number[],
-  options: { smoothWindow?: number; threshold?: number } = {},
+  options: {
+    smoothWindow?: number
+    threshold?: number
+    /**
+     * How far along the route each sample sits. Pass these whenever the
+     * samples came from resampling: measuring the samples against each other
+     * instead cuts every corner off the route and reports it short.
+     */
+    distances?: number[]
+  } = {},
 ): ElevationProfile {
   const elevations = smooth(rawElevations, options.smoothWindow ?? 3)
   const { gain, loss } = gainAndLoss(elevations, options.threshold ?? 3)
   return {
-    distances: cumulativeDistances(samplePoints),
+    distances: options.distances ?? cumulativeDistances(samplePoints),
     elevations,
     gain,
     loss,

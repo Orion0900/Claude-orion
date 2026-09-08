@@ -49,6 +49,9 @@ workflow turns Pages on if it isn't already.
   red where the climb is steep and green everywhere else, and each card says
   how far you'll be grinding and how steep it gets. Flip the switch and the
   paint follows, no new search needed.
+- **Keeps the colours on the road.** Start riding and the route keeps the
+  colouring you chose it by, so a climb still shows red as you come up on it.
+  The ground already covered dims behind you.
 - **Counts the climbing.** Every route is sampled against elevation data and
   reported as total ascent, with a profile you can scrub to see where the hills
   are on the map.
@@ -96,6 +99,18 @@ about 100 m of the smoothed profile, so a single noisy elevation sample can't
 paint a hill that isn't there, and only climbing counts: a sharp descent is
 still "easy going", because the question is what you have to pedal up.
 
+### Why the search box does not use Nominatim
+
+Nominatim is the geocoder everyone reaches for first, and its usage policy
+rules out precisely what a search box does: querying as you type. Clients that
+do it anyway get blocked, which is how an address box ends up silently
+returning nothing. Photon is built for the job — same OpenStreetMap data,
+keyless, and meant to be asked on every keystroke pause — so it leads here,
+biased toward the pin you have already dropped so that "Main Street" means the
+one near you. Nominatim stands in only when Photon cannot be reached, which is
+a one-off lookup and exactly what it is for. The same pair turns a tapped pin
+or a GPS fix back into a street address.
+
 ### Why lane share is measured rather than trusted
 
 The engine's low `use_roads` setting already favours cycleways, but it never
@@ -120,13 +135,13 @@ The first three count as "bike lanes & paths" in the percentage.
 
 All keyless and public:
 
-| Purpose   | Service                                        |
-| --------- | ---------------------------------------------- |
-| Map tiles | OpenStreetMap                                  |
-| Routing   | Valhalla (FOSSGIS), bicycle costing            |
-| Road tags | Valhalla `trace_attributes`, same instance     |
-| Elevation | Open-Meteo Elevation API (Copernicus DEM)      |
-| Search    | Nominatim                                      |
+| Purpose        | Service                                    |
+| -------------- | ------------------------------------------ |
+| Map tiles      | OpenStreetMap                              |
+| Routing        | Valhalla (FOSSGIS), bicycle costing        |
+| Road tags      | Valhalla `trace_attributes`, same instance |
+| Elevation      | Open-Meteo Elevation API (Copernicus DEM)  |
+| Address search | Photon, with Nominatim standing in         |
 
 These are community-run, fair-use endpoints. Requests are serialised per host
 with a minimum gap, retried with backoff, and elevation lookups are cached per
@@ -196,6 +211,14 @@ placement and wording, GPS matching, GPX and sharing.
 ```bash
 npm test
 ```
+
+### When nothing comes back
+
+An empty result is not one problem but four, and they ask different things of
+the rider: the planner could not be reached, the planner knows no way through,
+the hill data could not be fetched, or every way there uses a highway. The
+search reports which, because telling someone to move their pin when a server
+is down sends them fixing something that was never broken.
 
 ## Known limits
 

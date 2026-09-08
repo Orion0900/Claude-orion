@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createValhallaRouter, createValhallaWays, maneuverToStep } from './valhalla'
+import { NoRouteError } from '../lib/routeSearch'
 import { encodePolyline } from '../lib/polyline'
 import { destination } from '../lib/geo'
 
@@ -110,11 +111,26 @@ describe('createValhallaRouter', () => {
     expect(routes[1].distance).toBeCloseTo(1400, 5)
   })
 
-  it('raises the engine’s own error message', async () => {
+  it('reports "no path" as a refusal, not as an unreachable engine', async () => {
     mockFetch({ error: 'No path could be found for input', error_code: 442 })
     await expect(
       createValhallaRouter().route(from, to, { useRoads: 0.1, useHills: 0.1 }),
-    ).rejects.toThrow('No path could be found')
+    ).rejects.toBeInstanceOf(NoRouteError)
+  })
+
+  it('treats the engine’s 4xx refusal as a refusal too', async () => {
+    mockFetch({ error: 'No path could be found for input' }, false, 400)
+    await expect(
+      createValhallaRouter().route(from, to, { useRoads: 0.1, useHills: 0.1 }),
+    ).rejects.toBeInstanceOf(NoRouteError)
+  })
+
+  it('lets a server outage read as an outage', async () => {
+    mockFetch({}, false, 503)
+    const failure = await createValhallaRouter()
+      .route(from, to, { useRoads: 0.1, useHills: 0.1 })
+      .catch((error) => error)
+    expect(failure).not.toBeInstanceOf(NoRouteError)
   })
 
   it('keeps preferences inside the engine’s 0-1 range', async () => {

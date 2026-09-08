@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildProfile } from './elevation'
-import { destination, pathLength, resample } from './geo'
+import { destination, haversine, pathLength, resample, resampleWithDistances, type LatLng } from './geo'
 import { gradeSegments, STEEP_GRADE, steepDistance, steepestGrade, windowedGrades } from './grades'
 
 const origin = { lat: 42.36, lng: -71.06 }
@@ -72,5 +72,61 @@ describe('gradeSegments', () => {
 
   it('uses five percent as the line between cruising and grinding', () => {
     expect(STEEP_GRADE).toBe(0.05)
+  })
+})
+
+describe('gradeSegments against a route that bends', () => {
+  /** A staircase: 100 m east, 100 m north, repeated — a third longer than its chords. */
+  function staircase(): LatLng[] {
+    const out: LatLng[] = [origin]
+    let at = origin
+    for (let i = 0; i < 20; i++) {
+      for (const bearing of [90, 0]) {
+        for (let d = 20; d <= 100; d += 20) out.push(destination(at, bearing, d))
+        at = destination(at, bearing, 100)
+      }
+    }
+    return out
+  }
+
+  it('paints the whole ride, right up to the destination', () => {
+    const path = staircase()
+    const total = pathLength(path)
+    const { points, distances } = resampleWithDistances(path, 60)
+    // A steady climb over the back half of the route.
+    const profile = buildProfile(
+      points,
+      distances.map((d) => (d < total / 2 ? 0 : (d - total / 2) * 0.08)),
+      { smoothWindow: 1, distances },
+    )
+
+    const segments = gradeSegments(path, profile)
+    const covered = segments.reduce((sum, s) => sum + s.length, 0)
+    expect(covered).toBeCloseTo(total, -1)
+
+    // The last painted point must be the end of the ride, not short of it.
+    const last = segments[segments.length - 1]
+    const end = path[path.length - 1]
+    expect(haversine(last.path[last.path.length - 1], end)).toBeLessThan(5)
+  })
+
+  it('reports the real grade rather than an inflated one', () => {
+    const path = staircase()
+    const total = pathLength(path)
+    const { points, distances } = resampleWithDistances(path, 60)
+    // A constant 4% climb: under the 5% line, so nothing should read as steep.
+    const profile = buildProfile(points, distances.map((d) => d * 0.04), { smoothWindow: 1, distances })
+
+    const segments = gradeSegments(path, profile)
+    expect(steepestGrade(segments)).toBeLessThan(0.05)
+    expect(steepDistance(segments)).toBe(0)
+    expect(profile.distances[profile.distances.length - 1]).toBeCloseTo(total, 0)
+  })
+
+  it('answers the same question with the same object rather than recomputing', () => {
+    const path = staircase()
+    const { points, distances } = resampleWithDistances(path, 60)
+    const profile = buildProfile(points, distances.map((d) => d * 0.02), { smoothWindow: 1, distances })
+    expect(gradeSegments(path, profile)).toBe(gradeSegments(path, profile))
   })
 })

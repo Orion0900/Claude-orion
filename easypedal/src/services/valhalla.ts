@@ -10,13 +10,21 @@ import type { RawStep } from '../lib/navigation'
 import { countTurns, type Maneuver } from '../lib/turns'
 import { decodePolyline } from '../lib/polyline'
 import type { RoadEdge } from '../lib/bikeway'
-import type { CostingProfile, RouteGeometry, RoutingProvider, WayProvider } from '../lib/routeSearch'
+import { NoRouteError, type CostingProfile, type RouteGeometry, type RoutingProvider, type WayProvider } from '../lib/routeSearch'
 import { fetchJson, HttpError } from './http'
 
 /** FOSSGIS-hosted Valhalla, the public instance the OSM website's bike directions use. */
 export const VALHALLA_BASE = 'https://valhalla1.openstreetmap.de'
 
-/** Beyond this a request goes in the body rather than the query string. */
+/**
+ * Beyond this a request goes in the body rather than the query string.
+ *
+ * Measured on the *escaped* form, which is what actually travels: roughly a
+ * sixth of the polyline alphabet percent-escapes to three characters, so the
+ * raw JSON length understates the request line by about a third — enough for
+ * a long ride to sail past a proxy's 8 KB limit and come back 414, which is a
+ * 4xx and so is never retried and never falls back to POST.
+ */
 const MAX_QUERY_BYTES = 6000
 
 interface ValhallaManeuver {
@@ -189,8 +197,9 @@ function geometryFrom(trip: ValhallaTrip): RouteGeometry | null {
  */
 async function call<T>(base: string, endpoint: string, request: unknown, signal?: AbortSignal): Promise<T> {
   const json = JSON.stringify(request)
-  if (json.length <= MAX_QUERY_BYTES) {
-    return fetchJson<T>(`${base}/${endpoint}?json=${encodeURIComponent(json)}`, { signal, minGapMs: 300 })
+  const escaped = encodeURIComponent(json)
+  if (escaped.length <= MAX_QUERY_BYTES) {
+    return fetchJson<T>(`${base}/${endpoint}?json=${escaped}`, { signal, minGapMs: 300 })
   }
   return fetchJson<T>(`${base}/${endpoint}`, {
     signal,
@@ -232,9 +241,20 @@ export function createValhallaRouter(options: ValhallaOptions = {}): RoutingProv
         units: 'kilometers',
         language: 'en-US',
       }
-      const data = await call<RouteResponse>(base, 'route', request, signal)
+      // Valhalla says "no path" with a 4xx and an error body. That is the
+      // engine answering, not the engine being unreachable, and the rider
+      // needs to hear the difference.
+      let data: RouteResponse
+      try {
+        data = await call<RouteResponse>(base, 'route', request, signal)
+      } catch (error) {
+        if (error instanceof HttpError && error.status && error.status >= 400 && error.status < 500 && error.status !== 429) {
+          throw new NoRouteError(error.message)
+        }
+        throw error
+      }
       if (data.error || !data.trip) {
-        throw new HttpError(data.error ?? 'Routing failed')
+        throw new NoRouteError(data.error ?? 'The route planner found no way through')
       }
       const trips = [data.trip, ...(data.alternates ?? []).map((alternate) => alternate.trip)]
       return trips.flatMap((trip) => {

@@ -5,6 +5,7 @@ import {
   DEFAULT_CRITERIA,
   findRoutes,
   isDuplicate,
+  NoRouteError,
   scoreRoute,
   viaLabel,
   type RouteResult,
@@ -22,7 +23,7 @@ import {
   WAYS,
 } from './__fixtures__/world'
 
-function search(overrides: Partial<SearchOptions> = {}, priority: 'lanes' | 'hills' = 'lanes') {
+function outcome(overrides: Partial<SearchOptions> = {}, priority: 'lanes' | 'hills' = 'lanes') {
   return findRoutes({
     routing: createFakeEngine(),
     ways: createFakeWays(),
@@ -31,6 +32,11 @@ function search(overrides: Partial<SearchOptions> = {}, priority: 'lanes' | 'hil
     elevationSamples: 40,
     ...overrides,
   })
+}
+
+/** Most tests only care about what came back, not why it didn't. */
+async function search(overrides: Partial<SearchOptions> = {}, priority: 'lanes' | 'hills' = 'lanes') {
+  return (await outcome(overrides, priority)).routes
 }
 
 describe('costingProfiles', () => {
@@ -109,9 +115,10 @@ describe('findRoutes', () => {
     expect(routes.every((route) => route.ways?.meters.unsafe === 0)).toBe(true)
   })
 
-  it('returns nothing rather than something unsafe', async () => {
-    const routes = await search({ routing: createFakeEngine({ answer: () => ['highway'] }) })
-    expect(routes).toEqual([])
+  it('returns nothing rather than something unsafe, and says why', async () => {
+    const result = await outcome({ routing: createFakeEngine({ answer: () => ['highway'] }) })
+    expect(result.routes).toEqual([])
+    expect(result.failure).toBe('unsafe-only')
   })
 
   it('puts the cycleway first when lanes are the priority', async () => {
@@ -166,18 +173,54 @@ describe('findRoutes', () => {
     expect(routes.length).toBeGreaterThan(0)
   })
 
-  it('gives up when there is no elevation data', async () => {
-    const routes = await search({
+  it('blames the terrain service, not the rider, when elevation fails', async () => {
+    const result = await outcome({
       elevation: { lookup: async () => { throw new Error('offline') } },
     })
-    expect(routes).toEqual([])
+    expect(result.routes).toEqual([])
+    // Moving a pin would never help here, so it must not read like it would.
+    expect(result.failure).toBe('elevation-unavailable')
   })
 
-  it('returns nothing once aborted', async () => {
+  it('reports an unreachable engine as unreachable', async () => {
+    const result = await outcome({
+      routing: { route: async () => { throw new Error('connection refused') } },
+    })
+    expect(result.routes).toEqual([])
+    expect(result.failure).toBe('routing-unavailable')
+  })
+
+  it('reports an engine that simply knows no way through', async () => {
+    const result = await outcome({ routing: { route: async () => [] } })
+    expect(result.routes).toEqual([])
+    expect(result.failure).toBe('no-route')
+  })
+
+  it('tells an engine that refuses apart from an engine that is down', async () => {
+    const refused = await outcome({
+      routing: { route: async () => { throw new NoRouteError('no path could be found') } },
+    })
+    expect(refused.failure).toBe('no-route')
+  })
+
+  it('flags routes whose road types could not be looked up', async () => {
+    const result = await outcome({ ways: createFakeWays({ fail: true }) })
+    expect(result.routes.length).toBeGreaterThan(0)
+    expect(result.failure).toBeNull()
+    expect(result.waysUnavailable).toBe(true)
+  })
+
+  it('does not flag road types when they were looked up fine', async () => {
+    const result = await outcome()
+    expect(result.waysUnavailable).toBe(false)
+  })
+
+  it('returns nothing once aborted, and blames nobody', async () => {
     const controller = new AbortController()
     controller.abort()
-    const routes = await search({ signal: controller.signal })
-    expect(routes).toEqual([])
+    const result = await outcome({ signal: controller.signal })
+    expect(result.routes).toEqual([])
+    expect(result.failure).toBeNull()
   })
 
   it('places turn instructions along the route', async () => {

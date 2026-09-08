@@ -11,6 +11,9 @@ import { gradeSegments } from '../lib/grades'
 export const GOOD_COLOR = '#4ade80'
 export const BAD_COLOR = '#f87171'
 
+/** The route is drawn fatter mid-ride, to be read at a glance from a bike. */
+const NAV_WEIGHT = 11
+
 interface MapViewProps {
   start: LatLng | null
   finish: LatLng | null
@@ -110,6 +113,9 @@ export function MapView({
   const onSelectRef = useRef(onSelect)
   const onBrowseRef = useRef(onBrowse)
   const onRecenterRef = useRef(onRecenter)
+  // Read inside Leaflet handlers, which are bound once and outlive any render.
+  const navigatingRef = useRef(navigating)
+  navigatingRef.current = navigating
   onPickRef.current = onPick
   onSelectRef.current = onSelect
   onBrowseRef.current = onBrowse
@@ -127,8 +133,47 @@ export function MapView({
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
+    /**
+     * Dropping a pin waits out the double-tap window.
+     *
+     * Leaflet fires a click for each tap of a double tap, and a double tap is
+     * this app's re-centre gesture. Acting on the first click immediately
+     * would set the start, flip the panel to the destination, and let the
+     * second click overwrite the destination with the very same point — so a
+     * rider who double taps loses the other end of their ride. Waiting a beat
+     * costs nothing a finger can feel.
+     */
+    const DOUBLE_TAP_MS = 300
+    const DOUBLE_TAP_SLOP_PX = 36
+    let pendingPin: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null
+
+    const cancelPendingPin = () => {
+      if (!pendingPin) return
+      clearTimeout(pendingPin.timer)
+      pendingPin = null
+    }
+
     map.on('click', (event: L.LeafletMouseEvent) => {
-      onPickRef.current({ lat: event.latlng.lat, lng: event.latlng.lng })
+      // Mid-ride the map is a view, not a form: a stray tap must not move the
+      // start pin out from under the route being ridden.
+      if (navigatingRef.current) return
+
+      const { x, y } = event.containerPoint
+      if (pendingPin && Math.hypot(x - pendingPin.x, y - pendingPin.y) <= DOUBLE_TAP_SLOP_PX) {
+        cancelPendingPin()
+        return
+      }
+      cancelPendingPin()
+
+      const point = { lat: event.latlng.lat, lng: event.latlng.lng }
+      pendingPin = {
+        x,
+        y,
+        timer: setTimeout(() => {
+          pendingPin = null
+          onPickRef.current(point)
+        }, DOUBLE_TAP_MS),
+      }
     })
 
     // A pan or pinch means "let me look around"; navigation hands over the map.
@@ -178,6 +223,7 @@ export function MapView({
     mapRef.current = map
 
     return () => {
+      cancelPendingPin()
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
@@ -264,22 +310,52 @@ export function MapView({
     for (const route of routes) {
       const isSelected = route.id === selectedId
 
-      // Navigating shows the road ahead brightly and the ground already
-      // covered dimmed, so "which way now" reads at a glance.
+      // Navigating keeps the same colours the rider chose the route by — a
+      // climb still reads red as they come up on it, which is when it matters
+      // most — and dims the ground already covered so "which way now" is
+      // still the thing that stands out.
       if (navigating && isSelected) {
-        const [behind, ahead] = splitPath(route.path, traveled)
-        layer.addLayer(
-          L.polyline(toLatLngs(behind), { color: '#5a6472', weight: 7, opacity: 0.55, lineJoin: 'round' }),
-        )
-        layer.addLayer(
-          L.polyline(toLatLngs(ahead), {
-            color: '#4ade80',
-            weight: 11,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round',
-          }),
-        )
+        const stretches = paintedStretches(route, paint)
+        if (stretches.length === 0) {
+          layer.addLayer(
+            L.polyline(toLatLngs(route.path), {
+              color: GOOD_COLOR,
+              weight: NAV_WEIGHT,
+              opacity: 1,
+              lineJoin: 'round',
+              lineCap: 'round',
+            }),
+          )
+        }
+        for (const segment of stretches) {
+          if (segment.path.length < 2) continue
+          layer.addLayer(
+            L.polyline(toLatLngs(segment.path), {
+              color: segment.good ? GOOD_COLOR : BAD_COLOR,
+              weight: NAV_WEIGHT,
+              opacity: 1,
+              lineJoin: 'round',
+              lineCap: 'round',
+              interactive: false,
+            }),
+          )
+        }
+
+        // The ground already covered goes on last, over the top: laying it
+        // over the colours is what dims them, and saves clipping every
+        // coloured stretch against how far the rider has got.
+        const [behind] = splitPath(route.path, traveled)
+        if (traveled > 0 && behind.length >= 2) {
+          layer.addLayer(
+            L.polyline(toLatLngs(behind), {
+              color: '#5a6472',
+              weight: NAV_WEIGHT + 1,
+              opacity: 1,
+              lineJoin: 'round',
+              interactive: false,
+            }),
+          )
+        }
         continue
       }
 
@@ -319,8 +395,12 @@ export function MapView({
       finishMarkerRef.current?.bringToFront()
     }
 
+    // Framing the whole route is what you want when choosing one, and exactly
+    // what you don't want mid-ride: the follow camera is tracking the rider,
+    // and this runs on every GPS fix, so it would yank the map back from
+    // wherever they had panned to look ahead.
     const selected = routes.find((route) => route.id === selectedId)
-    if (selected) {
+    if (selected && !navigating) {
       map.fitBounds(
         L.latLngBounds(selected.path.map((p) => [p.lat, p.lng] as [number, number])),
         { padding: [48, 48] },

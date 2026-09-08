@@ -66,22 +66,38 @@ export function cumulativeDistances(path: LatLng[]): number[] {
   return out
 }
 
+export interface Resampled {
+  points: LatLng[]
+  /**
+   * How far along the *original* path each point sits, in meters.
+   *
+   * This is not the same as measuring the resampled points against each
+   * other. Straightening a polyline down to a hundred points cuts every
+   * corner, and on a twisty route the chords add up to a fifth less than the
+   * road really is — so anything that maps a sample back onto the route has
+   * to use these distances, not the resampled shape's own.
+   */
+  distances: number[]
+}
+
 /**
  * Resample a polyline to exactly `count` points spaced evenly by distance
- * along the path (endpoints always included). Used to keep elevation
- * lookups within the provider's per-request point budget.
+ * along the path (endpoints always included), keeping each point's true
+ * distance along the original. Used to keep elevation lookups within the
+ * provider's per-request point budget.
  */
-export function resample(path: LatLng[], count: number): LatLng[] {
-  if (path.length === 0) return []
-  if (count <= 1 || path.length === 1) return [path[0]]
-  if (path.length === 2 && count === 2) return [path[0], path[1]]
+export function resampleWithDistances(path: LatLng[], count: number): Resampled {
+  if (path.length === 0) return { points: [], distances: [] }
+  if (count <= 1 || path.length === 1) return { points: [path[0]], distances: [0] }
 
   const cum = cumulativeDistances(path)
   const total = cum[cum.length - 1]
-  if (total === 0) return new Array(count).fill(path[0])
+  if (path.length === 2 && count === 2) return { points: [path[0], path[1]], distances: [0, total] }
+  if (total === 0) return { points: new Array(count).fill(path[0]), distances: new Array(count).fill(0) }
 
   const step = total / (count - 1)
-  const out: LatLng[] = [path[0]]
+  const points: LatLng[] = [path[0]]
+  const distances: number[] = [0]
   let seg = 1
 
   for (let i = 1; i < count - 1; i++) {
@@ -90,11 +106,17 @@ export function resample(path: LatLng[], count: number): LatLng[] {
     const spanStart = cum[seg - 1]
     const spanLen = cum[seg] - spanStart
     const t = spanLen === 0 ? 0 : (target - spanStart) / spanLen
-    out.push(interpolate(path[seg - 1], path[seg], t))
+    points.push(interpolate(path[seg - 1], path[seg], t))
+    distances.push(target)
   }
 
-  out.push(path[path.length - 1])
-  return out
+  points.push(path[path.length - 1])
+  distances.push(total)
+  return { points, distances }
+}
+
+export function resample(path: LatLng[], count: number): LatLng[] {
+  return resampleWithDistances(path, count).points
 }
 
 /** Linear interpolation between two nearby points (fine at running scale). */
