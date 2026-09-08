@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { LatLng } from '../lib/geo'
+import { splitPath, type LatLng } from '../lib/geo'
 import type { RouteResult } from '../lib/routeSearch'
 
 interface MapViewProps {
@@ -16,12 +16,30 @@ interface MapViewProps {
   navigating: boolean
   /** Heading to point the map along, in degrees. Null until the runner moves. */
   heading: number | null
+  /** How far through the route the runner is, 0-1, for dimming ground covered. */
+  traveled: number
   onSelect: (id: string) => void
   onPickStart: (point: LatLng) => void
   status: string | null
 }
 
 const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
+
+/**
+ * Where the runner sits on screen while navigating, as a percentage down the
+ * viewport, and how much bigger the rotor is than the viewport.
+ *
+ * These two numbers place both the camera and the puck. Leaflet pans the map so
+ * the runner is at the rotor's centre, so the rotor is shifted until that centre
+ * lands on the puck — and because the shift is expressed in the rotor's own
+ * size, it has to be divided by the rotor's scale. Get this wrong and the map
+ * is centred somewhere the puck isn't, which is exactly how the runner ends up
+ * hidden behind the bottom card.
+ */
+const PUCK_Y = 62
+/** Tilting pushes the rotor's far edge up-screen; oversizing hides that seam. */
+const ROTOR_SCALE = 2.6
+const ROTOR_SHIFT = (PUCK_Y - 50) / ROTOR_SCALE
 
 export function MapView({
   start,
@@ -31,6 +49,7 @@ export function MapView({
   position,
   navigating,
   heading,
+  traveled,
   onSelect,
   onPickStart,
   status,
@@ -105,17 +124,36 @@ export function MapView({
     if (!map || !layer) return
     layer.clearLayers()
 
+    const toLatLngs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number])
+
     for (const route of routes) {
       const isSelected = route.id === selectedId
-      const line = L.polyline(
-        route.path.map((p) => [p.lat, p.lng] as [number, number]),
-        {
-          color: isSelected ? '#4ade80' : '#7c8798',
-          weight: isSelected ? 5 : 3,
-          opacity: isSelected ? 1 : 0.5,
-          lineJoin: 'round',
-        },
-      )
+
+      // Navigating shows the road ahead brightly and the ground already
+      // covered dimmed, so "which way now" reads at a glance.
+      if (navigating && isSelected) {
+        const [behind, ahead] = splitPath(route.path, traveled)
+        layer.addLayer(
+          L.polyline(toLatLngs(behind), { color: '#5a6472', weight: 7, opacity: 0.55, lineJoin: 'round' }),
+        )
+        layer.addLayer(
+          L.polyline(toLatLngs(ahead), {
+            color: '#4ade80',
+            weight: 11,
+            opacity: 1,
+            lineJoin: 'round',
+            lineCap: 'round',
+          }),
+        )
+        continue
+      }
+
+      const line = L.polyline(toLatLngs(route.path), {
+        color: isSelected ? '#4ade80' : '#7c8798',
+        weight: isSelected ? 5 : 3,
+        opacity: isSelected ? 1 : 0.5,
+        lineJoin: 'round',
+      })
       line.on('click', (event) => {
         L.DomEvent.stopPropagation(event)
         onSelectRef.current(route.id)
@@ -124,7 +162,7 @@ export function MapView({
       if (isSelected) line.bringToFront()
     }
 
-    startMarkerRef.current?.bringToFront()
+    if (!navigating) startMarkerRef.current?.bringToFront()
 
     const selected = routes.find((route) => route.id === selectedId)
     if (selected) {
@@ -133,7 +171,7 @@ export function MapView({
         { padding: [48, 48] },
       )
     }
-  }, [routes, selectedId])
+  }, [routes, selectedId, navigating, traveled])
 
   useEffect(() => {
     const map = mapRef.current
@@ -178,6 +216,16 @@ export function MapView({
       return
     }
     const latlng = L.latLng(position.lat, position.lng)
+
+    // While navigating the runner is drawn as a fixed puck on the glass, so a
+    // tilted, squashed map marker would only compete with it.
+    if (navigating) {
+      positionMarkerRef.current?.remove()
+      positionMarkerRef.current = null
+      map.panTo(latlng, { animate: true, duration: 0.4 })
+      return
+    }
+
     if (positionMarkerRef.current) {
       positionMarkerRef.current.setLatLng(latlng)
     } else {
@@ -191,13 +239,23 @@ export function MapView({
     }
     positionMarkerRef.current.bringToFront()
     map.panTo(latlng, { animate: true })
-  }, [position])
+  }, [position, navigating])
 
   return renderMap()
 
   function renderMap() {
     return (
-      <div className="map">
+      <div
+        className="map"
+        style={
+          navigating
+            ? ({
+                '--nav-puck-y': `${PUCK_Y}%`,
+                '--nav-rotor-size': `${ROTOR_SCALE * 100}%`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         <div className={navigating ? 'map-viewport navigating' : 'map-viewport'}>
           <div
             className="map-rotor"
@@ -207,7 +265,7 @@ export function MapView({
                     // Shift the map down so the runner sits low on screen with
                     // the road ahead filling the view. North-up until a heading
                     // is known, then the map turns to face the way you're going.
-                    transform: `translate(-50%, -50%) translateY(12%) rotateX(52deg) rotate(${-(heading ?? 0)}deg)`,
+                    transform: `translate(-50%, -50%) translateY(${ROTOR_SHIFT}%) rotateX(52deg) rotate(${-(heading ?? 0)}deg)`,
                   }
                 : undefined
             }
@@ -215,6 +273,15 @@ export function MapView({
             <div ref={containerRef} className="map-canvas" role="application" aria-label="Route map" />
           </div>
         </div>
+        {navigating && position ? (
+          <div className="nav-puck" aria-hidden="true">
+            <span className="nav-puck-halo" />
+            <svg viewBox="0 0 32 32">
+              <circle cx="16" cy="16" r="14" className="nav-puck-body" />
+              <path d="M16 8 L23 22 L16 18.5 L9 22 Z" className="nav-puck-chevron" />
+            </svg>
+          </div>
+        ) : null}
         {status ? <div className="map-overlay">{status}</div> : null}
       </div>
     )

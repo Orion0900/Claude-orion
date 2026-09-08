@@ -204,6 +204,16 @@ A true 3D map would mean vector tiles and a rendering library, which in practice
 means an API key. That would trade away the thing that makes this app work on
 first load with no account at all.
 
+The camera is driven by a single number: where the runner sits on screen. The
+map is panned so the runner is at the rotor's centre, so the rotor is shifted
+until that centre lands exactly under the on-screen puck. Expressed in the
+rotor's own units, that shift has to be divided by how much bigger the rotor is
+than the screen — get it wrong and the map centres somewhere the puck isn't,
+which is how the runner ends up hidden behind the bottom card.
+
+The route ahead is drawn bright and thick, the ground already covered dimmed
+behind, so "which way now" reads without thinking.
+
 ## Offline
 
 The service worker caches the app shell and the map tiles you've already
@@ -214,7 +224,7 @@ still needs a connection.
 
 ## Tests
 
-210 unit tests covering the geodesy, ascent accumulation, turn classification,
+216 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.

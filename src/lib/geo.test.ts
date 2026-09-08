@@ -8,6 +8,7 @@ import {
   pathLength,
   pointAtFraction,
   resample,
+  splitPath,
 } from './geo'
 
 const BOSTON = { lat: 42.3601, lng: -71.0589 }
@@ -132,5 +133,39 @@ describe('pointAtFraction', () => {
   it('handles a degenerate path', () => {
     expect(pointAtFraction([BOSTON, BOSTON], 0.4)).toEqual(BOSTON)
     expect(pointAtFraction([BOSTON], 0.4)).toEqual(BOSTON)
+  })
+})
+
+describe('splitPath', () => {
+  const line = Array.from({ length: 11 }, (_, i) => destination(BOSTON, 90, i * 100))
+
+  it('divides the line at the right place', () => {
+    const [behind, ahead] = splitPath(line, 0.4)
+    expect(pathLength(behind)).toBeCloseTo(400, 0)
+    expect(pathLength(ahead)).toBeCloseTo(600, 0)
+  })
+
+  it('joins back up with no gap', () => {
+    const [behind, ahead] = splitPath(line, 0.37)
+    expect(haversine(behind[behind.length - 1], ahead[0])).toBeLessThan(0.01)
+  })
+
+  it('adds up to the whole line', () => {
+    const [behind, ahead] = splitPath(line, 0.63)
+    expect(pathLength(behind) + pathLength(ahead)).toBeCloseTo(pathLength(line), 0)
+  })
+
+  it('puts everything ahead at the start and everything behind at the end', () => {
+    expect(pathLength(splitPath(line, 0)[0])).toBeCloseTo(0, 5)
+    expect(pathLength(splitPath(line, 1)[1])).toBeCloseTo(0, 5)
+  })
+
+  it('clamps fractions outside the line', () => {
+    expect(pathLength(splitPath(line, -1)[0])).toBeCloseTo(0, 5)
+    expect(pathLength(splitPath(line, 4)[1])).toBeCloseTo(0, 5)
+  })
+
+  it('copes with a degenerate line', () => {
+    expect(splitPath([BOSTON], 0.5)[0]).toHaveLength(1)
   })
 })

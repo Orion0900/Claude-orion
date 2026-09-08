@@ -43,6 +43,7 @@ export default function App() {
   const [followingId, setFollowingId] = useState<string | null>(null)
   const [livePosition, setLivePosition] = useState<LatLng | null>(null)
   const [heading, setHeading] = useState<number | null>(null)
+  const [traveled, setTraveled] = useState(0)
 
   const searchRef = useRef<AbortController | null>(null)
   const routing = useMemo(() => createOsrmProvider(), [])
@@ -143,6 +144,7 @@ export default function App() {
     setFollowingId(null)
     setLivePosition(null)
     setHeading(null)
+    setTraveled(0)
   }
 
   return (
@@ -220,6 +222,7 @@ export default function App() {
           paceSeconds={paceSeconds}
           onPosition={setLivePosition}
           onHeading={setHeading}
+          onProgress={setTraveled}
           onExit={stopRun}
         />
       ) : null}
@@ -232,6 +235,7 @@ export default function App() {
         position={livePosition}
         navigating={following !== null}
         heading={heading}
+        traveled={traveled}
         status={status}
         onSelect={(id) => {
           setSelectedId(id)
