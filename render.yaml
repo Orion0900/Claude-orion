@@ -15,6 +15,6 @@ services:
       - key: ASSEMBLYAI_API_KEY
         sync: false
       - key: CLAUDE_MODEL
-        value: claude-opus-5
+        value: claude-haiku-4-5
       - key: DATA_DIR
         value: /data
