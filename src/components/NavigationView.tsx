@@ -21,6 +21,9 @@ interface NavigationViewProps {
   onHeading: (heading: number | null) => void
   onPosition: (position: LatLng | null) => void
   onProgress: (fraction: number) => void
+  /** True while the runner has dragged the map away to look around. */
+  browsing: boolean
+  onRecenter: () => void
   onExit: () => void
 }
 
@@ -49,6 +52,8 @@ export function NavigationView({
   onHeading,
   onPosition,
   onProgress,
+  browsing,
+  onRecenter,
   onExit,
 }: NavigationViewProps) {
   const [progress, setProgress] = useState<RouteProgress | null>(null)
@@ -189,7 +194,24 @@ export function NavigationView({
       ) : null}
       {error ? <p className="nav-alert">{error}</p> : null}
 
-      <div className="nav-spacer" style={{ pointerEvents: 'none' }} />
+      {/* The map owns this space, so it must not swallow pans and pinches. */}
+      <div className="nav-spacer" style={{ pointerEvents: 'none' }}>
+        {browsing ? (
+          <button type="button" className="nav-recenter" onClick={onRecenter}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" fill="currentColor" />
+              <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            Re-centre
+          </button>
+        ) : null}
+      </div>
 
       <div className="nav-footer">
         <div className="nav-summary">

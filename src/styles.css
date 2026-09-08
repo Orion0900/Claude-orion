@@ -624,10 +624,12 @@ input[type='range'] {
   background: linear-gradient(to bottom, var(--bg) 0%, rgba(15, 17, 21, 0.55) 55%, transparent 100%);
 }
 
-/* Leaflet's own credit sits inside the rotor and would be skewed with it;
-   the navigation view carries a flat one instead. */
-.map-viewport.navigating .leaflet-control-attribution,
-.map-viewport.navigating .leaflet-control-zoom {
+/* Leaflet's own credit sits inside the rotor and would be skewed with it, and
+   its zoom buttons land under the instruction banner. The navigation view
+   carries a flat credit of its own, and pinch handles zoom — so both stay
+   hidden for the whole run, not just while the camera is tilted. */
+.map.in-run .leaflet-control-attribution,
+.map.in-run .leaflet-control-zoom {
   display: none;
 }
 
@@ -709,10 +711,6 @@ input[type='range'] {
 }
 
 /* Everything between banner and card is map, so the runner can see ahead. */
-.nav-spacer {
-  flex: 1;
-}
-
 .nav-footer {
   display: flex;
   align-items: center;
@@ -783,4 +781,36 @@ input[type='range'] {
   font-size: 10.5px;
   color: var(--text-dim);
   text-align: center;
+}
+
+/* Shown once the runner has dragged the map away from themselves. */
+.nav-recenter {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.nav-recenter svg {
+  width: 18px;
+  height: 18px;
+  color: #4c8dff;
+}
+
+.nav-spacer {
+  position: relative;
+  flex: 1;
 }
