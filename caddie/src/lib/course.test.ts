@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { destination } from './geo'
-import { greenDepth, hazardsAlongLine, manualCourse, parseOverpass, setHoleTarget, targetOf, type OverpassResponse } from './course'
+import {
+  greenDepth,
+  hazardsAlongLine,
+  manualCourse,
+  nearestHole,
+  parseOverpass,
+  parseOverpassCourses,
+  setHoleTarget,
+  targetOf,
+  type OverpassResponse,
+} from './course'
 
 const TEE = { lat: 42.3601, lng: -71.0589 }
 const box = (centre: { lat: number; lng: number }, half: number) => [
@@ -71,5 +81,69 @@ describe('manual course', () => {
     course = setHoleTarget(course, 1, destination(TEE, 0, 250))
     expect(course.holes).toHaveLength(2)
     expect(targetOf(course.holes[0])).toEqual(destination(TEE, 0, 250))
+  })
+})
+
+describe('parseOverpassCourses', () => {
+  const club = destination(TEE, 0, 0)
+  const muni = destination(TEE, 90, 1500)
+  const greenA = destination(club, 0, 300)
+  const greenB = destination(muni, 0, 300)
+  const response: OverpassResponse = {
+    elements: [
+      { type: 'way', id: 10, tags: { leisure: 'golf_course', name: 'Riverside Club' }, geometry: geom(box(club, 600)) },
+      { type: 'way', id: 11, tags: { golf: 'hole', ref: '1', par: '4' }, geometry: geom([club, greenA]) },
+      { type: 'way', id: 12, tags: { golf: 'green' }, geometry: geom(box(greenA, 15)) },
+      { type: 'way', id: 13, tags: { golf: 'bunker' }, geometry: geom(box(destination(club, 0, 250), 10)) },
+      { type: 'way', id: 20, tags: { leisure: 'golf_course', name: 'Town Muni' }, geometry: geom(box(muni, 600)) },
+      { type: 'way', id: 21, tags: { golf: 'hole', ref: '1', par: '3' }, geometry: geom([muni, greenB]) },
+      { type: 'way', id: 22, tags: { golf: 'green' }, geometry: geom(box(greenB, 15)) },
+    ],
+  }
+
+  it('keeps two nearby courses apart', () => {
+    const courses = parseOverpassCourses(response)
+    expect(courses.map((c) => c.name).sort()).toEqual(['Riverside Club', 'Town Muni'])
+    for (const course of courses) expect(course.holes).toHaveLength(1)
+  })
+
+  it('files each hazard under the course that contains it', () => {
+    const courses = parseOverpassCourses(response)
+    expect(courses.find((c) => c.name === 'Riverside Club')?.hazards).toHaveLength(1)
+    expect(courses.find((c) => c.name === 'Town Muni')?.hazards).toHaveLength(0)
+  })
+
+  it('names holes outside any outline after the nearest course relation', () => {
+    const stray = destination(TEE, 180, 900)
+    const strayGreen = destination(stray, 180, 200)
+    const courses = parseOverpassCourses({
+      elements: [
+        { type: 'relation', id: 99, tags: { leisure: 'golf_course', name: 'Lakeside Links' }, center: { lat: stray.lat, lon: stray.lng } },
+        { type: 'way', id: 30, tags: { golf: 'hole', ref: '7' }, geometry: geom([stray, strayGreen]) },
+        { type: 'way', id: 31, tags: { golf: 'green' }, geometry: geom(box(strayGreen, 15)) },
+      ],
+    })
+    expect(courses).toHaveLength(1)
+    expect(courses[0].name).toBe('Lakeside Links')
+    expect(courses[0].holes[0].number).toBe(7)
+  })
+
+  it('is empty when nothing golf-shaped is nearby', () => {
+    expect(parseOverpassCourses({ elements: [] })).toEqual([])
+  })
+})
+
+describe('nearestHole', () => {
+  it('picks the hole whose tee you are standing on', () => {
+    const courses = parseOverpassCourses({
+      elements: [
+        { type: 'way', id: 40, tags: { golf: 'hole', ref: '1' }, geometry: geom([TEE, destination(TEE, 0, 300)]) },
+        { type: 'way', id: 41, tags: { golf: 'green' }, geometry: geom(box(destination(TEE, 0, 300), 15)) },
+        { type: 'way', id: 42, tags: { golf: 'hole', ref: '2' }, geometry: geom([destination(TEE, 90, 800), destination(TEE, 90, 1100)]) },
+        { type: 'way', id: 43, tags: { golf: 'green' }, geometry: geom(box(destination(TEE, 90, 1100), 15)) },
+      ],
+    })
+    expect(nearestHole(courses[0], destination(TEE, 90, 780))?.number).toBe(2)
+    expect(nearestHole(courses[0], TEE)?.number).toBe(1)
   })
 })

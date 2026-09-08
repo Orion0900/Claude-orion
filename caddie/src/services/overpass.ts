@@ -2,11 +2,11 @@
  * Course data from OpenStreetMap, via the public Overpass API.
  *
  * One query pulls every golf feature within reach of the player, plus the
- * course outline for its name. Two mirrors are tried in turn, because each
- * has its off days.
+ * course outlines that say which course each hole belongs to. Two mirrors are
+ * tried in turn, because each has its off days.
  */
-import { parseOverpass, type Course, type OverpassResponse } from '../lib/course'
-import type { LatLng } from '../lib/geo'
+import { parseOverpassCourses, type Course, type OverpassResponse } from '../lib/course'
+import { haversine, type LatLng } from '../lib/geo'
 import { fetchJson } from './http'
 
 const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
@@ -23,10 +23,22 @@ function query(centre: LatLng, radius: number): string {
   way${around}["natural"="water"];
   way${around}["leisure"="golf_course"];
 );
-out body geom;`
+out body geom;
+relation${around}["leisure"="golf_course"];
+out tags center;`
 }
 
-export async function loadNearbyCourse(centre: LatLng, signal?: AbortSignal): Promise<Course | null> {
+export interface NearbyCourse {
+  course: Course
+  /** Meters from the player to the middle of the course's holes. */
+  distance: number
+}
+
+/**
+ * Every mapped course within reach of the player, nearest first, so they can
+ * say which one they're standing on rather than being handed a guess.
+ */
+export async function findNearbyCourses(centre: LatLng, signal?: AbortSignal): Promise<NearbyCourse[]> {
   let lastError: unknown
   for (const mirror of MIRRORS) {
     try {
@@ -37,19 +49,21 @@ export async function loadNearbyCourse(centre: LatLng, signal?: AbortSignal): Pr
         timeoutMs: 30000,
         retries: 0,
       })
-      const parsed = parseOverpass(response)
-      if (parsed.holes.length === 0) return null
-      return {
-        id: `osm-${centre.lat.toFixed(4)}-${centre.lng.toFixed(4)}`,
-        name: parsed.name ?? 'Nearby course',
-        holes: parsed.holes,
-        hazards: parsed.hazards,
-        source: 'osm',
-      }
+      return rankByDistance(parseOverpassCourses(response), centre)
     } catch (error) {
       if (signal?.aborted) throw error
       lastError = error
     }
   }
   throw lastError instanceof Error ? lastError : new Error('Course lookup failed')
+}
+
+/** Sort courses by how far the player is from the nearest hole on each. */
+export function rankByDistance(courses: Course[], from: LatLng): NearbyCourse[] {
+  return courses
+    .map((course) => ({
+      course,
+      distance: Math.min(...course.holes.map((hole) => haversine(from, hole.tee ?? hole.green))),
+    }))
+    .sort((a, b) => a.distance - b.distance)
 }

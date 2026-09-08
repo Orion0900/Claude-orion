@@ -23,7 +23,7 @@ export function HoleHeader({ hole, holeCount, distance, green, unit, gpsStatus, 
         <div className="hole-title">
           <strong>{hole ? `Hole ${hole.number}` : 'No hole'}</strong>
           <span>
-            {[hole?.par ? `Par ${hole.par}` : null, hole?.length ? formatDistance(hole.length, unit) : null, holeCount > 0 ? `${holeCount} holes` : null]
+            {[hole?.par ? `Par ${hole.par}` : null, hole?.length ? formatDistance(hole.length, unit) : null, holeCount > 0 ? `${holeCount} hole${holeCount === 1 ? '' : 's'}` : null]
               .filter(Boolean)
               .join(' · ')}
           </span>

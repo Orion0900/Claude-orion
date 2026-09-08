@@ -7,13 +7,13 @@ interface SettingsViewProps {
   profile: Profile
   course: Course | null
   courseStatus: string | null
-  canFindCourse: boolean
+  /** True once the player's position is known, which "Tee is here" needs. */
+  hasPosition: boolean
   tapMode: 'none' | 'pin' | 'tee' | 'me'
   holeNumber: number
   usingManualPosition: boolean
   onProfile: (patch: Partial<Profile>) => void
-  onFindCourse: () => void
-  onNewManualCourse: () => void
+  onChangeCourse: () => void
   onTapMode: (mode: 'none' | 'pin' | 'tee' | 'me') => void
   onTeeHere: () => void
   onPar: (par: number | null) => void
@@ -45,18 +45,15 @@ export function SettingsView(p: SettingsViewProps) {
         </p>
         {p.courseStatus && <p className="status">{p.courseStatus}</p>}
         <div className="button-row">
-          <button type="button" className="primary" onClick={p.onFindCourse} disabled={!p.canFindCourse} title={p.canFindCourse ? '' : 'Needs your position first'}>
-            Find the course I'm on
-          </button>
-          <button type="button" onClick={p.onNewManualCourse}>
-            Build one by hand
+          <button type="button" className="primary" onClick={p.onChangeCourse}>
+            Change course
           </button>
         </div>
         <h4>Hole {p.holeNumber}</h4>
         <div className="button-row">
           {tapButton('pin', hole ? 'Move the flag' : 'Set the flag')}
           {tapButton('tee', 'Set tee by tap')}
-          <button type="button" onClick={p.onTeeHere} disabled={!hole || !p.canFindCourse}>
+          <button type="button" onClick={p.onTeeHere} disabled={!hole || !p.hasPosition}>
             Tee is here
           </button>
         </div>
@@ -120,7 +117,9 @@ export function SettingsView(p: SettingsViewProps) {
             Forget all tracked shots
           </button>
         </div>
-        <p className="muted small">A new round keeps your history; the caddie learns across rounds.</p>
+        <p className="muted small">
+          A new round asks which hole you're starting on and keeps your history; the caddie learns across rounds.
+        </p>
       </section>
     </div>
   )

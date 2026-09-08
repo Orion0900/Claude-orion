@@ -29,10 +29,17 @@ EasyPedal. Merging is the only step.
 
 ## What it does
 
-- **Finds the course you're on.** One tap pulls every mapped hole within a
-  mile and a half from OpenStreetMap: tees, greens, bunkers, water, pins where
-  someone has mapped them. Not every course is mapped, so any hole can also be
-  set by hand: tap the map where the flag is.
+- **Asks where you are before anything else.** Opening the app puts two
+  questions first: which course you're at, then which hole you're starting on.
+  The course search lists every mapped course within a mile and a half —
+  by name, hole count and how far away it is — so a club and the muni across
+  the road don't get merged into one. The hole grid shows par per hole and
+  offers the one you're standing closest to. Nine holes in, or starting on the
+  back nine, you pick the hole rather than being dropped on the first.
+- **Courses from the map, or by hand.** Tees, greens, bunkers, water and pins
+  come from OpenStreetMap. Not every course is mapped, so **Set it up by hand**
+  gives you eighteen holes to fill in: pick a number and tap where the flag is,
+  as you play.
 - **GPS and the line.** A live dot for you, a flag for the hole, a dashed line
   between them with the distance written on it. Front and back of the green
   too, when the green's outline is known. Yards or meters.

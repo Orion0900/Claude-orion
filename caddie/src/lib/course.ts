@@ -6,7 +6,7 @@
  * `natural=water`, and the occasional `golf=pin` node. Not every course has
  * all of it, so anything can be missing and the app still has to work.
  */
-import { centroid, haversine, polygonCrossings, type LatLng } from './geo'
+import { centroid, haversine, pointInPolygon, polygonCrossings, type LatLng } from './geo'
 import type { HazardInterval, HazardKind } from './advisor'
 
 export interface Hole {
@@ -76,6 +76,8 @@ interface OsmElement {
   tags?: Record<string, string>
   lat?: number
   lon?: number
+  /** Overpass `out center`: a relation's middle, without its member geometry. */
+  center?: { lat: number; lon: number }
   geometry?: Array<{ lat: number; lon: number }>
 }
 
@@ -189,6 +191,91 @@ export function parseOverpass(response: OverpassResponse): { name: string | null
 
   holes.sort((a, b) => a.number - b.number)
   return { name, holes, hazards }
+}
+
+/**
+ * Every golf course in an Overpass answer, as separate courses.
+ *
+ * Two courses can easily sit within a mile of each other — a club with 27
+ * holes, or a muni across the road — and merging them would give the player
+ * a "hole 4" belonging to neither. So each hole is filed under the
+ * `leisure=golf_course` outline that contains its green. Holes inside no
+ * mapped outline (courses mapped as relations, or not outlined at all) become
+ * one more course, named after the nearest golf course OSM knows about.
+ */
+export function parseOverpassCourses(response: OverpassResponse): Course[] {
+  const parsed = parseOverpass(response)
+  if (parsed.holes.length === 0) return []
+
+  const areas = response.elements
+    .filter((e) => e.type === 'way' && e.tags?.leisure === 'golf_course' && (e.geometry?.length ?? 0) > 2)
+    .map((e) => {
+      const outline = (e.geometry as NonNullable<OsmElement['geometry']>).map(toLatLng)
+      return { id: e.id, name: e.tags?.name ?? null, outline, centre: centroid(outline) }
+    })
+
+  // Relations carry a name and a centre but no usable outline here; they only
+  // ever name the leftovers.
+  const named = [
+    ...areas.filter((a) => a.name).map((a) => ({ name: a.name as string, centre: a.centre })),
+    ...response.elements
+      .filter((e) => e.type === 'relation' && e.tags?.leisure === 'golf_course' && e.tags?.name && e.center)
+      .map((e) => ({ name: e.tags?.name as string, centre: { lat: (e.center as { lat: number }).lat, lng: (e.center as { lon: number }).lon } })),
+  ]
+
+  const areaOf = (point: LatLng) => areas.find((a) => pointInPolygon(point, a.outline)) ?? null
+
+  const courses: Course[] = []
+  for (const area of areas) {
+    const holes = parsed.holes.filter((h) => areaOf(targetOf(h)) === area)
+    if (holes.length === 0) continue
+    courses.push({
+      id: `osm-way-${area.id}`,
+      name: area.name ?? 'Unnamed course',
+      holes,
+      hazards: parsed.hazards.filter((z) => areaOf(centroid(z.polygon)) === area),
+      source: 'osm',
+    })
+  }
+
+  const orphans = parsed.holes.filter((h) => areaOf(targetOf(h)) === null)
+  if (orphans.length > 0) {
+    const middle = centroid(orphans.map(targetOf))
+    const nearest = named.reduce<{ name: string; distance: number } | null>((best, candidate) => {
+      const distance = haversine(middle, candidate.centre)
+      return best === null || distance < best.distance ? { name: candidate.name, distance } : best
+    }, null)
+    courses.push({
+      id: 'osm-unbounded',
+      name: nearest && nearest.distance < 2000 ? nearest.name : (parsed.name ?? 'Nearby holes'),
+      holes: orphans,
+      hazards: parsed.hazards.filter((z) => areaOf(centroid(z.polygon)) === null),
+      source: 'osm',
+    })
+  }
+
+  // Courses that name the same club (an outline plus its unbounded holes) are
+  // one course as far as the player is concerned.
+  const merged: Course[] = []
+  for (const course of courses) {
+    const twin = merged.find((m) => m.name === course.name)
+    if (!twin) {
+      merged.push(course)
+      continue
+    }
+    const numbers = new Set(twin.holes.map((h) => h.number))
+    twin.holes = [...twin.holes, ...course.holes.filter((h) => !numbers.has(h.number))].sort((a, b) => a.number - b.number)
+    twin.hazards = [...twin.hazards, ...course.hazards]
+  }
+  return merged
+}
+
+/** The hole whose tee (or green) is closest to a point. */
+export function nearestHole(course: Course, from: LatLng): Hole | null {
+  if (course.holes.length === 0) return null
+  return course.holes.reduce((best, hole) =>
+    haversine(from, hole.tee ?? hole.green) < haversine(from, best.tee ?? best.green) ? hole : best,
+  )
 }
 
 /** A course the player builds by dropping pins, one hole at a time. */
