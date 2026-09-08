@@ -16,16 +16,30 @@ describe('bookmarkletUrl', () => {
     expect(decode('https://x.example.com///')).toContain("const BASE = 'https://x.example.com'")
   })
 
-  it('leaves no placeholder behind and calls both API steps', () => {
+  it('leaves no placeholder behind and posts link and transcript together', () => {
     const code = decode('https://x.example.com')
     expect(code).not.toContain('__API_BASE__')
-    // One request carries link and transcript together, so nothing races the
-    // server's caption hunt.
-    expect(code).toContain("post('/api/jobs'")
+    expect(code).toContain("BASE + '/api/jobs'")
     expect(code).toContain('transcript: text')
+    // One request carries both, so nothing races the server's caption hunt.
     expect(code).not.toContain("'/transcript'")
-    // Newlines between a timestamp and its line must be real, not escaped:
-    // the server's panel parser keys off them.
-    expect(code).toContain("t.trim() + '\\n' + x.trim()")
+  })
+
+  it('reads captions itself rather than relying on the transcript panel', () => {
+    const code = decode('https://x.example.com')
+    // Relative paths: m.youtube.com and www.youtube.com are separate origins,
+    // so only a relative URL stays same-origin and readable.
+    expect(code).toContain("'/watch?v=' + id")
+    // The absolute youtube.com URL is only the canonical link handed to
+    // PodBrief; nothing is ever *fetched* from an absolute YouTube origin.
+    expect(code).not.toMatch(/fetch\(\s*['"`]https:\/\/(?:www\.|m\.)?youtube\.com/)
+    expect(code).toContain('ytInitialPlayerResponse')
+    expect(code).toContain('fmt=json3')
+    // The panel remains a fallback, not the requirement.
+    expect(code).toContain('ytd-transcript-segment-renderer')
+  })
+
+  it('refuses to run anywhere but YouTube', () => {
+    expect(decode('https://x.example.com')).toContain('youtube')
   })
 })
