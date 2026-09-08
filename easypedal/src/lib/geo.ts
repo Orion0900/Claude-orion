@@ -163,3 +163,36 @@ export function splitPath(path: LatLng[], fraction: number): [LatLng[], LatLng[]
     [junction, ...path.slice(i)],
   ]
 }
+
+/**
+ * The part of a polyline between two distances along it, in meters. Both
+ * ends are interpolated, so consecutive slices share their boundary point
+ * and draw back to back with no gap.
+ */
+export function slicePath(
+  path: LatLng[],
+  from: number,
+  to: number,
+  cumulative: number[] = cumulativeDistances(path),
+): LatLng[] {
+  if (path.length < 2) return path.slice()
+  const total = cumulative[cumulative.length - 1]
+  const start = Math.max(0, Math.min(from, to, total))
+  const end = Math.min(total, Math.max(from, to, 0))
+  if (end <= start) return []
+
+  const at = (target: number): LatLng => {
+    let i = 1
+    while (i < cumulative.length - 1 && cumulative[i] < target) i++
+    const span = cumulative[i] - cumulative[i - 1]
+    const t = span === 0 ? 0 : (target - cumulative[i - 1]) / span
+    return interpolate(path[i - 1], path[i], t)
+  }
+
+  const out: LatLng[] = [at(start)]
+  for (let i = 0; i < path.length; i++) {
+    if (cumulative[i] > start && cumulative[i] < end) out.push(path[i])
+  }
+  out.push(at(end))
+  return out
+}

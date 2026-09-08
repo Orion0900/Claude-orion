@@ -1068,7 +1068,6 @@ input[type='range'] {
   border-radius: 999px;
   overflow: hidden;
   background: var(--bg);
-  gap: 1px;
 }
 
 .lane-bar-part {
@@ -1077,27 +1076,11 @@ input[type='range'] {
   min-width: 2px;
 }
 
-.lane-bar-part.protected {
+.lane-bar-part.good {
   background: #4ade80;
 }
 
-.lane-bar-part.lane {
-  background: #a3e635;
-}
-
-.lane-bar-part.path {
-  background: #2dd4bf;
-}
-
-.lane-bar-part.quiet {
-  background: #fbbf24;
-}
-
-.lane-bar-part.busy {
-  background: #fb923c;
-}
-
-.lane-bar-part.unsafe {
+.lane-bar-part.bad {
   background: #f87171;
 }
 

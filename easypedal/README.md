@@ -6,8 +6,8 @@ routes drawn on a map — painted by what you'll be riding on — with the same
 turn-by-turn navigation LoopMaker uses.
 
 <p>
-  <img src="docs/screenshot.png" width="260" alt="Route options, painted by road type" />
-  <img src="docs/screenshot-steps.png" width="260" alt="Turn-by-turn list" />
+  <img src="docs/screenshot.png" width="260" alt="Bike lanes first: green where there is a lane or path, red where there is not" />
+  <img src="docs/screenshot-hills.png" width="260" alt="Fewest hills first: red where the climb is steep" />
   <img src="docs/screenshot-navigation.png" width="260" alt="Navigation view" />
 </p>
 
@@ -41,10 +41,14 @@ workflow turns Pages on if it isn't already.
 - **Never a highway.** Every route is checked stretch by stretch. Anything on a
   trunk road or motorway is dropped before you see it, and if nothing safe
   exists it says so rather than offering something dangerous.
-- **Shows you the lanes.** The chosen route is painted by road type — protected
-  bike path, painted lane, shared path, quiet street, busy road — and each
-  option carries a bar and a percentage, so "78% on bike lanes" is a fact, not
-  a feeling.
+- **Shows you the lanes.** With bike lanes first, the chosen route is painted
+  green where there's a bike lane or path and red where there isn't, on the
+  map and on a bar in each card, with the percentage spelled out — "78% on
+  bike lanes" is a fact, not a feeling.
+- **Shows you the hills.** With fewest hills first, the same route is painted
+  red where the climb is steep and green everywhere else, and each card says
+  how far you'll be grinding and how steep it gets. Flip the switch and the
+  paint follows, no new search needed.
 - **Counts the climbing.** Every route is sampled against elevation data and
   reported as total ascent, with a profile you can scrub to see where the hills
   are on the map.
@@ -81,6 +85,16 @@ here is asking for the right ones and telling them apart.
 5. **Filter, then rank.** Anything with more than 40 m of highway is out.
    The rest are scored on lane share and climbing, weighted 60/25 in whichever
    order the rider chose, with a small charge for detours and busy roads.
+
+### What counts as steep
+
+Five percent. That's the grade at which a casual rider on an ordinary bike
+stops cruising and starts grinding — it roughly halves the speed of someone
+doing 18 km/h on the flat — and it's the limit cycling-infrastructure guidance
+sets for a comfortable sustained climb. Grade is measured over a window of
+about 100 m of the smoothed profile, so a single noisy elevation sample can't
+paint a hill that isn't there, and only climbing counts: a sharp descent is
+still "easy going", because the question is what you have to pedal up.
 
 ### Why lane share is measured rather than trusted
 
@@ -142,6 +156,7 @@ src/
   lib/
     routeSearch.ts   asking the engine three ways, measuring, filtering, ranking  <- the core
     bikeway.ts       road tags -> protected / lane / path / quiet / busy / unsafe
+    grades.ts        where the steep climbs are, cut from the route to paint
     polyline.ts      the engine's encoded shapes
     effort.ts        ride-time estimate from speed and climbing
     rideSummary.ts   what actually happened on the ride, measured
@@ -171,6 +186,7 @@ your phone.
 ## Tests
 
 Unit tests cover the polyline codec, road classification and the safety rule,
+steep-climb detection and its windowing,
 the ranking under both priorities, the search end to end against the synthetic
 town (highway filtering, de-duplication, degraded operation when a service
 fails), the Valhalla adapter's maneuver translation and request shapes, and

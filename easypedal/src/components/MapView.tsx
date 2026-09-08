@@ -3,18 +3,13 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { splitPath, type LatLng } from '../lib/geo'
 import { createDoubleTapDetector } from '../lib/gestures'
-import type { RouteResult } from '../lib/routeSearch'
-import type { WayKind } from '../lib/bikeway'
+import type { Priority, RouteResult } from '../lib/routeSearch'
+import { isBikeway } from '../lib/bikeway'
+import { gradeSegments } from '../lib/grades'
 
-/** Colours for each kind of road; the same ones the legend and lane bar use. */
-export const KIND_COLORS: Record<WayKind, string> = {
-  protected: '#4ade80',
-  lane: '#a3e635',
-  path: '#2dd4bf',
-  quiet: '#fbbf24',
-  busy: '#fb923c',
-  unsafe: '#f87171',
-}
+/** Two colours, whichever question is being asked: green is good, red is not. */
+export const GOOD_COLOR = '#4ade80'
+export const BAD_COLOR = '#f87171'
 
 interface MapViewProps {
   start: LatLng | null
@@ -41,6 +36,11 @@ interface MapViewProps {
   /** Fired on a double tap, which puts the rider back in the middle. */
   onRecenter: () => void
   onSelect: (id: string) => void
+  /**
+   * What the chosen route is painted by: where the bike lanes are, or where
+   * the steep climbs are. Follows the rider's priority switch.
+   */
+  paint: Priority
   /** A tap on the map, to set whichever end the panel is asking for. */
   onPick: (point: LatLng) => void
   status: string | null
@@ -48,13 +48,20 @@ interface MapViewProps {
 
 const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
 
-const LEGEND: Record<WayKind, string> = {
-  protected: 'Bike path',
-  lane: 'Bike lane',
-  path: 'Shared path',
-  quiet: 'Quiet street',
-  busy: 'Busy road',
-  unsafe: 'Highway',
+const LEGEND: Record<Priority, { good: string; bad: string }> = {
+  lanes: { good: 'Bike lane or path', bad: 'No bike lane' },
+  hills: { good: 'Easy going', bad: 'Steep climb (5%+)' },
+}
+
+/** The chosen route cut into good and bad stretches for the current paint. */
+function paintedStretches(route: RouteResult, paint: Priority): Array<{ path: LatLng[]; good: boolean }> {
+  if (paint === 'hills') {
+    return gradeSegments(route.path, route.profile).map((segment) => ({
+      path: segment.path,
+      good: segment.kind === 'easy',
+    }))
+  }
+  return (route.ways?.segments ?? []).map((segment) => ({ path: segment.path, good: isBikeway(segment.kind) }))
 }
 
 /**
@@ -87,6 +94,7 @@ export function MapView({
   onBrowse,
   onRecenter,
   onSelect,
+  paint,
   onPick,
   status,
 }: MapViewProps) {
@@ -289,12 +297,12 @@ export function MapView({
       if (!isSelected) continue
       line.bringToFront()
 
-      // The chosen route is painted by what it rides on, so where the bike
-      // lanes are — and where they run out — reads straight off the map.
-      for (const segment of route.ways?.segments ?? []) {
+      // The chosen route is painted green and red by whichever question the
+      // rider asked: where the bike lanes are, or where the steep climbs are.
+      for (const segment of paintedStretches(route, paint)) {
         if (segment.path.length < 2) continue
         const stretch = L.polyline(toLatLngs(segment.path), {
-          color: KIND_COLORS[segment.kind],
+          color: segment.good ? GOOD_COLOR : BAD_COLOR,
           weight: 5,
           opacity: 1,
           lineJoin: 'round',
@@ -318,7 +326,7 @@ export function MapView({
         { padding: [48, 48] },
       )
     }
-  }, [routes, selectedId, navigating, traveled])
+  }, [routes, selectedId, navigating, traveled, paint])
 
   useEffect(() => {
     const map = mapRef.current
@@ -445,14 +453,16 @@ export function MapView({
           </div>
         ) : null}
         {status ? <div className="map-overlay">{status}</div> : null}
-        {!navigating && routes.some((route) => route.id === selectedId && route.ways) ? (
+        {!navigating && routes.some((route) => route.id === selectedId && (paint === 'hills' || route.ways)) ? (
           <div className="map-legend" aria-label="What the colours mean">
-            {(['protected', 'lane', 'path', 'quiet', 'busy'] as WayKind[]).map((kind) => (
-              <span key={kind}>
-                <i style={{ background: KIND_COLORS[kind] }} />
-                {LEGEND[kind]}
-              </span>
-            ))}
+            <span>
+              <i style={{ background: GOOD_COLOR }} />
+              {LEGEND[paint].good}
+            </span>
+            <span>
+              <i style={{ background: BAD_COLOR }} />
+              {LEGEND[paint].bad}
+            </span>
           </div>
         ) : null}
       </div>

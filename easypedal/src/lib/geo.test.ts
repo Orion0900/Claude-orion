@@ -8,6 +8,7 @@ import {
   pathLength,
   pointAtFraction,
   resample,
+  slicePath,
   splitPath,
 } from './geo'
 
@@ -167,5 +168,30 @@ describe('splitPath', () => {
 
   it('copes with a degenerate line', () => {
     expect(splitPath([BOSTON], 0.5)[0]).toHaveLength(1)
+  })
+})
+
+describe('slicePath', () => {
+  const origin = { lat: 42.36, lng: -71.06 }
+  const path = Array.from({ length: 11 }, (_, i) => destination(origin, 90, i * 100))
+
+  it('cuts the part between two distances, interpolating both ends', () => {
+    const slice = slicePath(path, 150, 350)
+    expect(pathLength(slice)).toBeCloseTo(200, 0)
+    expect(haversine(slice[0], destination(origin, 90, 150))).toBeLessThan(1)
+    expect(haversine(slice[slice.length - 1], destination(origin, 90, 350))).toBeLessThan(1)
+    // Vertices at 200 and 300 sit inside; nothing else does.
+    expect(slice).toHaveLength(4)
+  })
+
+  it('shares its boundary point with the next slice', () => {
+    const a = slicePath(path, 0, 250)
+    const b = slicePath(path, 250, 1000)
+    expect(a[a.length - 1]).toEqual(b[0])
+  })
+
+  it('clamps to the path and returns nothing for an empty range', () => {
+    expect(pathLength(slicePath(path, -50, 5000))).toBeCloseTo(1000, 0)
+    expect(slicePath(path, 300, 300)).toEqual([])
   })
 })

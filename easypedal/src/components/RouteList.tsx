@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { HIGHLIGHT_LABELS, viaLabel, type RouteResult } from '../lib/routeSearch'
+import { HIGHLIGHT_LABELS, viaLabel, type Priority, type RouteResult } from '../lib/routeSearch'
+import { gradeSegments, steepDistance, steepestGrade } from '../lib/grades'
 import { appleMapsUrl, isAppleDevice, shareRoute } from '../lib/share'
 import { simplicityLabel } from '../lib/turns'
 import { isSaved, type SavedRoute } from '../lib/savedRoutes'
 import { estimateDuration } from '../lib/effort'
-import { bikewayLabel, busyShare, KIND_LABELS, WAY_KINDS, type WayBreakdown } from '../lib/bikeway'
+import { bikewayLabel, busyShare, isBikeway, KIND_LABELS, WAY_KINDS, type WayBreakdown } from '../lib/bikeway'
 import { distancePhrase, instructionFor, isInstruction, type RouteStep } from '../lib/navigation'
 import {
   formatDistance,
@@ -21,6 +22,7 @@ interface RouteListProps {
   distanceUnit: DistanceUnit
   elevationUnit: ElevationUnit
   speed: number
+  priority: Priority
   scrub: number | null
   onSelect: (id: string) => void
   onScrub: (fraction: number | null) => void
@@ -53,18 +55,46 @@ function ShareButton({ route, name }: { route: RouteResult; name: string }) {
   )
 }
 
-/** A stacked bar: how much of the ride is on each kind of road. */
+/** A bar in ride order: green where there's a bike lane or path, red where there isn't. */
 export function LaneBar({ ways }: { ways: WayBreakdown }) {
   if (ways.total <= 0) return null
   return (
     <div className="lane-bar" role="img" aria-label={laneSummary(ways)}>
-      {WAY_KINDS.map((kind) => {
-        const share = ways.meters[kind] / ways.total
-        if (share <= 0) return null
-        return <span key={kind} className={`lane-bar-part ${kind}`} style={{ flexGrow: share }} />
-      })}
+      {ways.segments.map((segment, index) => (
+        <span
+          key={index}
+          className={isBikeway(segment.kind) ? 'lane-bar-part good' : 'lane-bar-part bad'}
+          style={{ flexGrow: segment.length / ways.total }}
+        />
+      ))}
     </div>
   )
+}
+
+/** The same bar for hills: red where the climb is steep, green elsewhere. */
+export function GradeBar({ route }: { route: RouteResult }) {
+  const segments = gradeSegments(route.path, route.profile)
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0)
+  if (total <= 0) return null
+  return (
+    <div className="lane-bar" role="img" aria-label={`${Math.round((steepDistance(segments) / total) * 100)}% steep climbing`}>
+      {segments.map((segment, index) => (
+        <span
+          key={index}
+          className={segment.kind === 'easy' ? 'lane-bar-part good' : 'lane-bar-part bad'}
+          style={{ flexGrow: segment.length / total }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** "0.4 mi of steep climbing, up to 8%" or "No steep climbs". */
+function steepNote(route: RouteResult, distanceUnit: DistanceUnit): string {
+  const segments = gradeSegments(route.path, route.profile)
+  const steep = steepDistance(segments)
+  if (steep <= 0) return 'No steep climbs'
+  return `${formatDistance(steep, distanceUnit)} of steep climbing, up to ${Math.round(steepestGrade(segments) * 100)}%`
 }
 
 function laneSummary(ways: WayBreakdown): string {
@@ -98,6 +128,7 @@ export function RouteList({
   distanceUnit,
   elevationUnit,
   speed,
+  priority,
   scrub,
   onSelect,
   onScrub,
@@ -166,9 +197,16 @@ export function RouteList({
                 )}
               </span>
 
+              {priority === 'hills' ? (
+                <>
+                  <GradeBar route={route} />
+                  <span className="route-note">{steepNote(route, distanceUnit)}</span>
+                </>
+              ) : null}
+
               {route.ways ? (
                 <>
-                  <LaneBar ways={route.ways} />
+                  {priority === 'lanes' ? <LaneBar ways={route.ways} /> : null}
                   <span className="route-note">
                     <strong>{Math.round(route.bikewayShare * 100)}%</strong> on bike lanes &amp; paths ·{' '}
                     {bikewayLabel(route.bikewayShare).toLowerCase()}
@@ -177,6 +215,8 @@ export function RouteList({
               ) : (
                 <span className="route-note">Road types unknown for this route</span>
               )}
+
+              {priority === 'lanes' ? <span className="route-note">{steepNote(route, distanceUnit)}</span> : null}
 
               {busy > 0.02 && route.ways ? (
                 <span className="route-note warn">

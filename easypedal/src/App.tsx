@@ -262,6 +262,7 @@ export default function App() {
               distanceUnit={form.distanceUnit}
               elevationUnit={form.elevationUnit}
               speed={form.speed}
+              priority={form.priority}
               scrub={scrub}
               onSelect={(id) => {
                 setSelectedId(id)
@@ -335,6 +336,7 @@ export default function App() {
           setSelectedId(id)
           setScrub(null)
         }}
+        paint={form.priority}
         onPick={(point) => setEndpoint(picking, point, null)}
       />
     </div>

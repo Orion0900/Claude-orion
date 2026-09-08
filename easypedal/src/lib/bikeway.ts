@@ -118,11 +118,15 @@ function samePoint(a: LatLng, b: LatLng): boolean {
   return Math.abs(a.lat - b.lat) < 1e-7 && Math.abs(a.lng - b.lng) < 1e-7
 }
 
+/** The kinds that count as "bike lanes & paths": no cars, or a lane of your own. */
+export function isBikeway(kind: WayKind): boolean {
+  return kind === 'protected' || kind === 'lane' || kind === 'path'
+}
+
 /** Share of the route on infrastructure built for bikes: 0-1. */
 export function bikewayShare(breakdown: WayBreakdown): number {
   if (breakdown.total <= 0) return 0
-  const { protected: p, lane, path } = breakdown.meters
-  return (p + lane + path) / breakdown.total
+  return WAY_KINDS.filter(isBikeway).reduce((sum, kind) => sum + breakdown.meters[kind], 0) / breakdown.total
 }
 
 /** Share of the route on through roads with nothing for bikes: 0-1. */

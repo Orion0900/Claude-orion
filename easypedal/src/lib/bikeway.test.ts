@@ -5,8 +5,10 @@ import {
   breakdownEdges,
   busyShare,
   classifyEdge,
+  isBikeway,
   isSafe,
   UNSAFE_TOLERANCE_METERS,
+  WAY_KINDS,
   type RoadEdge,
 } from './bikeway'
 
@@ -120,5 +122,11 @@ describe('shares and safety', () => {
     expect(bikewayLabel(0.5)).toContain('half')
     expect(bikewayLabel(0.2)).toContain('Some')
     expect(bikewayLabel(0.05)).toContain('Few')
+  })
+})
+
+describe('isBikeway', () => {
+  it('counts protected paths, painted lanes and shared paths, and nothing else', () => {
+    expect(WAY_KINDS.filter(isBikeway)).toEqual(['protected', 'lane', 'path'])
   })
 })
