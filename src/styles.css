@@ -533,54 +533,160 @@ input[type='range'] {
   }
 }
 
-/* ---- Follow mode: the panel you glance at mid-run ---- */
-.follow {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-raised);
-}
-
-.follow-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.follow-head h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--text);
-  text-transform: none;
-}
-
-.follow-bar {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg);
+/* ---- Map viewport: a plain frame normally, a rotor while navigating ---- */
+.map-viewport {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  margin-bottom: 12px;
 }
 
-.follow-bar span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+.map-rotor {
+  position: absolute;
+  inset: 0;
 }
 
-.follow-stats {
+/* Navigating tilts and turns the whole map. The rotor is oversized so the
+   receding "horizon" is still covered by loaded tiles once tilted. */
+.map-viewport.navigating {
+  perspective: 900px;
+  perspective-origin: 50% 75%;
+}
+
+.map-viewport.navigating .map-rotor {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: 220%;
+  height: 220%;
+  transform-origin: 50% 50%;
+  transition: transform 0.5s ease-out;
+  will-change: transform;
+}
+
+/* Tilting makes the far edge of the map recede past the loaded tiles. A haze
+   at the horizon reads as distance rather than as a missing map. */
+.map-viewport.navigating::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46%;
+  z-index: 450;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg) 0%, rgba(15, 17, 21, 0.72) 50%, transparent 100%);
+}
+
+/* Leaflet's own credit sits inside the rotor and would be skewed with it;
+   the navigation footer carries a flat one instead. */
+.map-viewport.navigating .leaflet-control-attribution,
+.map-viewport.navigating .leaflet-control-zoom {
+  display: none;
+}
+
+.nav-attribution {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ---- Navigation: banner, alert, footer ---- */
+.app.navigating {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.app.navigating .sidebar {
+  display: none;
+}
+
+.nav {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.nav > * {
+  pointer-events: auto;
+}
+
+.nav-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  background: rgba(23, 26, 33, 0.96);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.nav-banner.astray {
+  background: rgba(60, 26, 26, 0.96);
+}
+
+.nav-arrow {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  color: var(--accent);
+}
+
+.nav-banner.astray .nav-arrow {
+  color: var(--danger);
+}
+
+.nav-banner-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The distance is what you glance at; it gets the size. */
+.nav-distance {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-instruction {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.nav-alert {
+  margin: 10px 14px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(248, 113, 113, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #fca5a5;
+  font-size: 13px;
+  align-self: flex-start;
+}
+
+.nav-footer {
+  padding: 14px 18px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  background: rgba(23, 26, 33, 0.96);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.nav-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin: 0;
+  margin: 0 0 12px;
 }
 
-.follow-stats dt {
+.nav-stats dt {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.07em;
@@ -589,16 +695,14 @@ input[type='range'] {
   margin-bottom: 2px;
 }
 
-/* Numbers you read at a glance while moving, so they are set large. */
-.follow-stats dd {
+.nav-stats dd {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 860px) {
-  .follow {
-    padding: 14px 18px;
-  }
+.nav-buttons {
+  display: flex;
+  gap: 10px;
 }

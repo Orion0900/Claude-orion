@@ -1,6 +1,7 @@
 import type { LatLng } from '../lib/geo'
 import type { RouteGeometry, RouteOptions, RoutingProvider } from '../lib/routeSearch'
 import { countTurns, type Maneuver } from '../lib/turns'
+import type { RawStep } from '../lib/navigation'
 import { fetchJson, HttpError } from './http'
 
 /** FOSSGIS-hosted OSRM, the public instance that exposes a walking profile. */
@@ -12,7 +13,12 @@ interface OsrmResponse {
   routes?: Array<{
     distance: number
     geometry: { coordinates: [number, number][] }
-    legs?: Array<{ steps?: Array<{ maneuver?: Maneuver }> }>
+    legs?: Array<{
+      steps?: Array<{
+        name?: string
+        maneuver?: Maneuver & { location?: [number, number]; exit?: number }
+      }>
+    }>
   }>
 }
 
@@ -38,15 +44,28 @@ export function createOsrmProvider(base = OSRM_BASE): RoutingProvider {
         throw new HttpError(data.message ?? `Routing failed (${data.code})`)
       }
       const route = data.routes[0]
-      const maneuvers = (route.legs ?? [])
-        .flatMap((leg) => leg.steps ?? [])
+      const rawSteps = (route.legs ?? []).flatMap((leg) => leg.steps ?? [])
+      const maneuvers = rawSteps
         .map((step) => step.maneuver)
         .filter((maneuver): maneuver is Maneuver => maneuver !== undefined)
+
+      const steps: RawStep[] = rawSteps.flatMap((step) => {
+        const location = step.maneuver?.location
+        if (!step.maneuver || !location) return []
+        return [{
+          type: step.maneuver.type,
+          modifier: step.maneuver.modifier,
+          exit: step.maneuver.exit,
+          name: step.name || undefined,
+          location: { lat: location[1], lng: location[0] },
+        }]
+      })
 
       return {
         distance: route.distance,
         path: route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
         turns: countTurns(maneuvers),
+        steps,
       }
     },
   }

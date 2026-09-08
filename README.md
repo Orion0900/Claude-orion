@@ -27,6 +27,9 @@ end at your door.
   on the map.
 - **Sends to your phone.** On an iPhone, the share sheet hands the GPX straight
   to Strava, Garmin, Files or AirDrop. Everywhere else it downloads.
+- **Turn-by-turn navigation.** Hit **Start run** for a tilted, heading-up view
+  like driving directions: the next turn, the street it's onto, and the distance
+  counting down — spoken aloud too, so you needn't look at the screen.
 - **Follows you as you run.** A live dot on the route, distance done and left,
   and a warning when you drift off the line — so you don't need a watch.
 - **Installs on your phone.** Add to Home Screen gives it an icon, a full
@@ -139,13 +142,14 @@ src/
     routeSearch.ts   candidate generation, refinement, scoring   <- the core
     turns.ts         which maneuvers count as a turn worth remembering
     follow.ts        matching a live GPS fix to a point on the route
+    navigation.ts    turn instructions, distances and what to say next
     effort.ts        grade-adjusted finish-time estimate
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
     __fixtures__/    synthetic grid city used by the tests
   services/          OSRM, Open-Meteo, Nominatim + shared fair-use HTTP client
-  components/        MapView, ControlPanel, RouteList, ElevationProfile, FollowMode
+  components/        MapView, ControlPanel, RouteList, ElevationProfile, NavigationView
 public/
   manifest.webmanifest, sw.js, icons     the installable-app layer
 ```
@@ -165,6 +169,31 @@ and the whole route is searched again.
 
 The screen is held awake while following, where the browser allows it.
 
+### Turn-by-turn
+
+The routing engine describes a route as maneuvers, but to guide someone mid-run
+each one needs a position *along* the route, to compare against how far they've
+got. Those are found by projecting each maneuver onto the route, walking
+forwards only — which keeps them in running order even where a loop crosses its
+own path, and stops the closing "you're back at the start" being dragged to
+distance zero because it sits on the same spot as the opening instruction.
+
+Each turn is spoken at most once per distance band (400 m, 150 m, 25 m), so you
+get a heads-up and a final call rather than a stream of repeats.
+
+### The tilted view
+
+Leaflet draws a flat map, so the perspective is CSS: the map sits in an
+oversized "rotor" that is turned to your heading and pitched back with
+`rotateX`. Everything inside — tiles, the route line, your position — tilts
+together, so nothing drifts out of alignment. Tilting pushes the far edge past
+the loaded tiles, so a haze at the horizon reads that as distance rather than as
+a missing map.
+
+A true 3D map would mean vector tiles and a rendering library, which in practice
+means an API key. That would trade away the thing that makes this app work on
+first load with no account at all.
+
 ## Offline
 
 The service worker caches the app shell and the map tiles you've already
@@ -175,9 +204,10 @@ still needs a connection.
 
 ## Tests
 
-157 unit tests covering the geodesy, ascent accumulation, turn classification,
-GPS-to-route matching, unit conversion, GPX output, sharing and its fallbacks,
-the OSRM adapter, and the search algorithm end to end.
+188 unit tests covering the geodesy, ascent accumulation, turn classification,
+GPS-to-route matching, turn instructions and their placement, unit conversion,
+GPX output, sharing and its fallbacks, the OSRM adapter, and the search
+algorithm end to end.
 
 The search tests run against a synthetic city in `src/lib/__fixtures__` —
 streets on a 120 m lattice and terrain that climbs steadily to the east — so
