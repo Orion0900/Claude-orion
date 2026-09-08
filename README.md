@@ -20,6 +20,10 @@ end at your door.
   data and filtered on total ascent, so "flat five miles" means flat.
 - **Gives you options.** Several distinct routes in different directions, not
   one take-it-or-leave-it suggestion. "Find different routes" reshuffles.
+- **Remembers the ones you liked.** Star a route and it's kept on the device,
+  whole — so it opens instantly next time and starts with no connection at all.
+- **Tells you how the run went.** Finish a loop and you get distance, time,
+  measured pace and climbing, with one tap to save the route.
 - **Keeps the navigation simple.** Ask for fewer turns and it builds rounder,
   straighter loops and ranks them by how little you'll have to think. Every
   route shows its turn count.
@@ -145,12 +149,14 @@ src/
     navigation.ts    turn instructions, distances and what to say next
     effort.ts        grade-adjusted finish-time estimate
     gestures.ts      double-tap detection, kept away from the DOM to be tested
+    runSummary.ts    what actually happened on a run, measured not estimated
+    savedRoutes.ts   keeping routes, and recognising one you already have
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
     __fixtures__/    synthetic grid city used by the tests
   services/          OSRM, Open-Meteo, Nominatim + shared fair-use HTTP client
-  components/        MapView, ControlPanel, RouteList, ElevationProfile, NavigationView
+  components/        MapView, ControlPanel, RouteList, SavedRoutes, ElevationProfile, NavigationView
 public/
   manifest.webmanifest, sw.js, icons     the installable-app layer
 ```
@@ -228,6 +234,24 @@ begins is what makes dragging behave the way a finger expects. The container
 changes size when it flattens, so Leaflet is told to remeasure — otherwise the
 map quietly re-centres on the wrong point.
 
+## Your location
+
+Nothing is asked for on arrival. The app requests your location only when you
+tap **Use my current location** or start a run, after saying why.
+
+Coordinates do leave the device, because roads and hills have to be looked up:
+they go to the routing, elevation and search services listed above and nowhere
+else. There is no account, no analytics and no tracking, and saved routes never
+leave your phone.
+
+## Recognising a route you already have
+
+Route identifiers come from the seed and bearing of one particular search, so
+the same loop found twice has two different ids. Saved routes are matched by a
+signature built from the geometry instead — start point, the centre of the
+route's extent, and length rounded to ten metres — which is what lets a star
+stay filled when the same loop turns up in a later search.
+
 ## Offline
 
 The service worker caches the app shell and the map tiles you've already
@@ -238,7 +262,7 @@ still needs a connection.
 
 ## Tests
 
-224 unit tests covering the geodesy, ascent accumulation, turn classification,
+257 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
