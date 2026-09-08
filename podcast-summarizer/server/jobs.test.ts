@@ -173,6 +173,22 @@ describe('JobStore pipeline', () => {
     expect(done.transcriptSource).toBe('phone')
   })
 
+  it('never dead-ends when YouTube itself is unreachable', async () => {
+    const store = mk({
+      summarizer,
+      youtubeMirrors: [],
+      fetch: (async () => {
+        throw new Error('getaddrinfo ENOTFOUND www.youtube.com')
+      }) as typeof fetch,
+    })
+    const job = await store.create(`https://www.youtube.com/watch?v=${YT}`)
+    const waiting = await waitFor(store, job.id, ['needs_transcript', 'failed'])
+    // Every rung failing is still a paste-able job, not a dead end.
+    expect(waiting.stage).toBe('needs_transcript')
+    expect(waiting.message).toMatch(/ENOTFOUND|reach YouTube|would not serve/)
+    expect(waiting.episode?.id).toBe(YT)
+  })
+
   it('fails clearly on non-episode links', async () => {
     const store = mk({ summarizer, fetch: fakeFetch({}) })
     const show = await store.create(`https://open.spotify.com/show/${EP}`)

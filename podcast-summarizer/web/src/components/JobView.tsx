@@ -90,8 +90,11 @@ export function JobView({
         <div className="card failed">
           <h3>Didn’t work</h3>
           <p>{job.error}</p>
-          {job.episode?.source === 'spotify' && <SourceForm message="If you know where the audio lives, give it here and we’ll try again." onSubmit={provide} />}
-          {job.episode?.source === 'youtube' && <TranscriptForm episode={job.episode} message="You can still paste the transcript by hand." onSubmit={provideTranscript} />}
+          {job.episode?.source === 'spotify' ? (
+            <SourceForm message="If you know where the audio lives, give it here and we’ll try again." onSubmit={provide} />
+          ) : (
+            <TranscriptForm episode={job.episode} message="You can still paste the transcript by hand." onSubmit={provideTranscript} />
+          )}
         </div>
       )}
 

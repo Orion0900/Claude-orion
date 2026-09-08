@@ -15,7 +15,7 @@ import { dirname } from 'node:path'
 import { expandShortLink, fetchEpisodeMeta, isSpotifyShortLink, parseSpotifyUrl, type SpotifyCredentials } from './lib/spotify.js'
 import { fetchFeed, matchEpisode, pickFeed, searchFeeds, type FeedItem } from './lib/feeds.js'
 import { fetchFeedTranscript, parseTranscriptFile, renderTranscript, transcribeWithAssemblyAI, transcribeWithOpenAI, wordCount, type Segment } from './lib/transcribe.js'
-import { fetchYouTube, parseYouTubeUrl } from './lib/youtube.js'
+import { fetchYouTube, parseYouTubeUrl, type YouTubeResult } from './lib/youtube.js'
 import type { Summarizer, Summary } from './lib/summarize.js'
 
 export type Stage = 'queued' | 'resolving' | 'finding_audio' | 'needs_source' | 'needs_transcript' | 'transcribing' | 'summarizing' | 'done' | 'failed'
@@ -192,7 +192,13 @@ export class JobStore {
         const yt = parseYouTubeUrl(input)
         const sp = parseSpotifyUrl(input)
         if (yt) {
-          const result = await fetchYouTube(yt.videoId, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors })
+          // A thrown error here (DNS, TLS, a mirror hanging) must still leave
+          // the user with the paste route, so treat it as "blocked", not failed.
+          const result: YouTubeResult = await fetchYouTube(yt.videoId, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors }).catch((err: Error) => ({
+            meta: { videoId: yt.videoId, title: `YouTube video ${yt.videoId}`, url: `https://www.youtube.com/watch?v=${yt.videoId}` },
+            reasons: [err.message],
+            blocked: `Couldn’t reach YouTube from the server (${err.message}).`,
+          }))
           const m = result.meta
           const episode: Episode = {
             source: 'youtube',
@@ -235,7 +241,11 @@ export class JobStore {
 
       if (!transcript && episode.source === 'youtube') {
         // Resumed without a transcript: the caller wants another server-side try.
-        const result = await fetchYouTube(episode.id, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors })
+        const result: YouTubeResult = await fetchYouTube(episode.id, { fetch: fetchImpl, mirrors: this.opts.youtubeMirrors }).catch((err: Error) => ({
+          meta: { videoId: episode.id, title: episode.title, url: episode.url },
+          reasons: [err.message],
+          blocked: `Couldn’t reach YouTube from the server (${err.message}).`,
+        }))
         if (!result.segments) {
           this.update(job, { stage: 'needs_transcript', message: result.blocked ?? 'Captions unavailable.' })
           return

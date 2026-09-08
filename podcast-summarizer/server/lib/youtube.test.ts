@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractPlayerResponse, fetchYouTube, metaFromPlayerResponse, parseJson3, parseTimedTextXml, parseYouTubeUrl, pickTrack, tracksFromPlayerResponse } from './youtube.js'
+import { discoverMirrors, extractPlayerResponse, fetchYouTube, metaFromPlayerResponse, parseJson3, parseTimedTextXml, parseYouTubeUrl, pickTrack, tracksFromPlayerResponse } from './youtube.js'
 
 const ID = 'dQw4w9WgXcQ'
 
@@ -121,6 +121,42 @@ describe('fetchYouTube', () => {
     const m = await fetchYouTube(ID, { fetch: viaMirror, mirrors: ['https://inv.example'] })
     expect(m.via).toBe('mirror')
     expect(m.segments?.map((s) => s.text)).toEqual(['Mirror line one', 'Mirror line two'])
+  })
+
+  it('falls back to the legacy timedtext endpoint when the modern ones are gated', async () => {
+    const f = fakeFetch({
+      'https://www.youtube.com/watch': () => new Response('', { status: 429 }),
+      'https://www.youtube.com/youtubei': () => new Response('', { status: 429 }),
+      'https://www.youtube.com/api/timedtext?type=list': () =>
+        new Response('<transcript_list><track id="0" name="" lang_code="en" lang_original="English"/><track id="1" lang_code="fr" kind="asr"/></transcript_list>'),
+      'https://www.youtube.com/api/timedtext?v=': () => new Response(json3),
+      'https://www.youtube.com/oembed': () => new Response(JSON.stringify({ title: 'Legacy Title' })),
+    })
+    const r = await fetchYouTube(ID, { fetch: f, mirrors: [] })
+    expect(r.segments).toHaveLength(40)
+    expect(r.reasons.some((x) => x.includes('watch'))).toBe(true)
+  })
+
+  it('reports every rung it tried', async () => {
+    const f = fakeFetch({ 'https://www.youtube.com': () => new Response('', { status: 429 }) })
+    const r = await fetchYouTube(ID, { fetch: f, mirrors: ['https://inv.example'] })
+    expect(r.segments).toBeUndefined()
+    expect(r.reasons.length).toBeGreaterThanOrEqual(4)
+    expect(r.reasons.join(' ')).toMatch(/legacy timedtext/)
+    expect(r.reasons.join(' ')).toMatch(/inv\.example/)
+  })
+
+  it('discovers live mirrors from the Invidious directory', async () => {
+    const directory = JSON.stringify([
+      ['dead.example', { type: 'https', api: true, uri: 'https://dead.example', monitor: { uptime: 40 } }],
+      ['good.example', { type: 'https', api: true, uri: 'https://good.example/', monitor: { uptime: 99 } }],
+      ['onion.example', { type: 'onion', api: true, uri: 'http://onion.example' }],
+      ['noapi.example', { type: 'https', api: false, uri: 'https://noapi.example' }],
+    ])
+    const f = fakeFetch({ 'https://api.invidious.io/instances.json': () => new Response(directory) })
+    expect(await discoverMirrors(f)).toEqual(['https://good.example'])
+    const broken = fakeFetch({})
+    expect(await discoverMirrors(broken)).toEqual([])
   })
 
   it('distinguishes a video with no captions from being blocked', async () => {
