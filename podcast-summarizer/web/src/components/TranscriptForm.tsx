@@ -82,9 +82,13 @@ export function TranscriptForm({
           )}{' '}
           — the website, not the app.
         </li>
-        <li>Tap <strong>…more</strong> under the title, then <strong>Show transcript</strong>.</li>
+        <li>
+          Tap <strong>AA</strong> in Safari’s address bar, then <strong>Request Desktop Website</strong>. YouTube’s mobile site
+          has no transcript; only the desktop one does.
+        </li>
+        <li>Under the video, tap <strong>…more</strong>, then <strong>Show transcript</strong>.</li>
         <li>Press and hold the transcript, <strong>Select All</strong>, <strong>Copy</strong>.</li>
-        <li>Paste below and tap Summarize.</li>
+        <li>Come back here, paste below, and tap Summarize.</li>
       </ol>
 
       <textarea
@@ -95,7 +99,10 @@ export function TranscriptForm({
         autoCapitalize="off"
         autoCorrect="off"
       />
-      <p className="muted small">Timestamps are kept, so the summary can still point at the moment.</p>
+      <p className="muted small">
+        Timestamps are kept, so the summary can still point at the moment. Tired of copying?{' '}
+        <a href="#/settings">Set up the one-tap bookmarklet</a>.
+      </p>
       <button className="primary wide" disabled={text.trim().length < 200 || auto === 'sending'} onClick={() => void submitManual()}>
         Summarize this transcript
       </button>
