@@ -49,6 +49,9 @@ workflow turns Pages on if it isn't already.
   red where the climb is steep and green everywhere else, and each card says
   how far you'll be grinding and how steep it gets. Flip the switch and the
   paint follows, no new search needed.
+- **Keeps the colours on the road.** Start riding and the route keeps the
+  colouring you chose it by, so a climb still shows red as you come up on it.
+  The ground already covered dims behind you.
 - **Counts the climbing.** Every route is sampled against elevation data and
   reported as total ascent, with a profile you can scrub to see where the hills
   are on the map.

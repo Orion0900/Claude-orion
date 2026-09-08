@@ -11,6 +11,9 @@ import { gradeSegments } from '../lib/grades'
 export const GOOD_COLOR = '#4ade80'
 export const BAD_COLOR = '#f87171'
 
+/** The route is drawn fatter mid-ride, to be read at a glance from a bike. */
+const NAV_WEIGHT = 11
+
 interface MapViewProps {
   start: LatLng | null
   finish: LatLng | null
@@ -307,22 +310,52 @@ export function MapView({
     for (const route of routes) {
       const isSelected = route.id === selectedId
 
-      // Navigating shows the road ahead brightly and the ground already
-      // covered dimmed, so "which way now" reads at a glance.
+      // Navigating keeps the same colours the rider chose the route by — a
+      // climb still reads red as they come up on it, which is when it matters
+      // most — and dims the ground already covered so "which way now" is
+      // still the thing that stands out.
       if (navigating && isSelected) {
-        const [behind, ahead] = splitPath(route.path, traveled)
-        layer.addLayer(
-          L.polyline(toLatLngs(behind), { color: '#5a6472', weight: 7, opacity: 0.55, lineJoin: 'round' }),
-        )
-        layer.addLayer(
-          L.polyline(toLatLngs(ahead), {
-            color: '#4ade80',
-            weight: 11,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round',
-          }),
-        )
+        const stretches = paintedStretches(route, paint)
+        if (stretches.length === 0) {
+          layer.addLayer(
+            L.polyline(toLatLngs(route.path), {
+              color: GOOD_COLOR,
+              weight: NAV_WEIGHT,
+              opacity: 1,
+              lineJoin: 'round',
+              lineCap: 'round',
+            }),
+          )
+        }
+        for (const segment of stretches) {
+          if (segment.path.length < 2) continue
+          layer.addLayer(
+            L.polyline(toLatLngs(segment.path), {
+              color: segment.good ? GOOD_COLOR : BAD_COLOR,
+              weight: NAV_WEIGHT,
+              opacity: 1,
+              lineJoin: 'round',
+              lineCap: 'round',
+              interactive: false,
+            }),
+          )
+        }
+
+        // The ground already covered goes on last, over the top: laying it
+        // over the colours is what dims them, and saves clipping every
+        // coloured stretch against how far the rider has got.
+        const [behind] = splitPath(route.path, traveled)
+        if (traveled > 0 && behind.length >= 2) {
+          layer.addLayer(
+            L.polyline(toLatLngs(behind), {
+              color: '#5a6472',
+              weight: NAV_WEIGHT + 1,
+              opacity: 1,
+              lineJoin: 'round',
+              interactive: false,
+            }),
+          )
+        }
         continue
       }
 
