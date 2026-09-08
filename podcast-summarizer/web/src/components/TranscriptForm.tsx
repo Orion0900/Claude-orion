@@ -82,9 +82,13 @@ export function TranscriptForm({
           )}{' '}
           — the website, not the app.
         </li>
-        <li>Tap <strong>…more</strong> under the title, then <strong>Show transcript</strong>.</li>
+        <li>
+          Tap <strong>AA</strong> in Safari’s address bar, then <strong>Request Desktop Website</strong>. YouTube’s mobile site
+          has no transcript; only the desktop one does.
+        </li>
+        <li>Under the video, tap <strong>…more</strong>, then <strong>Show transcript</strong>.</li>
         <li>Press and hold the transcript, <strong>Select All</strong>, <strong>Copy</strong>.</li>
-        <li>Paste below and tap Summarize.</li>
+        <li>Come back here, paste below, and tap Summarize.</li>
       </ol>
 
       <textarea

@@ -150,6 +150,9 @@ web/
   in sometimes on free hosting.
 - A YouTube video with captions disabled has nothing to read; paste is the
   only route.
+- Pasting on an iPhone needs Safari's **AA → Request Desktop Website** first:
+  YouTube's mobile site has no *Show transcript* panel at all, only the
+  desktop one does. The app says so at the point you need it.
 - Spotify-exclusive shows have no public RSS feed, so there's no audio to
   transcribe. The app will ask for a source it can't find.
 - Episode lookup without Spotify API credentials reads the public episode
