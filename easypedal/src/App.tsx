@@ -22,10 +22,32 @@ import {
   findRoutes,
   type RideCriteria,
   type RouteResult,
+  type SearchFailure,
   type SearchProgress,
 } from './lib/routeSearch'
 import { createValhallaRouter, createValhallaWays } from './services/valhalla'
 import { createOpenMeteoProvider } from './services/openMeteo'
+import { describePoint } from './services/geocode'
+
+/** Shown while the address for a GPS fix is still being looked up. */
+const CURRENT_LOCATION = 'Your current location'
+
+/**
+ * Why nothing came back, in words that say what to do about it. Coming back
+ * empty because a service is down is a wait-and-retry; coming back empty
+ * because there is no safe way through is a move-the-pin. Saying the wrong
+ * one sends the rider off fixing something that was never broken.
+ */
+const FAILURE_MESSAGES: Record<SearchFailure, string> = {
+  'routing-unavailable':
+    'Could not reach the route planner. Check your connection and try again — your pins are still set.',
+  'no-route':
+    'No cycling route between these two points. One end may be away from any road the map knows — try moving a pin.',
+  'elevation-unavailable':
+    'Found routes, but the hill data service did not answer, so the climbing could not be checked. Try again in a moment.',
+  'unsafe-only':
+    'Every route between these points uses a highway, so none is safe to ride. Try moving a pin, or picking a nearer destination.',
+}
 
 const INITIAL_FORM: RideForm = {
   priority: 'lanes',
@@ -68,14 +90,49 @@ export default function App() {
   const ways = useMemo(() => createValhallaWays(), [])
   const elevation = useMemo(() => createOpenMeteoProvider(), [])
 
+  // Each end's newest pin wins. Dragging a pin around the map would otherwise
+  // leave a queue of address lookups, each answering a question the rider has
+  // already moved on from, so the previous one is cancelled outright.
+  const pinLookup = useRef<Record<Endpoint, AbortController | null>>({ from: null, to: null })
+
+  const cancelLookup = useCallback((which: Endpoint) => {
+    pinLookup.current[which]?.abort()
+    pinLookup.current[which] = null
+  }, [])
+
   const setEndpoint = useCallback((which: Endpoint, point: LatLng, label: string | null) => {
-    const place = { point, label }
+    const apply = which === 'from' ? setFrom : setTo
+    apply({ point, label })
     if (which === 'from') {
-      setFrom(place)
       // Having set the start, the next tap is almost certainly the finish.
       setPicking('to')
-    } else {
-      setTo(place)
+    }
+
+    cancelLookup(which)
+
+    // A pin dropped on the map, or taken from GPS, arrives as bare
+    // coordinates. Ask what is actually there, so the panel and the saved
+    // ride name read as an address rather than six decimal places.
+    if (label !== null && label !== CURRENT_LOCATION) return
+
+    const controller = new AbortController()
+    pinLookup.current[which] = controller
+    void describePoint(point, { signal: controller.signal })
+      .then((address) => {
+        if (!address || controller.signal.aborted) return
+        apply({ point, label: label === CURRENT_LOCATION ? `${CURRENT_LOCATION} · ${address}` : address })
+      })
+      .catch(() => {
+        // The pin still works without a name; the map shows where it is.
+      })
+  }, [cancelLookup])
+
+  // A lookup in flight when the app closes has nowhere to deliver its answer.
+  useEffect(() => {
+    const lookups = pinLookup.current
+    return () => {
+      lookups.from?.abort()
+      lookups.to?.abort()
     }
   }, [])
 
@@ -88,7 +145,7 @@ export default function App() {
     setLocationError(null)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setEndpoint('from', { lat: position.coords.latitude, lng: position.coords.longitude }, 'Your current location')
+        setEndpoint('from', { lat: position.coords.latitude, lng: position.coords.longitude }, CURRENT_LOCATION)
         setLocating(false)
       },
       () => {
@@ -171,13 +228,11 @@ export default function App() {
       })
       if (controller.signal.aborted) return
 
-      setRoutes(found)
-      setSelectedId(found[0]?.id ?? null)
-      if (found.length === 0) {
-        setError(
-          'No safe route came back. Every way between these points uses a highway, or one end is off the road map — try moving a pin.',
-        )
-      } else if (found.every((route) => route.ways === null)) {
+      setRoutes(found.routes)
+      setSelectedId(found.routes[0]?.id ?? null)
+      if (found.failure) {
+        setError(FAILURE_MESSAGES[found.failure])
+      } else if (found.waysUnavailable) {
         setError('Routes found, but the road types could not be looked up, so lane coverage is unknown.')
       }
     } catch (caught) {
@@ -227,6 +282,10 @@ export default function App() {
             distanceUnit={form.distanceUnit}
             elevationUnit={form.elevationUnit}
             onOpen={(route) => {
+              // An address lookup still running would otherwise land later and
+              // drag an end of this saved ride back to a pin dropped earlier.
+              cancelLookup('from')
+              cancelLookup('to')
               setRoutes([route])
               setSelectedId(route.id)
               setFrom({ point: route.path[0], label: 'Start of a saved ride' })
@@ -247,6 +306,8 @@ export default function App() {
             onPick={setPicking}
             onPickPlace={setEndpoint}
             onSwap={() => {
+              cancelLookup('from')
+              cancelLookup('to')
               setFrom(to)
               setTo(from)
             }}

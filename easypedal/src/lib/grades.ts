@@ -51,21 +51,42 @@ export function windowedGrades(profile: ElevationProfile): number[] {
 /**
  * Cut the route into steep climbs and everything else. Descents, however
  * sharp, are "easy": the question is what you have to pedal up.
+ *
+ * Results are remembered per profile. A profile is fixed once its route is
+ * found, and this is asked the same question on every render of the card, the
+ * bar and the map — including on every pointer move while the rider scrubs
+ * the elevation trace, which is exactly when the phone can least afford it.
  */
 export function gradeSegments(
   path: LatLng[],
   profile: ElevationProfile,
   threshold = STEEP_GRADE,
 ): GradeSegment[] {
+  const byThreshold = cache.get(profile)
+  const remembered = byThreshold?.get(threshold)
+  if (remembered) return remembered
+
+  const computed = cutSegments(path, profile, threshold)
+  if (byThreshold) byThreshold.set(threshold, computed)
+  else cache.set(profile, new Map([[threshold, computed]]))
+  return computed
+}
+
+/** Keyed on the profile, which is frozen for the life of its route. */
+const cache = new WeakMap<ElevationProfile, Map<number, GradeSegment[]>>()
+
+function cutSegments(path: LatLng[], profile: ElevationProfile, threshold: number): GradeSegment[] {
   const samples = profile.elevations.length
   if (path.length < 2 || samples < 2) {
     return path.length < 2 ? [] : [{ kind: 'easy', path: path.slice(), length: 0, maxGrade: 0 }]
   }
 
-  // The profile was measured at evenly spaced samples of the path; re-derive
-  // their positions so each stretch can be cut from the real geometry.
-  const points = resample(path, samples)
-  const along = cumulativeDistances(points)
+  // Where each sample sits along the route. The profile carries these, and
+  // they are the true along-path distances; measuring the resampled points
+  // against each other instead would cut every corner and leave the last
+  // stretch of the ride unpainted.
+  const along =
+    profile.distances.length === samples ? profile.distances : cumulativeDistances(resample(path, samples))
   const cumulative = cumulativeDistances(path)
   const grades = windowedGrades(profile)
 

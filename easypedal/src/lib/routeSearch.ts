@@ -8,7 +8,7 @@
  * coverage and climbing, and the candidates are ranked by the rider's
  * priority. Anything that would put them on a highway is dropped outright.
  */
-import { pathLength, resample, haversine, type LatLng } from './geo'
+import { pathLength, resample, resampleWithDistances, haversine, type LatLng } from './geo'
 import { buildProfile, type ElevationProfile } from './elevation'
 import { placeSteps, type RawStep, type RouteStep } from './navigation'
 import {
@@ -42,8 +42,24 @@ export interface RouteGeometry {
   shape?: string
 }
 
+/**
+ * Thrown by a routing provider that reached its engine and was told there is
+ * no way through. It is the opposite of a network failure, and calls for the
+ * opposite response from the rider — move a pin, rather than try again — so
+ * the two must never be reported as one.
+ */
+export class NoRouteError extends Error {
+  constructor(message = 'No route between these points') {
+    super(message)
+    this.name = 'NoRouteError'
+  }
+}
+
 export interface RoutingProvider {
-  /** The engine's best route and any alternatives it offers, best first. */
+  /**
+   * The engine's best route and any alternatives it offers, best first.
+   * Throws `NoRouteError` when the engine answered but knows no way through.
+   */
   route(from: LatLng, to: LatLng, profile: CostingProfile, signal?: AbortSignal): Promise<RouteGeometry[]>
 }
 
@@ -178,28 +194,63 @@ interface Measured {
   ways: WayBreakdown | null
 }
 
+/**
+ * Why a search came back with nothing. Coming back empty is not one problem
+ * but four, and they call for four different things from the rider — move a
+ * pin, wait and retry, or accept there is no safe way through — so the search
+ * says which it hit rather than leaving the screen to guess.
+ */
+export type SearchFailure =
+  /** Every attempt to reach the routing engine failed. */
+  | 'routing-unavailable'
+  /** The engine answered, but knows no way between these two points. */
+  | 'no-route'
+  /** Routes were found, but their climbing could not be measured. */
+  | 'elevation-unavailable'
+  /** Every route found puts the rider on a highway. */
+  | 'unsafe-only'
+
+export interface SearchOutcome {
+  routes: RouteResult[]
+  /** Why `routes` is empty; null whenever it isn't. */
+  failure: SearchFailure | null
+  /** True when routes came back but no road types could be looked up. */
+  waysUnavailable: boolean
+}
+
+interface Candidates {
+  geometries: RouteGeometry[]
+  /** True when every attempt failed to reach the engine at all. */
+  unreachable: boolean
+}
+
 /** Ask the engine with each profile in turn and keep every distinct answer. */
-async function collectCandidates(options: SearchOptions, report: () => void): Promise<RouteGeometry[]> {
+async function collectCandidates(options: SearchOptions, report: () => void): Promise<Candidates> {
   const { routing, criteria, signal } = options
-  const candidates: RouteGeometry[] = []
+  const geometries: RouteGeometry[] = []
+  let attempts = 0
+  let unreachable = 0
 
   for (const profile of costingProfiles(criteria.priority)) {
     if (signal?.aborted) break
     let found: RouteGeometry[] = []
+    attempts++
     try {
       found = await routing.route(criteria.from, criteria.to, profile, signal)
     } catch (error) {
       if ((error as Error).name === 'AbortError') throw error
-      // One profile failing is not the end of the search.
+      // One profile failing is not the end of the search. An engine that
+      // answered "no way through" is not an engine that could not be reached.
+      if (!(error instanceof NoRouteError)) unreachable++
     }
     report()
     for (const geometry of found) {
       if (geometry.path.length < 2 || geometry.distance <= 0) continue
-      if (candidates.some((kept) => isDuplicate(kept, geometry))) continue
-      candidates.push(geometry)
+      if (geometries.some((kept) => isDuplicate(kept, geometry))) continue
+      geometries.push(geometry)
     }
   }
-  return candidates
+  return { geometries, unreachable: attempts > 0 && unreachable === attempts }
 }
 
 async function measure(geometry: RouteGeometry, options: SearchOptions): Promise<Measured | null> {
@@ -214,22 +265,33 @@ async function measure(geometry: RouteGeometry, options: SearchOptions): Promise
     // Without road data the route still stands; it just can't claim any lanes.
   }
 
-  const samples = resample(geometry.path, Math.min(sampleCount, Math.max(2, geometry.path.length)))
+  const samples = resampleWithDistances(
+    geometry.path,
+    Math.min(sampleCount, Math.max(2, geometry.path.length)),
+  )
   try {
-    const elevations = await elevation.lookup(samples, signal)
-    return { geometry, profile: buildProfile(samples, elevations), ways: breakdown }
+    const elevations = await elevation.lookup(samples.points, signal)
+    return {
+      geometry,
+      profile: buildProfile(samples.points, elevations, { distances: samples.distances }),
+      ways: breakdown,
+    }
   } catch (error) {
     if ((error as Error).name === 'AbortError') throw error
     return null // no elevation data means the climbing half of "easy" can't be judged
   }
 }
 
+const EMPTY: SearchOutcome = { routes: [], failure: null, waysUnavailable: false }
+
+const gaveUp = (failure: SearchFailure): SearchOutcome => ({ routes: [], failure, waysUnavailable: false })
+
 /**
  * Find the easiest rides between two points: ask the engine several ways,
  * measure lanes and climbing for each distinct answer, drop anything unsafe,
  * rank by the rider's priority and return the best few.
  */
-export async function findRoutes(options: SearchOptions): Promise<RouteResult[]> {
+export async function findRoutes(options: SearchOptions): Promise<SearchOutcome> {
   const { criteria, signal, onProgress } = options
   const maxCandidates = options.maxCandidates ?? 6
   const profiles = costingProfiles(criteria.priority).length
@@ -239,11 +301,15 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
   const report = () => onProgress?.({ completed, total })
   report()
 
-  const candidates = (await collectCandidates(options, () => {
+  const collected = await collectCandidates(options, () => {
     completed++
     report()
-  })).slice(0, maxCandidates)
-  if (signal?.aborted) return []
+  })
+  const candidates = collected.geometries.slice(0, maxCandidates)
+  if (signal?.aborted) return EMPTY
+  if (candidates.length === 0) {
+    return gaveUp(collected.unreachable ? 'routing-unavailable' : 'no-route')
+  }
 
   total = profiles + candidates.length
   report()
@@ -255,11 +321,15 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
     report()
     if (result) measured.push(result)
   }
-  if (signal?.aborted) return []
+  if (signal?.aborted) return EMPTY
+  // Candidates existed but none could be measured: the terrain service is the
+  // only thing that stops a route here, and that is a wait-and-retry, not a
+  // reason to move a pin.
+  if (measured.length === 0) return gaveUp('elevation-unavailable')
 
   // A highway is never on offer, however good the rest of the route is.
   const safe = measured.filter((item) => item.ways === null || isSafe(item.ways))
-  if (safe.length === 0) return []
+  if (safe.length === 0) return gaveUp('unsafe-only')
 
   const context: ScoreContext = {
     shortest: Math.min(...safe.map((item) => item.geometry.distance)),
@@ -284,8 +354,8 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
   }))
 
   results.sort((a, b) => a.score - b.score)
-  const kept = results.slice(0, criteria.results)
-  return assignHighlights(kept)
+  const kept = assignHighlights(results.slice(0, criteria.results))
+  return { routes: kept, failure: null, waysUnavailable: kept.every((route) => route.ways === null) }
 }
 
 /** Label what each route is best at, so the list reads as choices rather than a ranking. */

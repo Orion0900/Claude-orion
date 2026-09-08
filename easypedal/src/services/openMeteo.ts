@@ -1,6 +1,6 @@
 import type { LatLng } from '../lib/geo'
 import type { ElevationProvider } from '../lib/routeSearch'
-import { fetchJson } from './http'
+import { fetchJson, HttpError } from './http'
 
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation'
 /** Open-Meteo accepts at most 100 coordinate pairs per request. */
@@ -28,10 +28,24 @@ export function createOpenMeteoProvider(base = ELEVATION_URL): ElevationProvider
           `${base}?latitude=${lat}&longitude=${lng}`,
           { signal, minGapMs: 150 },
         )
-        chunk.forEach((p, index) => cache.set(key(p), data.elevation[index] ?? 0))
+        // A short or missing answer is a failed lookup, not a route at sea
+        // level. Filling the gap with zero would invent a cliff, inflate the
+        // climbing that the ranking is built on, and cache the lie for the
+        // rest of the session.
+        if (!Array.isArray(data.elevation) || data.elevation.length < chunk.length) {
+          throw new HttpError('Elevation service returned an incomplete answer')
+        }
+        chunk.forEach((p, index) => {
+          const value = data.elevation[index]
+          if (typeof value === 'number' && Number.isFinite(value)) cache.set(key(p), value)
+        })
       }
 
-      return points.map((p) => cache.get(key(p)) ?? 0)
+      return points.map((p) => {
+        const value = cache.get(key(p))
+        if (value === undefined) throw new HttpError('Elevation service did not cover the whole route')
+        return value
+      })
     },
   }
 }

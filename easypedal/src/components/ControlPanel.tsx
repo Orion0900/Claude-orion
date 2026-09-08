@@ -28,27 +28,41 @@ const PRIORITY_CHOICES: Array<{ value: Priority; label: string; hint: string }> 
   },
 ]
 
-/** The first part of a geocoder's long-winded label: "Central Library" not the whole address. */
+/**
+ * The first part of a geocoder's long-winded label: "Central Library", not the
+ * whole address. A GPS fix carries its marker in front of the address, and
+ * naming a saved ride "Your current location · 24 Beacon Street to Harvard
+ * Square" helps nobody, so anything before the marker is dropped too.
+ */
 export function shortPlaceName(label: string | null): string | null {
   if (!label) return null
-  const first = label.split(',')[0].trim()
+  const afterMarker = label.split(' · ').pop() ?? label
+  const first = afterMarker.split(',')[0].trim()
   return first || null
 }
 
 interface PlaceSearchProps {
   id: string
   placeholder: string
+  /** Bias results toward here, so a street name finds the nearby one. */
+  near: LatLng | null
   onPick: (point: LatLng, label: string) => void
 }
 
 /** A search box that offers places as you pause typing. */
-function PlaceSearch({ id, placeholder, onPick }: PlaceSearchProps) {
+function PlaceSearch({ id, placeholder, near, onPick }: PlaceSearchProps) {
   const [query, setQuery] = useState('')
   const [places, setPlaces] = useState<Place[]>([])
+  const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [noMatches, setNoMatches] = useState(false)
   const querySelected = useRef(false)
+  // A moving bias must not itself re-run the search, or dropping a pin would
+  // fire a fresh request for text the rider typed a minute ago.
+  const nearRef = useRef(near)
+  nearRef.current = near
 
-  // Debounced geocoding; Nominatim is fair-use, so never per keystroke.
+  // Debounced: one request per typing pause, never one per keystroke.
   useEffect(() => {
     if (querySelected.current) {
       querySelected.current = false
@@ -56,17 +70,28 @@ function PlaceSearch({ id, placeholder, onPick }: PlaceSearchProps) {
     }
     if (query.trim().length < 3) {
       setPlaces([])
+      setNoMatches(false)
+      setSearchError(null)
       return
     }
     const controller = new AbortController()
     const timer = setTimeout(async () => {
+      setSearching(true)
       try {
         setSearchError(null)
-        setPlaces(await searchPlaces(query, controller.signal))
+        const found = await searchPlaces(query, { signal: controller.signal, near: nearRef.current })
+        if (controller.signal.aborted) return
+        setPlaces(found)
+        setNoMatches(found.length === 0)
       } catch (error) {
-        if ((error as Error).name !== 'AbortError') setSearchError('Place search is unavailable.')
+        if ((error as Error).name === 'AbortError') return
+        setPlaces([])
+        setNoMatches(false)
+        setSearchError('Place search is unavailable right now. Tap the map to set this end instead.')
+      } finally {
+        if (!controller.signal.aborted) setSearching(false)
       }
-    }, 450)
+    }, 400)
 
     return () => {
       clearTimeout(timer)
@@ -81,28 +106,36 @@ function PlaceSearch({ id, placeholder, onPick }: PlaceSearchProps) {
         type="text"
         placeholder={placeholder}
         value={query}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
+        spellCheck={false}
         onChange={(event) => setQuery(event.target.value)}
         aria-label={placeholder}
       />
       {places.length > 0 ? (
         <ul className="suggestions">
           {places.map((place) => (
-            <li key={`${place.lat},${place.lng}`}>
+            <li key={`${place.lat},${place.lng},${place.label}`}>
               <button
                 type="button"
                 onClick={() => {
                   querySelected.current = true
                   setQuery(place.label)
                   setPlaces([])
-                  onPick({ lat: place.lat, lng: place.lng }, place.label)
+                  setNoMatches(false)
+                  onPick({ lat: place.lat, lng: place.lng }, place.detail ? `${place.label}, ${place.detail}` : place.label)
                 }}
               >
-                {place.label}
+                <span className="suggestion-name">{place.label}</span>
+                {place.detail ? <span className="suggestion-detail">{place.detail}</span> : null}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
+      {searching ? <p className="hint">Searching…</p> : null}
+      {noMatches && !searching ? <p className="hint">No places match that. Try a fuller address, or tap the map.</p> : null}
       {searchError ? <p className="notice">{searchError}</p> : null}
     </div>
   )
@@ -176,6 +209,7 @@ export function ControlPanel({
             <PlaceSearch
               id="from-search"
               placeholder="Search an address or place"
+              near={to ?? from}
               onPick={(point, label) => onPickPlace('from', point, label)}
             />
             <button type="button" className="btn btn-secondary" onClick={onLocate} disabled={locating}>
@@ -203,6 +237,7 @@ export function ControlPanel({
             <PlaceSearch
               id="to-search"
               placeholder="Search where you're going"
+              near={from ?? to}
               onPick={(point, label) => onPickPlace('to', point, label)}
             />
             <p className="hint">{describe(to, toLabel, 'Not set yet.')}</p>

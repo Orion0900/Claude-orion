@@ -15,7 +15,12 @@ const MAX_TILES = 400
 
 const TILE_HOSTS = ['tile.openstreetmap.org']
 /** Hosts whose answers are route-specific and must always be live. */
-const LIVE_ONLY_HOSTS = ['valhalla1.openstreetmap.de', 'api.open-meteo.com', 'nominatim.openstreetmap.org']
+const LIVE_ONLY_HOSTS = [
+  'valhalla1.openstreetmap.de',
+  'api.open-meteo.com',
+  'photon.komoot.io',
+  'nominatim.openstreetmap.org',
+]
 
 self.addEventListener('install', (event) => {
   // The shell is cached as it's used; take over as soon as we're ready.

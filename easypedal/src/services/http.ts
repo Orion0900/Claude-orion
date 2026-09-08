@@ -46,20 +46,33 @@ export interface FetchJsonOptions {
 export async function fetchJson<T>(url: string, options: FetchJsonOptions = {}): Promise<T> {
   const host = hostOf(url)
   const minGap = options.minGapMs ?? 250
-  const state = queues.get(host) ?? { chain: Promise.resolve(), lastStart: 0 }
 
-  const run = state.chain.then(async () => {
-    const sinceLast = Date.now() - state.lastStart
+  // One state object per host, kept in the map and mutated in place. Storing a
+  // copy instead would freeze `lastStart` at whatever it was when the request
+  // was queued — which is before the request has run — so every later request
+  // would compare against a stale time and the gap would never be honoured.
+  let state = queues.get(host)
+  if (!state) {
+    state = { chain: Promise.resolve(), lastStart: 0 }
+    queues.set(host, state)
+  }
+  const entry = state
+
+  const run = entry.chain.then(async () => {
+    const sinceLast = Date.now() - entry.lastStart
     if (sinceLast < minGap) await wait(minGap - sinceLast)
-    state.lastStart = Date.now()
+    entry.lastStart = Date.now()
     return attempt(url, options)
   })
 
   // Keep the chain alive even when this request rejects, or the whole host
   // queue would poison every request behind it.
-  queues.set(host, { ...state, chain: run.catch(() => undefined) })
+  entry.chain = run.catch(() => undefined)
   return run as Promise<T>
 }
+
+/** A request that ran out of time. Retryable, and never a user cancellation. */
+export const TIMEOUT_STATUS = 408
 
 async function attempt<T>(url: string, options: FetchJsonOptions): Promise<T> {
   const retries = options.retries ?? 2
@@ -69,7 +82,14 @@ async function attempt<T>(url: string, options: FetchJsonOptions): Promise<T> {
   for (let i = 0; i <= retries; i++) {
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    // Our own deadline aborts the same way a caller does, so without this flag
+    // a slow network would be indistinguishable from the rider walking away —
+    // and callers quite rightly say nothing at all when someone cancels.
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
     const onAbort = () => controller.abort()
     options.signal?.addEventListener('abort', onAbort)
 
@@ -90,11 +110,20 @@ async function attempt<T>(url: string, options: FetchJsonOptions): Promise<T> {
       }
       return (await response.json()) as T
     } catch (error) {
-      lastError = error
       if (options.signal?.aborted) throw error
-      // 4xx other than rate limiting won't fix themselves.
-      if (error instanceof HttpError && error.status && error.status < 500 && error.status !== 429) {
-        throw error
+      const failure = timedOut
+        ? new HttpError(`Timed out after ${timeoutMs} ms for ${hostOf(url)}`, TIMEOUT_STATUS)
+        : error
+      lastError = failure
+      // 4xx other than rate limiting and our own deadline won't fix themselves.
+      if (
+        failure instanceof HttpError &&
+        failure.status &&
+        failure.status < 500 &&
+        failure.status !== 429 &&
+        failure.status !== TIMEOUT_STATUS
+      ) {
+        throw failure
       }
       if (i < retries) await wait(400 * 2 ** i)
     } finally {

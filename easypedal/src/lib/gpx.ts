@@ -1,5 +1,5 @@
 import type { RouteResult } from './routeSearch'
-import { resample } from './geo'
+import { cumulativeDistances } from './geo'
 
 const escapeXml = (value: string) =>
   value.replace(/[<>&'"]/g, (c) =>
@@ -12,12 +12,18 @@ const escapeXml = (value: string) =>
  * the nearest sample rather than inventing values.
  */
 export function toGpx(route: RouteResult, name: string): string {
-  const samples = resample(route.path, route.profile.elevations.length || 1)
+  const elevations = route.profile.elevations
+  const cumulative = cumulativeDistances(route.path)
+  const total = cumulative[cumulative.length - 1] ?? 0
+
+  // Samples are spaced evenly by distance, but a routing engine's vertices are
+  // not: dense through bends, sparse along a straight. Matching them by
+  // position in the list would put the hills in the wrong part of the ride.
   const elevationAt = (index: number) => {
-    if (!route.profile.elevations.length) return undefined
-    const ratio = route.path.length <= 1 ? 0 : index / (route.path.length - 1)
-    const sampleIndex = Math.round(ratio * (samples.length - 1))
-    return route.profile.elevations[Math.min(sampleIndex, route.profile.elevations.length - 1)]
+    if (elevations.length === 0) return undefined
+    const ratio = total === 0 ? 0 : cumulative[index] / total
+    const sampleIndex = Math.round(ratio * (elevations.length - 1))
+    return elevations[Math.min(Math.max(sampleIndex, 0), elevations.length - 1)]
   }
 
   const points = route.path
