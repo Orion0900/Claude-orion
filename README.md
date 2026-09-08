@@ -330,7 +330,7 @@ still needs a connection.
 
 ## Tests
 
-345 unit tests covering the geodesy, ascent accumulation, turn classification,
+349 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
@@ -345,6 +345,17 @@ elevation service fails are all verified without touching the network.
 ```bash
 npm test
 ```
+
+### Browser checks
+
+`tests/` holds two scripts that drive the built app in a real browser against
+the same stand-in city. `consistency.mjs` runs six fresh sessions and compares
+them; `repeatability.mjs` covers what that cannot — five runs back to back
+without reloading, the same again with noisy GPS, and repeated searches in one
+session.
+
+The second run in a session is where state carried over from the first shows up,
+which is not something a single pass can find.
 
 ## Known limits
 

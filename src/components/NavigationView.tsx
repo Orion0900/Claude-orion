@@ -101,7 +101,8 @@ export function NavigationView({
   const originRef = useRef<LatLng | null>(null)
   const directionSettledRef = useRef(false)
   // Bad fixes cluster at junctions, so they are screened before use.
-  const filterRef = useRef(createFixFilter())
+  // Navigation wants live positions, so nothing from before the run counts.
+  const filterRef = useRef(createFixFilter({ notBefore: Date.now() }))
   // A single far-off match is not evidence; two in a row is.
   const relocateStreakRef = useRef(0)
   // Which maneuver has been announced at which band, so nothing repeats.
@@ -124,7 +125,7 @@ export function NavigationView({
     setDismissedSummary(false)
     originRef.current = null
     directionSettledRef.current = false
-    filterRef.current.reset()
+    filterRef.current = createFixFilter({ notBefore: Date.now() })
     relocateStreakRef.current = 0
   }, [])
 
@@ -235,7 +236,10 @@ export function NavigationView({
         lastFixRef.current = here
       },
       () => setError('Lost your location. Check that location access is allowed.'),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
+      // maximumAge 0: never satisfy this watch from the browser's cache. A run
+      // started soon after another would otherwise open on the previous run's
+      // final position.
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
     )
 
     return () => {
