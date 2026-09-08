@@ -6,11 +6,14 @@ import {
   distancePhrase,
   headingBetween,
   instructionFor,
+  isInstruction,
   nextStep,
   placeSteps,
+  roadLabel,
   turnAngle,
   type RawStep,
 } from './navigation'
+import { isTurn } from './turns'
 
 const start: LatLng = { lat: 42.3601, lng: -71.0589 }
 
@@ -222,5 +225,110 @@ describe('headingBetween', () => {
 
   it('reports nothing when the movement is just GPS jitter', () => {
     expect(headingBetween(start, destination(start, 45, 1))).toBeNull()
+  })
+})
+
+describe('roadLabel', () => {
+  const at = { location: start }
+
+  it('prefers the street name', () => {
+    expect(roadLabel({ ...at, type: 'turn', name: 'Mill Road' })).toBe('Mill Road')
+  })
+
+  it('adds the road number when the name does not already carry it', () => {
+    expect(roadLabel({ ...at, type: 'turn', name: 'London Road', ref: 'A21' })).toBe('London Road (A21)')
+  })
+
+  it('does not repeat a number already in the name', () => {
+    expect(roadLabel({ ...at, type: 'turn', name: 'A21', ref: 'A21' })).toBe('A21')
+  })
+
+  it('falls back to the road number alone', () => {
+    expect(roadLabel({ ...at, type: 'turn', ref: 'B2100' })).toBe('B2100')
+  })
+
+  it('falls back to where the road is signposted to', () => {
+    expect(roadLabel({ ...at, type: 'turn', destinations: 'Town Centre, Station' })).toBe('toward Town Centre')
+  })
+
+  it('gives nothing for a genuinely unnamed path', () => {
+    expect(roadLabel({ ...at, type: 'turn' })).toBeNull()
+  })
+})
+
+describe('isInstruction', () => {
+  it('announces slight turns, which the turn count deliberately ignores', () => {
+    expect(isInstruction({ type: 'turn', modifier: 'slight left' })).toBe(true)
+    expect(isTurn({ type: 'turn', modifier: 'slight left' })).toBe(false)
+  })
+
+  it('announces ordinary and sharp turns', () => {
+    expect(isInstruction({ type: 'turn', modifier: 'left' })).toBe(true)
+    expect(isInstruction({ type: 'turn', modifier: 'sharp right' })).toBe(true)
+  })
+
+  it('announces forks and roundabouts', () => {
+    expect(isInstruction({ type: 'fork', modifier: 'slight right' })).toBe(true)
+    expect(isInstruction({ type: 'roundabout', modifier: 'straight' })).toBe(true)
+  })
+
+  it('stays quiet when carrying straight on', () => {
+    expect(isInstruction({ type: 'continue', modifier: 'straight' })).toBe(false)
+    expect(isInstruction({ type: 'new name', modifier: 'straight' })).toBe(false)
+  })
+
+  it('stays quiet about setting off and finishing', () => {
+    expect(isInstruction({ type: 'depart', modifier: 'left' })).toBe(false)
+    expect(isInstruction({ type: 'arrive' })).toBe(false)
+  })
+})
+
+describe('naming the road in instructions', () => {
+  const at = { location: start }
+
+  it('names the street you turn onto', () => {
+    expect(instructionFor({ ...at, type: 'turn', modifier: 'left', name: 'Mill Road' })).toBe(
+      'Turn left onto Mill Road',
+    )
+  })
+
+  it('names a road that only has a number', () => {
+    expect(instructionFor({ ...at, type: 'turn', modifier: 'right', ref: 'A21' })).toBe('Turn right onto A21')
+  })
+
+  it('reads a signposted destination as a phrase, not as a street', () => {
+    expect(instructionFor({ ...at, type: 'turn', modifier: 'left', destinations: 'Town Centre' })).toBe(
+      'Turn left toward Town Centre',
+    )
+  })
+
+  it('names the road on a slight turn too', () => {
+    expect(instructionFor({ ...at, type: 'turn', modifier: 'slight left', name: 'Oak Avenue' })).toBe(
+      'Bear left onto Oak Avenue',
+    )
+  })
+
+  it('still works where the path genuinely has no name', () => {
+    expect(instructionFor({ ...at, type: 'turn', modifier: 'left' })).toBe('Turn left')
+  })
+
+  it('surfaces a slight turn as the next instruction', () => {
+    const path = squareLoop()
+    const steps = placeSteps(path, [
+      { type: 'depart', location: start },
+      { type: 'turn', modifier: 'slight left', location: destination(start, 0, 120), name: 'Oak Avenue' },
+      { type: 'turn', modifier: 'right', location: destination(start, 0, 240), name: 'Mill Road' },
+      { type: 'arrive', location: start },
+    ])
+    expect(nextStep(steps, 0)?.name).toBe('Oak Avenue')
+  })
+
+  it('says a name aloud using the engine pronunciation when given', () => {
+    const spoken = announcementFor(
+      { ...at, type: 'turn', modifier: 'left', name: 'Beaulieu Road', pronunciation: 'Byoo-lee Road' },
+      200,
+      'mi',
+    )
+    expect(spoken).toContain('Byoo-lee Road')
   })
 })

@@ -116,3 +116,67 @@ describe('createOsrmProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('road naming from the engine', () => {
+  const start = { lat: 42.36, lng: -71.06 }
+  const end = { lat: 42.37, lng: -71.05 }
+
+  function withSteps(steps: unknown[]) {
+    return {
+      code: 'Ok',
+      routes: [
+        {
+          distance: 500,
+          geometry: { coordinates: [[-71.06, 42.36], [-71.05, 42.37]] },
+          legs: [{ steps }],
+        },
+      ],
+    }
+  }
+
+  it('carries the street name through to the instruction data', async () => {
+    mockFetch(withSteps([
+      { name: 'Mill Road', maneuver: { type: 'turn', modifier: 'left', location: [-71.058, 42.362] } },
+    ]))
+    const result = await createOsrmProvider().route([start, end])
+    expect(result.steps?.[0].name).toBe('Mill Road')
+  })
+
+  it('carries road numbers and signposted destinations', async () => {
+    mockFetch(withSteps([
+      {
+        name: '',
+        ref: 'A21',
+        destinations: 'Town Centre',
+        maneuver: { type: 'turn', modifier: 'right', location: [-71.058, 42.362] },
+      },
+    ]))
+    const result = await createOsrmProvider().route([start, end])
+    expect(result.steps?.[0].ref).toBe('A21')
+    expect(result.steps?.[0].destinations).toBe('Town Centre')
+    expect(result.steps?.[0].name).toBeUndefined()
+  })
+
+  it('prefers a rotary’s own name over the road leaving it', async () => {
+    mockFetch(withSteps([
+      {
+        name: 'Exit Road',
+        rotary_name: 'Market Roundabout',
+        maneuver: { type: 'rotary', modifier: 'right', exit: 2, location: [-71.058, 42.362] },
+      },
+    ]))
+    const result = await createOsrmProvider().route([start, end])
+    expect(result.steps?.[0].name).toBe('Market Roundabout')
+    expect(result.steps?.[0].exit).toBe(2)
+  })
+
+  it('drops steps the engine gave no location for', async () => {
+    mockFetch(withSteps([
+      { name: 'Nowhere', maneuver: { type: 'turn', modifier: 'left' } },
+      { name: 'Mill Road', maneuver: { type: 'turn', modifier: 'left', location: [-71.058, 42.362] } },
+    ]))
+    const result = await createOsrmProvider().route([start, end])
+    expect(result.steps).toHaveLength(1)
+    expect(result.steps?.[0].name).toBe('Mill Road')
+  })
+})

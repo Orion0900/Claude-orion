@@ -9,7 +9,7 @@
  */
 import { cumulativeDistances, haversine, type LatLng } from './geo'
 import { projectOntoSegment } from './follow'
-import { isTurn, type Maneuver } from './turns'
+import type { Maneuver } from './turns'
 import { metersToFeet, metersToMiles, type DistanceUnit } from './units'
 
 export interface RawStep extends Maneuver {
@@ -17,8 +17,43 @@ export interface RawStep extends Maneuver {
   location: LatLng
   /** The road this step travels along, i.e. what you turn onto. */
   name?: string
+  /** Road number, for roads carrying one instead of a name ("A21"). */
+  ref?: string
+  /** Where the road leads, as signposted ("Town Centre"). */
+  destinations?: string
   /** Roundabout exit number, when the engine gives one. */
   exit?: number
+  /** How to say the name aloud, when the engine offers a hint. */
+  pronunciation?: string
+}
+
+/**
+ * What to call the road you're turning onto. A name is best; failing that a
+ * road number is still something you can read off a sign; failing that, where
+ * the road is signposted to.
+ */
+export function roadLabel(step: RawStep): string | null {
+  if (step.name) return step.ref && !step.name.includes(step.ref) ? `${step.name} (${step.ref})` : step.name
+  if (step.ref) return step.ref
+  if (step.destinations) return `toward ${step.destinations.split(/[,;]/)[0].trim()}`
+  return null
+}
+
+/**
+ * Whether a maneuver is worth announcing while running.
+ *
+ * Deliberately wider than `isTurn`, which answers a different question — how
+ * complicated a route is to remember. A gentle bend doesn't add to that, but
+ * mid-run you still want to be told which way the road forks.
+ */
+export function isInstruction({ type, modifier }: Maneuver): boolean {
+  if (type === 'depart' || type === 'arrive' || type === 'notification') return false
+  // Carrying straight on down the same road needs no instruction; every other
+  // junction type does, including the slight ones.
+  if (type === 'continue' || type === 'new name') {
+    return modifier !== undefined && modifier !== 'straight'
+  }
+  return true
 }
 
 export interface RouteStep extends RawStep {
@@ -58,7 +93,7 @@ export function placeSteps(path: LatLng[], steps: RawStep[]): RouteStep[] {
 /** The next maneuver worth announcing, given how far along the runner is. */
 export function nextStep(steps: RouteStep[], distanceAlong: number): RouteStep | null {
   // A small lookback stops an instruction vanishing the instant you reach it.
-  return steps.find((step) => isTurn(step) && step.distanceAlong > distanceAlong - 5) ?? null
+  return steps.find((step) => isInstruction(step) && step.distanceAlong > distanceAlong - 5) ?? null
 }
 
 /** Degrees to swing an arrow: negative left, positive right, 180 back on yourself. */
@@ -97,11 +132,13 @@ const DIRECTION_WORDS: Record<string, string> = {
 
 /** What to put on the banner: "Turn left onto Mill Road". */
 export function instructionFor(step: RawStep): string {
-  const onto = step.name ? ` onto ${step.name}` : ''
+  const road = roadLabel(step)
+  // "toward the station" already reads as a phrase; a name needs "onto".
+  const onto = road ? (road.startsWith('toward ') ? ` ${road}` : ` onto ${road}`) : ''
 
   switch (step.type) {
     case 'depart':
-      return step.name ? `Head off along ${step.name}` : 'Head off'
+      return road ? `Head off along ${road}` : 'Head off'
     case 'arrive':
       return 'You’re back at the start'
     case 'roundabout':
@@ -148,7 +185,9 @@ export function spokenDistance(meters: number, unit: DistanceUnit): string {
 
 /** Spoken form, e.g. "In 660 feet, turn left onto Mill Road". */
 export function announcementFor(step: RawStep, metersAway: number, unit: DistanceUnit): string {
-  const instruction = instructionFor(step)
+  const written = instructionFor(step)
+  const spokenName = step.pronunciation && step.name
+  const instruction = spokenName ? written.replace(step.name!, step.pronunciation!) : written
   if (metersAway < 30) return instruction
   return `In ${spokenDistance(metersAway, unit)}, ${instruction.charAt(0).toLowerCase()}${instruction.slice(1)}`
 }

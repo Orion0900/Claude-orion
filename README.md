@@ -181,6 +181,16 @@ distance zero because it sits on the same spot as the opening instruction.
 Each turn is spoken at most once per distance band (400 m, 150 m, 25 m), so you
 get a heads-up and a final call rather than a stream of repeats.
 
+Instructions always name the road where the map knows one: the street name
+first, then a road number for roads carrying only that, then where the road is
+signposted to. Only a genuinely unnamed path gives a bare "Turn left".
+
+Deciding what to announce is a separate question from counting how complicated a
+route is. A gentle bend adds nothing to what you have to remember, so it doesn't
+count as a turn — but mid-run you still want telling which way the road forks.
+Navigation therefore announces every junction with a direction, slight ones
+included, while the turn count keeps ignoring them.
+
 ### The tilted view
 
 Leaflet draws a flat map, so the perspective is CSS: the map sits in an
@@ -204,7 +214,7 @@ still needs a connection.
 
 ## Tests
 
-188 unit tests covering the geodesy, ascent accumulation, turn classification,
+210 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.
