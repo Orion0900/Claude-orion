@@ -532,3 +532,73 @@ input[type='range'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---- Follow mode: the panel you glance at mid-run ---- */
+.follow {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-raised);
+}
+
+.follow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.follow-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-transform: none;
+}
+
+.follow-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.follow-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.follow-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+
+.follow-stats dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+/* Numbers you read at a glance while moving, so they are set large. */
+.follow-stats dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .follow {
+    padding: 14px 18px;
+  }
+}

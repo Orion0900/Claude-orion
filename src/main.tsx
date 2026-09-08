@@ -11,3 +11,15 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 )
+
+// Offline support. Registered relative to the page so it works both at a
+// domain root and under a project sub-path.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(new URL('sw.js', document.baseURI), { scope: './' })
+      .catch(() => {
+        // Offline support is a bonus; the app works fine without it.
+      })
+  })
+}

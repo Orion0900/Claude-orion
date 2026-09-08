@@ -27,6 +27,10 @@ end at your door.
   on the map.
 - **Sends to your phone.** On an iPhone, the share sheet hands the GPX straight
   to Strava, Garmin, Files or AirDrop. Everywhere else it downloads.
+- **Follows you as you run.** A live dot on the route, distance done and left,
+  and a warning when you drift off the line — so you don't need a watch.
+- **Installs on your phone.** Add to Home Screen gives it an icon, a full
+  screen with no browser chrome, and an app that opens without a signal.
 
 Loop or out-and-back, miles or kilometres, feet or metres. Built for the phone
 you'll actually hold at the front door: safe-area aware, no zoom-on-focus, and
@@ -38,6 +42,12 @@ sized for thumbs.
 npm install
 npm run dev      # http://localhost:5173
 ```
+
+### Installing it on an iPhone
+
+Open the site in **Safari**, tap **Share**, then **Add to Home Screen**. It gets
+an icon, launches full screen, and opens offline. iOS only offers this from
+Safari — Chrome on iOS has no Add to Home Screen.
 
 ```bash
 npm run build    # typecheck + production bundle into dist/
@@ -128,20 +138,46 @@ src/
     elevation.ts     smoothing and hysteresis ascent accumulation
     routeSearch.ts   candidate generation, refinement, scoring   <- the core
     turns.ts         which maneuvers count as a turn worth remembering
+    follow.ts        matching a live GPS fix to a point on the route
     effort.ts        grade-adjusted finish-time estimate
     gpx.ts           GPX 1.1 export
     share.ts         iOS share sheet, download fallback, Apple Maps links
     units.ts         miles/km, feet/metres, formatting
     __fixtures__/    synthetic grid city used by the tests
   services/          OSRM, Open-Meteo, Nominatim + shared fair-use HTTP client
-  components/        MapView, ControlPanel, RouteList, ElevationProfile
+  components/        MapView, ControlPanel, RouteList, ElevationProfile, FollowMode
+public/
+  manifest.webmanifest, sw.js, icons     the installable-app layer
 ```
+
+## Following a run without a watch
+
+Matching a GPS fix to "how far round am I?" is not simply the nearest point on
+the line. A loop touches its own start, and often crosses itself partway, so
+nearest-point alone makes progress jump backwards. Each fix is therefore matched
+within a window around the previous one, which keeps progress moving forward.
+
+Two cases break that window, and both are handled: at the very first fix there
+is no previous position, so ties go to the earlier segment — you haven't run it
+yet. And when nothing near the last fix is within 60 m, the window itself is
+assumed wrong (signal lost under a bridge, or you rejoined the loop elsewhere)
+and the whole route is searched again.
+
+The screen is held awake while following, where the browser allows it.
+
+## Offline
+
+The service worker caches the app shell and the map tiles you've already
+loaded, so the app opens and shows familiar ground without a signal. Routing and
+elevation requests are never cached: those are answers to a specific question,
+and a stale answer is worse than an honest error. Finding new routes therefore
+still needs a connection.
 
 ## Tests
 
-138 unit tests covering the geodesy, ascent accumulation, turn classification,
-unit conversion, GPX output, sharing and its fallbacks, the OSRM adapter, and
-the search algorithm end to end.
+157 unit tests covering the geodesy, ascent accumulation, turn classification,
+GPS-to-route matching, unit conversion, GPX output, sharing and its fallbacks,
+the OSRM adapter, and the search algorithm end to end.
 
 The search tests run against a synthetic city in `src/lib/__fixtures__` —
 streets on a 120 m lattice and terrain that climbs steadily to the east — so

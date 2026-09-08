@@ -21,6 +21,8 @@ interface RouteListProps {
   scrub: number | null
   onSelect: (id: string) => void
   onScrub: (fraction: number | null) => void
+  followingId: string | null
+  onFollow: (id: string) => void
 }
 
 /** Share sheet on a phone, plain download everywhere else. */
@@ -55,6 +57,8 @@ export function RouteList({
   scrub,
   onSelect,
   onScrub,
+  followingId,
+  onFollow,
 }: RouteListProps) {
   return (
     <div className="results">
@@ -121,6 +125,17 @@ export function RouteList({
                   onScrub={onScrub}
                 />
                 <div className="route-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={followingId === route.id}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onFollow(route.id)
+                    }}
+                  >
+                    {followingId === route.id ? 'Following…' : 'Follow this route'}
+                  </button>
                   <ShareButton route={route} name={name} />
                   <a
                     className="btn btn-secondary"
