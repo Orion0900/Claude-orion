@@ -16,6 +16,10 @@ interface OsrmResponse {
     legs?: Array<{
       steps?: Array<{
         name?: string
+        ref?: string
+        destinations?: string
+        pronunciation?: string
+        rotary_name?: string
         maneuver?: Maneuver & { location?: [number, number]; exit?: number }
       }>
     }>
@@ -56,7 +60,11 @@ export function createOsrmProvider(base = OSRM_BASE): RoutingProvider {
           type: step.maneuver.type,
           modifier: step.maneuver.modifier,
           exit: step.maneuver.exit,
-          name: step.name || undefined,
+          // A rotary's own name beats the road you leave it on.
+          name: step.rotary_name || step.name || undefined,
+          ref: step.ref || undefined,
+          destinations: step.destinations || undefined,
+          pronunciation: step.pronunciation || undefined,
           location: { lat: location[1], lng: location[0] },
         }]
       })
