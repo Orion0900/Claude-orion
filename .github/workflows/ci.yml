@@ -22,3 +22,24 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
+
+  podbrief:
+    name: PodBrief typecheck, build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: podcast-summarizer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: podcast-summarizer/package-lock.json
+
+      - run: npm ci
+      - name: Typecheck and build
+        run: npm run build
+      - name: Unit tests
+        run: npm test

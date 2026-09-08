@@ -9,6 +9,10 @@ end at your door.
 
 ![LoopMaker](docs/screenshot.png)
 
+> **Also in this repo:** [PodBrief](podcast-summarizer/) — paste a Spotify
+> podcast link, get every point from the episode summarized, installable on an
+> iPhone. See [podcast-summarizer/README.md](podcast-summarizer/README.md).
+
 ## What it does
 
 - **Loops that come home.** Routes start and finish at the same point, so
