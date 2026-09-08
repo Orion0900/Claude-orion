@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const LOOKS_LIKE_SPOTIFY = /spotify\.com\/|spotify:episode:|spotify\.link\//i
+const LOOKS_LIKE_LINK = /youtu\.be\/|youtube\.com\/|spotify\.com\/|spotify:episode:|spotify\.link\//i
 
 export function UrlForm({ onSubmit }: { onSubmit: (url: string) => Promise<void> }) {
   const [url, setUrl] = useState('')
@@ -12,8 +12,8 @@ export function UrlForm({ onSubmit }: { onSubmit: (url: string) => Promise<void>
   const submit = async (value: string) => {
     const v = value.trim()
     if (!v) return
-    if (!LOOKS_LIKE_SPOTIFY.test(v)) {
-      setError('Paste a Spotify episode link (open.spotify.com/episode/…).')
+    if (!LOOKS_LIKE_LINK.test(v)) {
+      setError('Paste a YouTube or Spotify episode link.')
       return
     }
     setBusy(true)
@@ -41,7 +41,9 @@ export function UrlForm({ onSubmit }: { onSubmit: (url: string) => Promise<void>
   return (
     <section className="card hero">
       <h2>Summarize an episode</h2>
-      <p className="muted">In Spotify, tap <strong>Share → Copy link</strong> on an episode, then paste it here.</p>
+      <p className="muted">
+        In YouTube, tap <strong>Share → Copy link</strong> on the episode, then paste it here. YouTube is free; Spotify links work too.
+      </p>
       <form
         className="row"
         onSubmit={(e) => {
@@ -55,7 +57,7 @@ export function UrlForm({ onSubmit }: { onSubmit: (url: string) => Promise<void>
           autoComplete="off"
           autoCapitalize="off"
           autoCorrect="off"
-          placeholder="https://open.spotify.com/episode/…"
+          placeholder="https://youtu.be/…"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           disabled={busy}

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { summaryToMarkdown, timestampToSeconds } from '../markdown'
-import type { Job } from '../types'
+import { linkAt, TRANSCRIPT_LABEL, type Episode, type Job } from '../types'
 
-function Stamp({ ts, spotifyUrl }: { ts: string; spotifyUrl?: string }) {
-  const secs = timestampToSeconds(ts)
-  if (spotifyUrl && secs !== undefined) {
+function Stamp({ ts, episode }: { ts: string; episode?: Episode }) {
+  const href = linkAt(episode, timestampToSeconds(ts))
+  if (href && episode) {
     return (
-      <a className="stamp" href={`${spotifyUrl}?t=${secs}`} target="_blank" rel="noreferrer" title="Open in Spotify at this point">
+      <a className="stamp" href={href} target="_blank" rel="noreferrer" title={`Open in ${episode.source === 'youtube' ? 'YouTube' : 'Spotify'} at this point`}>
         {ts}
       </a>
     )
@@ -16,7 +16,7 @@ function Stamp({ ts, spotifyUrl }: { ts: string; spotifyUrl?: string }) {
 
 export function SummaryView({ job }: { job: Job }) {
   const s = job.summary!
-  const url = job.episode?.spotifyUrl
+  const episode = job.episode
   const [copied, setCopied] = useState(false)
 
   const share = async () => {
@@ -47,7 +47,7 @@ export function SummaryView({ job }: { job: Job }) {
         </button>
         {job.transcriptWords && (
           <span className="muted small">
-            {job.transcriptWords.toLocaleString()} words · transcript from {job.transcriptSource === 'feed' ? 'the publisher' : job.transcriptSource}
+            {job.transcriptWords.toLocaleString()} words · from {job.transcriptSource ? TRANSCRIPT_LABEL[job.transcriptSource] : 'transcript'}
           </span>
         )}
       </div>
@@ -66,7 +66,7 @@ export function SummaryView({ job }: { job: Job }) {
           {s.key_points.map((p, i) => (
             <li key={i}>
               <div className="point">
-                <Stamp ts={p.timestamp} spotifyUrl={url} />
+                <Stamp ts={p.timestamp} episode={episode} />
                 <strong>{p.point}</strong>
               </div>
               <p className="detail">{p.detail}</p>
@@ -82,7 +82,7 @@ export function SummaryView({ job }: { job: Job }) {
             {s.chapters.map((c, i) => (
               <li key={i}>
                 <div className="point">
-                  <Stamp ts={c.start} spotifyUrl={url} />
+                  <Stamp ts={c.start} episode={episode} />
                   <strong>{c.title}</strong>
                 </div>
                 <p className="detail">{c.summary}</p>
@@ -99,7 +99,7 @@ export function SummaryView({ job }: { job: Job }) {
             <blockquote key={i}>
               “{q.text}”
               <footer>
-                — {q.speaker} <Stamp ts={q.timestamp} spotifyUrl={url} />
+                — {q.speaker} <Stamp ts={q.timestamp} episode={episode} />
               </footer>
             </blockquote>
           ))}

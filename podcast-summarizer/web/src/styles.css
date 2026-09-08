@@ -75,7 +75,8 @@ input[type='url'], input[type='text'] {
   padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
   background: var(--bg); color: var(--text); font-size: 16px; /* 16px stops iOS zooming on focus */
 }
-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; resize: vertical; margin-top: 8px; }
 label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0; }
 label input { margin-top: 6px; }
 
@@ -106,6 +107,8 @@ button.link.danger { color: var(--danger); align-self: center; }
 .steps li.active .dot { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .steps li.active { color: var(--text); font-weight: 600; }
 .steps li.failed .dot { background: var(--danger); }
+.steps li.waiting .dot { background: var(--accent); }
+.steps li.waiting { color: var(--text); font-weight: 600; }
 .status { display: flex; align-items: center; gap: 8px; }
 .spinner {
   width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
@@ -149,7 +152,7 @@ blockquote footer { font-style: normal; font-size: 13px; color: var(--muted); ma
 .pill { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--line); color: var(--muted); }
 .pill.done { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .pill.failed { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
-.pill.needs_source { background: var(--accent-soft); color: var(--accent); }
+.pill.waiting { background: var(--accent-soft); color: var(--accent); }
 .list .link.danger { padding: 12px; }
 
 .status-list .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--line); }

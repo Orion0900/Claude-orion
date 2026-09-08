@@ -8,7 +8,7 @@ export function summaryToMarkdown(job: Job): string {
   const lines: string[] = []
   lines.push(`# ${e?.title ?? 'Episode summary'}`)
   if (e?.showName) lines.push(`_${e.showName}_`)
-  if (e?.spotifyUrl) lines.push(e.spotifyUrl)
+  if (e?.url) lines.push(e.url)
   lines.push('', '## TL;DR', s.tldr, '', '## Key points')
   for (const p of s.key_points) lines.push(`- **${p.point}** (${p.timestamp}) — ${p.detail}`)
   if (s.chapters.length) {

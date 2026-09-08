@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { isActive, type Job } from '../types'
 import { EpisodeCard } from './EpisodeCard'
 import { Progress } from './Progress'
 import { SourceForm } from './SourceForm'
 import { SummaryView } from './SummaryView'
+import { TranscriptForm } from './TranscriptForm'
 
 export function JobView({
   id,
@@ -32,7 +33,7 @@ export function JobView({
         setJob(fresh)
         setError(undefined)
         onUpdate(fresh)
-        if (isActive(fresh.stage)) timer = setTimeout(tick, 2500)
+        if (isActive(fresh.stage) || fresh.stage === 'needs_transcript') timer = setTimeout(tick, isActive(fresh.stage) ? 2500 : 6000)
       } catch (err) {
         if (cancelled) return
         // A saved summary is still readable when the server is unreachable.
@@ -56,6 +57,14 @@ export function JobView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
+  const provideTranscript = useCallback(
+    async (text: string, format: string | undefined, source: 'phone' | 'manual') => {
+      const updated = await api.provideTranscript(id, text, format, source)
+      setJob(updated)
+    },
+    [id],
+  )
+
   if (!job) {
     return <p className="muted center">{error ?? 'Loading…'}</p>
   }
@@ -64,6 +73,7 @@ export function JobView({
     const updated = await api.provideSource(id, source)
     setJob(updated)
   }
+
 
   return (
     <div className="job">
@@ -74,11 +84,14 @@ export function JobView({
 
       {job.stage === 'needs_source' && <SourceForm message={job.message} onSubmit={provide} />}
 
+      {job.stage === 'needs_transcript' && <TranscriptForm key={job.updatedAt} episode={job.episode} message={job.message} onSubmit={provideTranscript} />}
+
       {job.stage === 'failed' && (
         <div className="card failed">
           <h3>Didn’t work</h3>
           <p>{job.error}</p>
-          <SourceForm message="If you know where the audio lives, give it here and we’ll try again." onSubmit={provide} />
+          {job.episode?.source === 'spotify' && <SourceForm message="If you know where the audio lives, give it here and we’ll try again." onSubmit={provide} />}
+          {job.episode?.source === 'youtube' && <TranscriptForm episode={job.episode} message="You can still paste the transcript by hand." onSubmit={provideTranscript} />}
         </div>
       )}
 
