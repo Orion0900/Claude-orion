@@ -20,6 +20,7 @@ interface NavigationViewProps {
   paceSeconds: number
   onHeading: (heading: number | null) => void
   onPosition: (position: LatLng | null) => void
+  onProgress: (fraction: number) => void
   onExit: () => void
 }
 
@@ -47,6 +48,7 @@ export function NavigationView({
   paceSeconds,
   onHeading,
   onPosition,
+  onProgress,
   onExit,
 }: NavigationViewProps) {
   const [progress, setProgress] = useState<RouteProgress | null>(null)
@@ -76,6 +78,7 @@ export function NavigationView({
         setError(null)
         setProgress(next)
         onPosition(here)
+        onProgress(next.fraction)
 
         // Prefer the device's own heading; fall back to the way you just moved.
         const derived = lastFixRef.current ? headingBetween(lastFixRef.current, here) : null
@@ -94,7 +97,7 @@ export function NavigationView({
       onPosition(null)
       onHeading(null)
     }
-  }, [route, cumulative, onPosition, onHeading])
+  }, [route, cumulative, onPosition, onHeading, onProgress])
 
   // Keep the screen on; not every browser allows it.
   useEffect(() => {
@@ -186,39 +189,45 @@ export function NavigationView({
       ) : null}
       {error ? <p className="nav-alert">{error}</p> : null}
 
+      <div className="nav-spacer" style={{ pointerEvents: 'none' }} />
+
       <div className="nav-footer">
-        <div className="nav-stats">
-          <div>
-            <dt>Left</dt>
-            <dd>{formatDistance(remaining, distanceUnit)}</dd>
-          </div>
-          <div>
-            <dt>Done</dt>
-            <dd>{formatDistance(progress?.distanceAlong ?? 0, distanceUnit)}</dd>
-          </div>
-          <div>
-            <dt>To go</dt>
-            <dd>{formatDuration(timeLeft)}</dd>
-          </div>
+        <div className="nav-summary">
+          <span className="nav-eta">{formatDuration(timeLeft)}</span>
+          <span className="nav-sub">
+            {formatDistance(remaining, distanceUnit)} left · {formatDistance(progress?.distanceAlong ?? 0, distanceUnit)} done
+          </span>
         </div>
-        <div className="nav-buttons">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-pressed={muted}
-            onClick={() => {
-              setMuted((was) => !was)
-              if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
-            }}
-          >
-            {muted ? 'Voice off' : 'Voice on'}
-          </button>
-          <button type="button" className="btn" onClick={onExit}>
-            End run
-          </button>
-        </div>
-        <p className="nav-attribution">Map data © OpenStreetMap contributors</p>
+        <button
+          type="button"
+          className="nav-icon-btn"
+          aria-pressed={muted}
+          aria-label={muted ? 'Turn voice directions on' : 'Turn voice directions off'}
+          onClick={() => {
+            setMuted((was) => !was)
+            if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor" />
+            {muted ? (
+              <path d="M16 9.5l5 5m0-5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+            ) : (
+              <path
+                d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
+            )}
+          </svg>
+        </button>
+        <button type="button" className="nav-end" onClick={onExit}>
+          End
+        </button>
       </div>
+      <p className="nav-attribution">Map data © OpenStreetMap contributors</p>
     </div>
   )
 }

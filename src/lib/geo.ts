@@ -136,3 +136,30 @@ export function pointAtFraction(path: LatLng[], fraction: number): LatLng {
   const t = spanLen === 0 ? 0 : (target - cum[i - 1]) / spanLen
   return interpolate(path[i - 1], path[i], t)
 }
+
+/**
+ * Split a polyline at a fraction of its length, into the part already covered
+ * and the part still ahead. Both keep the split point, so drawn back to back
+ * they show no gap.
+ */
+export function splitPath(path: LatLng[], fraction: number): [LatLng[], LatLng[]] {
+  if (path.length < 2) return [path.slice(), path.slice()]
+
+  const clamped = Math.min(1, Math.max(0, fraction))
+  const cum = cumulativeDistances(path)
+  const total = cum[cum.length - 1]
+  if (total === 0) return [path.slice(), path.slice()]
+
+  const target = clamped * total
+  let i = 1
+  while (i < cum.length - 1 && cum[i] < target) i++
+
+  const spanLength = cum[i] - cum[i - 1]
+  const t = spanLength === 0 ? 0 : (target - cum[i - 1]) / spanLength
+  const junction = interpolate(path[i - 1], path[i], t)
+
+  return [
+    [...path.slice(0, i), junction],
+    [junction, ...path.slice(i)],
+  ]
+}
