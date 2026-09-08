@@ -55,6 +55,15 @@ npm run dev     # Vite on :5173 with the API proxied from :8787, both hot-reload
 npm test        # unit and pipeline tests (no network needed)
 ```
 
+### One-click hosting (Render)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Orion0900/Claude-orion)
+
+The `render.yaml` at the repo root builds the Docker image and asks for your
+`ANTHROPIC_API_KEY` and `ASSEMBLYAI_API_KEY`. You get an HTTPS URL to open on
+the phone. The free plan sleeps when idle (first request takes ~30 s) and its
+disk resets on deploy; summaries you've opened are kept on the phone anyway.
+
 ### Docker
 
 ```bash
