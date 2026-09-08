@@ -121,3 +121,27 @@ describe('createFixFilter', () => {
     expect(filter.accept(fix({ position: destination(home, 90, 5000), timestamp: 500 })).accepted).toBe(true)
   })
 })
+
+describe('fixes left over from before the run', () => {
+  it('refuses a fix recorded before the run began', () => {
+    const filter = createFixFilter({ notBefore: 10_000 })
+    expect(filter.accept(fix({ timestamp: 9_000 }))).toEqual({ accepted: false, reason: 'stale' })
+  })
+
+  it('accepts one recorded after', () => {
+    const filter = createFixFilter({ notBefore: 10_000 })
+    expect(filter.accept(fix({ timestamp: 10_001 })).accepted).toBe(true)
+  })
+
+  it('does not let stale fixes count toward giving up', () => {
+    const filter = createFixFilter({ notBefore: 10_000, maxRejectStreak: 2 })
+    // However many arrive, a fix from before the run is never taken.
+    for (let i = 0; i < 5; i++) {
+      expect(filter.accept(fix({ timestamp: 1_000 + i })).accepted).toBe(false)
+    }
+  })
+
+  it('ignores the cut-off when none is given', () => {
+    expect(createFixFilter().accept(fix({ timestamp: 0 })).accepted).toBe(true)
+  })
+})

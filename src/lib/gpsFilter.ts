@@ -21,7 +21,7 @@ export interface Fix {
 
 export interface FixVerdict {
   accepted: boolean
-  reason?: 'inaccurate' | 'impossible-speed'
+  reason?: 'inaccurate' | 'impossible-speed' | 'stale'
 }
 
 /** Beyond this the receiver is guessing, and a guess moves the map. */
@@ -56,10 +56,18 @@ export function createFixFilter(options: {
   maxAccuracy?: number
   maxSpeed?: number
   maxRejectStreak?: number
+  /**
+   * Ignore fixes recorded before this moment. A browser will happily satisfy a
+   * new watch from its cache, so a run started shortly after another can open
+   * on the previous run's last position — showing the runner where they used to
+   * be, on a route they have only just begun.
+   */
+  notBefore?: number
 } = {}): FixFilter {
   const maxAccuracy = options.maxAccuracy ?? MAX_ACCURACY_METERS
   const maxSpeed = options.maxSpeed ?? MAX_SPEED_MPS
   const maxStreak = options.maxRejectStreak ?? MAX_REJECT_STREAK
+  const notBefore = options.notBefore ?? 0
 
   let last: Fix | null = null
   let streak = 0
@@ -79,6 +87,9 @@ export function createFixFilter(options: {
 
   return {
     accept(fix) {
+      // Left over from before this run began: not about this run at all.
+      if (fix.timestamp < notBefore) return { accepted: false, reason: 'stale' }
+
       // The first fix has nothing to be judged against, but still has to be
       // better than useless.
       if (last === null) {
