@@ -39,6 +39,30 @@ describe('bookmarkletUrl', () => {
     expect(code).toContain('ytd-transcript-segment-renderer')
   })
 
+  it('asks YouTube\u2019s own player endpoint when the page blob has no tracks', () => {
+    const code = decode('https://x.example.com')
+    expect(code).toContain('/youtubei/v1/player')
+    // The page's own client identity is reused so the call looks native.
+    expect(code).toContain('INNERTUBE_API_KEY')
+    expect(code).toContain('INNERTUBE_CLIENT_NAME')
+    expect(code).toContain('INNERTUBE_CLIENT_VERSION')
+  })
+
+  it('matches transcript rows by shape, not just desktop element names', () => {
+    const code = decode('https://x.example.com')
+    expect(code).toContain('ytd-transcript-segment-renderer')
+    expect(code).toContain('ytm-transcript-segment-renderer')
+    expect(code).toContain('transcript-segment')
+  })
+
+  it('reports what it tried when it finds nothing', () => {
+    const code = decode('https://x.example.com')
+    expect(code).toContain('No captions found.')
+    expect(code).toContain("trail.push('page: '")
+    expect(code).toContain("trail.push('player: '")
+    expect(code).toContain("trail.push('panel: '")
+  })
+
   it('refuses to run anywhere but YouTube', () => {
     expect(decode('https://x.example.com')).toContain('youtube')
   })

@@ -28,8 +28,11 @@ const SOURCE = `(async () => {
       document.body.appendChild(el);
     }
     el.textContent = msg;
+    el.style.whiteSpace = 'pre-line';
+    el.style.textAlign = 'center';
     return el;
   };
+  const trail = [];
 
   // The JSON blob is followed by other script text, so match braces rather
   // than trusting a lazy regex to find its end.
@@ -78,41 +81,82 @@ const SOURCE = `(async () => {
     note('Reading the captions…');
     let lines = [];
 
-    // Relative URL: same origin whether this is m.youtube.com or www.
-    for (const path of ['/watch?v=' + id + '&hl=en', '/watch?v=' + id + '&hl=en&app=desktop']) {
+    const tracksFrom = (pr) => {
+      const r = pr && pr.captions && pr.captions.playerCaptionsTracklistRenderer;
+      return ((r && r.captionTracks) || []).filter((t) => t && t.baseUrl);
+    };
+
+    const download = async (track) => {
+      const url = track.baseUrl + (track.baseUrl.indexOf('fmt=') < 0 ? '&fmt=json3' : '');
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('track ' + res.status);
+      const data = await res.json();
+      return (data.events || [])
+        .filter((e) => e.segs && e.tStartMs !== undefined)
+        .map((e) => {
+          const text = e.segs.map((s) => s.utf8 || '').join('').replace(/\\s+/g, ' ').trim();
+          return text ? stamp(e.tStartMs / 1000) + '\\n' + text : '';
+        })
+        .filter(Boolean);
+    };
+
+    // 1. The watch page's embedded player data, fetched relative so it stays
+    //    same-origin on both m.youtube.com and www.youtube.com.
+    let html = '';
+    try {
+      html = await (await fetch('/watch?v=' + id + '&hl=en', { credentials: 'include' })).text();
+      const tracks = tracksFrom(carveJson(html, 'ytInitialPlayerResponse'));
+      trail.push('page: ' + tracks.length + ' tracks');
+      if (tracks.length) lines = await download(pickTrack(tracks));
+    } catch (e) {
+      trail.push('page: ' + e.message);
+    }
+
+    // 2. YouTube's own player endpoint. The mobile page often omits caption
+    //    tracks from the embedded blob but serves them here; the page's own
+    //    client name, version and key are reused so the call looks native.
+    if (lines.length <= 10) {
       try {
-        const html = await (await fetch(path, { credentials: 'include' })).text();
-        const pr = carveJson(html, 'ytInitialPlayerResponse');
-        const tracks = pr && pr.captions && pr.captions.playerCaptionsTracklistRenderer
-          ? pr.captions.playerCaptionsTracklistRenderer.captionTracks || []
-          : [];
-        const track = pickTrack(tracks.filter((t) => t && t.baseUrl));
-        if (!track) continue;
-        const url = track.baseUrl + (track.baseUrl.indexOf('fmt=') < 0 ? '&fmt=json3' : '');
-        const data = await (await fetch(url, { credentials: 'include' })).json();
-        lines = (data.events || [])
-          .filter((e) => e.segs && e.tStartMs !== undefined)
-          .map((e) => {
-            const text = e.segs.map((s) => s.utf8 || '').join('').replace(/\\s+/g, ' ').trim();
-            return text ? stamp(e.tStartMs / 1000) + '\\n' + text : '';
-          })
-          .filter(Boolean);
-        if (lines.length > 10) break;
+        const pick = (re, fallback) => (html.match(re) || [])[1] || fallback;
+        const key = pick(/"INNERTUBE_API_KEY":"([^"]+)"/);
+        const client = pick(/"INNERTUBE_CLIENT_NAME":"([^"]+)"/, 'MWEB');
+        const version = pick(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/, '2.20240101.00.00');
+        const res = await fetch('/youtubei/v1/player' + (key ? '?key=' + key : ''), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            videoId: id,
+            contentCheckOk: true,
+            racyCheckOk: true,
+            context: { client: { clientName: client, clientVersion: version, hl: 'en', gl: 'US' } },
+          }),
+        });
+        if (!res.ok) throw new Error('player ' + res.status);
+        const tracks = tracksFrom(await res.json());
+        trail.push('player: ' + tracks.length + ' tracks');
+        if (tracks.length) lines = await download(pickTrack(tracks));
       } catch (e) {
-        /* try the next shape */
+        trail.push('player: ' + e.message);
       }
     }
 
-    // If YouTube changed shape, fall back to the transcript panel if it is open.
+    // 3. Whatever the open transcript panel has rendered. Desktop and mobile
+    //    name their elements differently, so match on shape: a short
+    //    timestamp followed by its line.
     if (lines.length <= 10) {
-      lines = [].slice.call(document.querySelectorAll('ytd-transcript-segment-renderer')).map((r) => {
-        const t = (r.querySelector('.segment-timestamp') || {}).textContent;
-        const x = (r.querySelector('.segment-text') || {}).textContent;
-        return t && x ? t.trim() + '\\n' + x.trim() : '';
+      const rows = document.querySelectorAll('ytd-transcript-segment-renderer, ytm-transcript-segment-renderer, [class*="transcript-segment"]');
+      const fromRows = [].slice.call(rows).map((r) => {
+        const text = (r.innerText || r.textContent || '').trim();
+        const m = text.match(/^((?:\\d{1,2}:)?\\d{1,2}:\\d{2})\\s+([\\s\\S]+)$/);
+        return m ? m[1] + '\\n' + m[2].replace(/\\s+/g, ' ').trim() : '';
       }).filter(Boolean);
+      trail.push('panel: ' + fromRows.length + ' rows');
+      if (fromRows.length > lines.length) lines = fromRows;
     }
+
     if (lines.length <= 10) {
-      return note('No captions found for this video.');
+      return note('No captions found.\\n' + trail.join('\\n') + '\\nOpen the transcript panel, or tell PodBrief this trail.');
     }
 
     const text = lines.join('\\n');
