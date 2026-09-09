@@ -95,6 +95,24 @@ want. LoopMaker works backwards from the target:
 5. **Score and filter.** Rank on distance error, ascent overage and turn
    density, drop near-duplicates, return the best few.
 
+### Turns, counted and described the way a runner would
+
+A routing engine emits a maneuver for every change in the network, and two of
+them a few metres apart — stepping left then right to cross at a kerb, or
+jogging round the corner of a block — are one moment to the person running it.
+Counted separately, an ordinary neighbourhood loop looks like it has thirty
+turns in it. Maneuvers within thirty metres of each other therefore collapse
+into the single decision they represent, measured from the last turn actually
+counted so a long zigzag cannot disappear entirely.
+
+How that number is shown matters as much as the number. A tally on every card
+invites a runner to worry about remembering thirty turns while they are still
+choosing, which is the one thing the app has already taken care of. So the scan
+line carries distance, climb and time; the turns become a phrase — *barely any
+turns*, *a few turns* — one option is named as the simplest of those offered,
+and the count itself appears only on the route you have chosen, alongside the
+reminder that every turn is called out as you reach it.
+
 ### Turns are a preference, not a limit
 
 Distance and climbing are stated constraints: a route either satisfies them or
@@ -343,7 +361,7 @@ still needs a connection.
 
 ## Tests
 
-349 unit tests covering the geodesy, ascent accumulation, turn classification,
+360 unit tests covering the geodesy, ascent accumulation, turn classification,
 GPS-to-route matching, turn instructions and their placement, unit conversion,
 GPX output, sharing and its fallbacks, the OSRM adapter, and the search
 algorithm end to end.

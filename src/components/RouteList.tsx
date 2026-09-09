@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { compassLabel, type RouteResult } from '../lib/routeSearch'
 import { appleMapsUrl, isAppleDevice, shareRoute } from '../lib/share'
-import { simplicityLabel } from '../lib/turns'
+import { simplicityLabel, turnDensity } from '../lib/turns'
 import { isSaved, type SavedRoute } from '../lib/savedRoutes'
 import { estimateDuration } from '../lib/effort'
 import {
@@ -65,6 +65,17 @@ export function RouteList({
   savedRoutes,
   onToggleSaved,
 }: RouteListProps) {
+  // Naming the least fiddly option turns a number a runner has to interpret
+  // into a recommendation they can just take.
+  const simplestId = routes.reduce<{ id: string | null; density: number }>(
+    (best, route) => {
+      if (route.turns === null) return best
+      const density = turnDensity(route.turns, route.distance)
+      return density < best.density ? { id: route.id, density } : best
+    },
+    { id: null, density: Infinity },
+  ).id
+
   return (
     <div className="results">
       {routes.map((route, index) => {
@@ -126,15 +137,15 @@ export function RouteList({
                     )}
                   </strong>
                 </span>
-                {route.turns === null ? null : (
-                  <span>
-                    <strong>{route.turns}</strong> turns
-                  </span>
-                )}
               </span>
 
               {route.turns === null ? null : (
-                <span className="route-note">{simplicityLabel(route.turns, route.distance)} to follow</span>
+                <span className="route-note">
+                  {simplicityLabel(route.turns, route.distance)}
+                  {simplestId === route.id && routes.length > 1 ? (
+                    <span className="route-simplest"> · simplest of these</span>
+                  ) : null}
+                </span>
               )}
             </button>
 
@@ -147,6 +158,14 @@ export function RouteList({
                   cursor={scrub}
                   onScrub={onScrub}
                 />
+                {route.turns === null ? null : (
+                  <p className="route-reassure">
+                    {route.turns === 0
+                      ? 'No turns to remember — the app calls anything that comes up.'
+                      : `${route.turns} turn${route.turns === 1 ? '' : 's'}, each called out as you reach it. Nothing to memorise.`}
+                  </p>
+                )}
+
                 <div className="route-actions">
                   <button
                     type="button"

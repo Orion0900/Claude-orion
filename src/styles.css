@@ -1008,3 +1008,21 @@ input[type='range'] {
   font-weight: 600;
   align-self: flex-start;
 }
+
+/* The simplest option, named rather than left to be worked out from a number. */
+.route-simplest {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Where the turn count lives now: an assurance on the chosen route, not a
+   warning on every card. */
+.route-reassure {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
