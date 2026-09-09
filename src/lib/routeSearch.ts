@@ -1,6 +1,6 @@
 import { bounds, destination, pathLength, resample, type LatLng } from './geo'
 import { buildProfile, type ElevationProfile } from './elevation'
-import { turnDensity } from './turns'
+import { countDecisions, turnDensity } from './turns'
 import { placeSteps, type RawStep, type RouteStep } from './navigation'
 
 export interface RouteGeometry {
@@ -335,7 +335,11 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
     }
 
     const distance = geometry.distance || pathLength(geometry.path)
-    const turns = geometry.turns ?? null
+    const steps = geometry.steps ? placeSteps(geometry.path, geometry.steps) : []
+    // Counted as a runner would: maneuvers clustered at one spot are one
+    // decision, not several. The engine's raw tally stands in only when it
+    // described no steps to place.
+    const turns = steps.length > 0 ? countDecisions(steps) : (geometry.turns ?? null)
     const { distanceError, meetsCriteria, score } = scoreRoute(
       distance,
       profile.gain,
@@ -350,7 +354,7 @@ export async function findRoutes(options: SearchOptions): Promise<RouteResult[]>
       profile,
       outboundBearing: bearing,
       turns,
-      steps: geometry.steps ? placeSteps(geometry.path, geometry.steps) : [],
+      steps,
       meetsCriteria,
       distanceError,
       score,
