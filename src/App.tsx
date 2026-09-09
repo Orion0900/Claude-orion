@@ -10,6 +10,7 @@ import {
 } from './lib/savedRoutes'
 import { SavedRoutes } from './components/SavedRoutes'
 import { requestCompassPermission } from './services/compass'
+import { createMapPerspectivePreference, type MapPerspective } from './lib/preferences'
 import { reverseRoute, type RunDirection } from './lib/direction'
 import { compassLabel } from './lib/routeSearch'
 import { formatDistance } from './lib/units'
@@ -60,6 +61,8 @@ export default function App() {
   const [traveled, setTraveled] = useState(0)
   const [browsing, setBrowsing] = useState(false)
   const [runDirection, setRunDirection] = useState<RunDirection>('forward')
+  const perspectivePref = useMemo(() => createMapPerspectivePreference(), [])
+  const [perspective, setPerspective] = useState<MapPerspective>(() => perspectivePref.read())
 
   const store = useMemo(() => createLocalStore(), [])
   const [saved, setSaved] = useState<SavedRoute[]>(() => store.read())
@@ -312,6 +315,14 @@ export default function App() {
           onRecenter={() => setBrowsing(false)}
           onDirection={setRunDirection}
           reversed={runDirection === 'reverse'}
+          perspective={perspective}
+          onTogglePerspective={() => {
+            setPerspective((current) => {
+              const next = current === '3d' ? '2d' : '3d'
+              perspectivePref.write(next)
+              return next
+            })
+          }}
           isRouteSaved={isSaved(saved, following)}
           onToggleSaved={() => toggleSaved(following)}
           onExit={stopRun}
@@ -326,6 +337,7 @@ export default function App() {
         position={livePosition}
         navigating={following !== null}
         heading={heading}
+        perspective={perspective}
         traveled={traveled}
         browsing={browsing}
         onBrowse={() => {

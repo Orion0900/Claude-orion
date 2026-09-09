@@ -13,6 +13,7 @@ import {
 import { chooseHeading, headingChanged, smoothHeading } from '../lib/heading'
 import { detectDirection, type RunDirection } from '../lib/direction'
 import { createFixFilter } from '../lib/gpsFilter'
+import type { MapPerspective } from '../lib/preferences'
 import { watchCompass } from '../services/compass'
 import { estimateDuration } from '../lib/effort'
 import { buildRunSummary, summaryHeadline } from '../lib/runSummary'
@@ -41,6 +42,9 @@ interface NavigationViewProps {
   onDirection: (direction: RunDirection) => void
   /** True once the instructions have been flipped to match. */
   reversed: boolean
+  /** Third-person tilted view, or flat on. */
+  perspective: MapPerspective
+  onTogglePerspective: () => void
   /** Whether this route is already kept, and how to keep it. */
   isRouteSaved: boolean
   onToggleSaved: () => void
@@ -77,6 +81,8 @@ export function NavigationView({
   onRecenter,
   onDirection,
   reversed,
+  perspective,
+  onTogglePerspective,
   isRouteSaved,
   onToggleSaved,
   onExit,
@@ -454,6 +460,17 @@ export function NavigationView({
               />
             )}
           </svg>
+        </button>
+        <button
+          type="button"
+          className="nav-icon-btn nav-perspective"
+          aria-pressed={perspective === '3d'}
+          aria-label={
+            perspective === '3d' ? 'Switch to a flat map' : 'Switch to the tilted view'
+          }
+          onClick={onTogglePerspective}
+        >
+          {perspective === '3d' ? '3D' : '2D'}
         </button>
         <button type="button" className="nav-end" onClick={onExit}>
           End

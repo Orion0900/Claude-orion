@@ -49,7 +49,7 @@ await context.route('**/v1/elevation**', async (route) => {
   const lats = u.searchParams.get('latitude').split(',').map(Number)
   await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ elevation: lats.map(() => 10) }) })
 })
-await context.route('**/tile.openstreetmap.org/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml',
+await context.route('**/*.tile.openstreetmap.org/**', (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml',
   body: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#2b3038"/></svg>', 'utf8') }))
 
 const page = await context.newPage()
