@@ -6,12 +6,12 @@
  * on the way — and the player's aggressiveness sets how much of the second
  * they'll accept.
  */
-import { clubById, clubName, type ClubId } from './clubs'
+import { clubById, type ClubId } from './clubs'
 import { bagEstimates, type DistanceEstimate } from './learning'
 import type { Aggressiveness, Profile } from './profile'
 import type { Lie, Shot } from './shots'
 import { probabilityBetween } from './stats'
-import { formatDistance, formatSpread, type Unit } from './units'
+import { formatDistance, toUnit, type Unit } from './units'
 
 export type HazardKind = 'water' | 'bunker'
 
@@ -33,6 +33,16 @@ export interface Situation {
 
 export type ShotMode = 'putt' | 'attack' | 'layup' | 'pitch'
 
+/**
+ * One glanceable fact about the shot. A golfer reads the screen between
+ * pulling a club and swinging, so a tip is an icon and a few words — never a
+ * sentence they'd have to stop and parse.
+ */
+export interface Tip {
+  icon: string
+  text: string
+}
+
 export interface Advice {
   club: ClubId
   mode: ShotMode
@@ -47,7 +57,7 @@ export interface Advice {
   greenOdds: number | null
   longer: ClubId | null
   shorter: ClubId | null
-  notes: string[]
+  tips: Tip[]
   estimate: DistanceEstimate | null
 }
 
@@ -109,14 +119,22 @@ function neighbours(all: Candidate[], chosen: Candidate): { longer: ClubId | nul
   }
 }
 
-function describeHazard(h: HazardInterval, unit: Unit): string {
-  const name = h.kind === 'water' ? 'Water' : 'Sand'
-  return `${name} from ${formatDistance(h.from, unit)} to ${formatDistance(h.to, unit)}`
+function hazardTip(h: HazardInterval, unit: Unit): Tip {
+  return {
+    icon: h.kind === 'water' ? '💦' : '🏖️',
+    text: `${Math.round(toUnit(h.from, unit))}–${formatDistance(h.to, unit)}`,
+  }
+}
+
+/** How the ball is sitting, when that changes the swing. */
+const LIE_TIP: Partial<Record<Lie, Tip>> = {
+  rough: { icon: '🌾', text: 'Rough: grip down' },
+  sand: { icon: '🏖️', text: 'Ball first' },
 }
 
 export function advise(situation: Situation, profile: Profile, shots: Shot[]): Advice {
   const unit = profile.unit
-  const notes: string[] = []
+  const tips: Tip[] = []
 
   if (situation.lie === 'green') {
     return {
@@ -129,11 +147,7 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
       greenOdds: null,
       longer: null,
       shorter: null,
-      notes: [
-        situation.distance > 9
-          ? 'Lag it: the first putt only has to leave a tap-in.'
-          : 'Pick a line and hit it firm enough to hold it.',
-      ],
+      tips: [situation.distance > 9 ? { icon: '🎯', text: 'Lag it close' } : { icon: '💪', text: 'Firm, no doubt' }],
       estimate: null,
     }
   }
@@ -150,7 +164,7 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
       greenOdds: null,
       longer: null,
       shorter: null,
-      notes: ['Add some clubs to your bag in Settings.'],
+      tips: [{ icon: '🎒', text: 'Add clubs in Settings' }],
       estimate: null,
     }
   }
@@ -171,14 +185,13 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
       greenOdds: null,
       longer: null,
       shorter: null,
-      notes: [
+      tips: [
         inSand
-          ? `Greenside bunker: open the face, hit the sand ${unit === 'yd' ? 'an inch or two' : 'a few centimetres'} behind the ball, and swing through.`
+          ? { icon: '🏖️', text: 'Splash it out' }
           : chip
-            ? `A chip from ${formatDistance(situation.distance, unit)}: land it on the green and let it run to the hole.`
-            : `A pitch from ${formatDistance(situation.distance, unit)}: pick a landing spot a few paces short of the flag and swing to it, not at the ball.`,
-        ...(profile.aggressiveness === 'conservative' ? ['Take the flag out of it: anywhere on the green is the win here.'] : []),
-        'Partial shots aren\'t used to learn your full-swing distances.',
+            ? { icon: '⛳', text: 'Land it, let it run' }
+            : { icon: '🌙', text: 'Smooth, not hard' },
+        ...(profile.aggressiveness === 'conservative' ? [{ icon: '🛟', text: 'Anywhere on is a win' }] : []),
       ],
       estimate: null,
     }
@@ -189,8 +202,8 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
   const stretch = profile.aggressiveness === 'aggressive' ? longest.spread : profile.aggressiveness === 'balanced' ? longest.spread * 0.4 : 0
   const reachable = situation.distance <= longest.expected + stretch
 
-  if (situation.lie === 'rough') notes.push('Out of the rough the ball comes off with less spin: expect about 7% less and a bigger miss.')
-  if (situation.lie === 'sand') notes.push('Fairway bunker: ball first, take one more club, and just get out if the lip is high.')
+  const lieTip = LIE_TIP[situation.lie]
+  if (lieTip) tips.push(lieTip)
 
   if (reachable) {
     // Where to land it: the flag, or the middle of the green for a safe play.
@@ -198,7 +211,7 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
       profile.aggressiveness === 'conservative' && situation.green
         ? (situation.green.front + situation.green.back) / 2
         : situation.distance
-    if (aim !== situation.distance) notes.push('Aiming at the middle of the green, not the flag.')
+    if (aim !== situation.distance) tips.push({ icon: '🟢', text: 'Middle of the green' })
 
     // Only clubs that can actually hit the number are attack candidates: a
     // club that clears the water by flying the green isn't an attack.
@@ -226,25 +239,15 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
       const greenOdds = situation.green
         ? probabilityBetween(best.expected, best.spread, situation.green.front, situation.green.back)
         : null
-      notes.unshift(
-        `${clubName(best.estimate.club)} carries ${formatDistance(best.expected, unit)} ${formatSpread(best.spread, unit)} for you; the target is ${formatDistance(aim, unit)}.`,
-      )
-      if (best.estimate.source !== 'chart') {
-        notes.push(
-          `That number comes from ${best.estimate.count} tracked ${clubName(best.estimate.club).toLowerCase()} shot${best.estimate.count === 1 ? '' : 's'}, not the stock chart (${formatDistance(best.estimate.chart, unit)}).`,
-        )
-      }
       const crossed = situation.hazards.filter((h) => h.to < best.expected)
       if (crossed.length > 0) {
         const worst = crossed.reduce((a, b) => (a.to > b.to ? a : b))
         const carryOdds = 1 - probabilityBetween(best.expected, best.spread, -Infinity, worst.to)
-        notes.push(`${describeHazard(worst, unit)}; this club carries it ${Math.round(carryOdds * 100)}% of the time.`)
+        tips.push({ icon: worst.kind === 'water' ? '💦' : '🏖️', text: `Carries it ${Math.round(carryOdds * 100)}%` })
       }
-      if (greenOdds !== null && greenOdds < 0.5 && profile.aggressiveness !== 'aggressive') {
-        notes.push('A pitch short of the green beats a bunker long; take the safe miss.')
-      }
-      if (best.expected < aim - best.spread * 0.5 && longer) {
-        notes.push(`Short of the number: a smooth ${clubName(longer).toLowerCase()} is the other play.`)
+      if (greenOdds !== null) tips.push({ icon: '⛳', text: `${Math.round(greenOdds * 100)}% on` })
+      if (best.estimate.source !== 'chart') {
+        tips.push({ icon: '📈', text: `Your ${best.estimate.count} shot${best.estimate.count === 1 ? '' : 's'}` })
       }
       return {
         club: best.estimate.club,
@@ -256,15 +259,13 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
         greenOdds,
         longer,
         shorter,
-        notes,
+        tips: tips.slice(0, 3),
         estimate: best.estimate,
       }
     }
 
     const blocking = situation.hazards.filter((h) => probabilityBetween(best.expected, best.spread, h.from, h.to) > 0.02)
-    notes.push(
-      `${blocking.map((h) => describeHazard(h, unit)).join('; ')}: the club that reaches finds it ${Math.round(best.risk * 100)}% of the time. Laying up.`,
-    )
+    if (blocking.length > 0) tips.push(hazardTip(blocking[0], unit))
   }
 
   // Lay-up: as far as the mindset allows, short of trouble, leaving a shot
@@ -273,7 +274,7 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
   const comfortable = wedge.expected
   const safe = all.filter((c) => c.risk <= tolerance && c.expected <= situation.distance)
   const pool = safe.length > 0 ? safe : all
-  if (safe.length === 0) notes.push('Nothing in the bag misses the trouble outright; the club with the lowest odds of finding it is below.')
+  if (safe.length === 0) tips.push({ icon: '😬', text: 'No clean way past' })
 
   const pick = (() => {
     switch (profile.aggressiveness) {
@@ -296,24 +297,21 @@ export function advise(situation: Situation, profile: Profile, shots: Shot[]): A
   })()
   if (safe.length === 0) {
     const least = all.reduce((a, b) => (b.risk < a.risk ? b : a))
-    return finishLayup(least, all, situation, profile, notes)
+    return finishLayup(least, all, situation, profile, tips)
   }
-  return finishLayup(pick, all, situation, profile, notes)
+  return finishLayup(pick, all, situation, profile, tips)
 }
 
-function finishLayup(pick: Candidate, all: Candidate[], situation: Situation, profile: Profile, notes: string[]): Advice {
+function finishLayup(pick: Candidate, all: Candidate[], situation: Situation, profile: Profile, tips: Tip[]): Advice {
   const unit = profile.unit
   const left = Math.max(0, situation.distance - pick.expected)
   const { longer, shorter } = neighbours(all, pick)
-  const reachNote =
-    situation.distance > pick.expected + pick.spread
-      ? `${clubName(pick.estimate.club)} to ${formatDistance(pick.expected, unit)} leaves ${formatDistance(left, unit)} in.`
-      : `${clubName(pick.estimate.club)} gets it close to the green without flirting with the trouble.`
-  notes.unshift(reachNote)
-  if (pick.estimate.source !== 'chart') {
-    notes.push(`Planned on your ${pick.estimate.count} tracked ${clubName(pick.estimate.club).toLowerCase()} shots.`)
+  if (situation.distance > pick.expected + pick.spread) {
+    tips.unshift({ icon: '👉', text: `Leaves ${formatDistance(left, unit)}` })
   }
-  if (profile.aggressiveness === 'conservative') notes.push('Playing to a full-wedge number: the shot you hit best.')
+  if (pick.estimate.source !== 'chart') {
+    tips.push({ icon: '📈', text: `Your ${pick.estimate.count} shot${pick.estimate.count === 1 ? '' : 's'}` })
+  }
   return {
     club: pick.estimate.club,
     mode: 'layup',
@@ -324,7 +322,7 @@ function finishLayup(pick: Candidate, all: Candidate[], situation: Situation, pr
     greenOdds: null,
     longer,
     shorter,
-    notes,
+    tips: tips.slice(0, 3),
     estimate: pick.estimate,
   }
 }

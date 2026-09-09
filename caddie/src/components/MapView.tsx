@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { bearingTo, destination, interpolate, type LatLng } from '../lib/geo'
+import { bearingTo, destination, type LatLng } from '../lib/geo'
 import type { Course, Hole } from '../lib/course'
 import { targetOf } from '../lib/course'
 import type { Shot } from '../lib/shots'
@@ -28,9 +28,12 @@ const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
 
 const FLAG_ICON = L.divIcon({
   className: 'flag-icon',
-  html: '<svg viewBox="0 0 24 32" width="24" height="32"><path d="M4 31V2" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M5 3h13l-4 5 4 5H5z" fill="#f87171"/></svg>',
-  iconSize: [24, 32],
-  iconAnchor: [4, 31],
+  html:
+    '<svg viewBox="0 0 24 32" width="26" height="34">' +
+    '<path d="M4 31V2" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path class="cloth" d="M5 3h13l-4 5 4 5H5z" fill="#cf3b34"/></svg>',
+  iconSize: [26, 34],
+  iconAnchor: [4, 33],
 })
 
 const TEE_ICON = L.divIcon({
@@ -99,7 +102,7 @@ export function MapView({ course, hole, position, accuracy, aim, shots, unit, ta
     layer.clearLayers()
     if (!hole) return
     if (hole.outline) {
-      L.polygon(hole.outline, { color: '#4ade80', fillColor: '#22c55e', fillOpacity: 0.25, weight: 2, interactive: false }).addTo(layer)
+      L.polygon(hole.outline, { color: '#0e7a3c', fillColor: '#22c55e', fillOpacity: 0.3, weight: 2, interactive: false }).addTo(layer)
     }
     if (hole.tee) L.marker(hole.tee, { icon: TEE_ICON, interactive: false }).addTo(layer)
     L.marker(targetOf(hole), { icon: FLAG_ICON, interactive: false }).addTo(layer)
@@ -112,13 +115,14 @@ export function MapView({ course, hole, position, accuracy, aim, shots, unit, ta
     layer.clearLayers()
     if (!hole || !position) return
     const target = targetOf(hole)
-    L.polyline([position, target], { color: '#ffffff', weight: 3, opacity: 0.9, dashArray: '6 8', interactive: false }).addTo(layer)
-    const mid = interpolate(position, target, 0.5)
+    L.polyline([position, target], { color: '#101a14', weight: 5, opacity: 0.35, interactive: false }).addTo(layer)
+    L.polyline([position, target], { color: '#ffffff', weight: 3, dashArray: '7 9', interactive: false }).addTo(layer)
     const meters = L.latLng(position).distanceTo(target)
-    L.marker(mid, { icon: distanceLabel(formatDistance(meters, unit)), interactive: false }).addTo(layer)
     if (aim !== null && aim > 0 && aim < meters) {
+      // Where the caddie wants the ball to finish, with its number on it.
       const landing = destination(position, bearingTo(position, target), aim)
-      L.circleMarker(landing, { radius: 9, color: '#fbbf24', weight: 2, fillOpacity: 0, dashArray: '3 3', interactive: false }).addTo(layer)
+      L.circleMarker(landing, { radius: 10, color: '#e09612', weight: 3, fillOpacity: 0, dashArray: '4 4', interactive: false }).addTo(layer)
+      L.marker(landing, { icon: distanceLabel(formatDistance(aim, unit)), interactive: false }).addTo(layer)
     }
   }, [hole, position, aim, unit])
 
@@ -128,9 +132,9 @@ export function MapView({ course, hole, position, accuracy, aim, shots, unit, ta
     if (!layer) return
     layer.clearLayers()
     for (const shot of shots) {
-      L.circleMarker(shot.start, { radius: 4, color: '#e8eaf0', fillColor: '#0f1115', fillOpacity: 1, weight: 2, interactive: false }).addTo(layer)
+      L.circleMarker(shot.start, { radius: 4, color: '#ffffff', fillColor: '#101a14', fillOpacity: 1, weight: 2, interactive: false }).addTo(layer)
       if (shot.end) {
-        L.polyline([shot.start, shot.end], { color: '#e8eaf0', weight: 2, opacity: 0.6, interactive: false }).addTo(layer)
+        L.polyline([shot.start, shot.end], { color: '#101a14', weight: 2, opacity: 0.45, interactive: false }).addTo(layer)
       }
     }
   }, [shots])
@@ -144,7 +148,7 @@ export function MapView({ course, hole, position, accuracy, aim, shots, unit, ta
     if (accuracy && accuracy > 5) {
       L.circle(position, { radius: accuracy, color: '#3b82f6', weight: 1, fillOpacity: 0.1, interactive: false }).addTo(layer)
     }
-    L.circleMarker(position, { radius: 7, color: '#ffffff', weight: 2, fillColor: '#3b82f6', fillOpacity: 1, interactive: false }).addTo(layer)
+    L.circleMarker(position, { radius: 8, color: '#ffffff', weight: 3, fillColor: '#0a6f95', fillOpacity: 1, interactive: false }).addTo(layer)
   }, [position, accuracy])
 
   // Frame the hole when it changes, when the player first appears, or when asked to.
@@ -188,9 +192,9 @@ export function MapView({ course, hole, position, accuracy, aim, shots, unit, ta
       <div ref={containerRef} className="map" />
       {tapMode !== 'none' && (
         <div className="map-hint">
-          {tapMode === 'pin' && 'Tap the map where the flag is'}
-          {tapMode === 'tee' && 'Tap the map where the tee is'}
-          {tapMode === 'me' && 'Tap the map where your ball is'}
+          {tapMode === 'pin' && '📍 Tap the flag'}
+          {tapMode === 'tee' && '📍 Tap the tee'}
+          {tapMode === 'me' && '📍 Tap your ball'}
         </div>
       )}
     </div>

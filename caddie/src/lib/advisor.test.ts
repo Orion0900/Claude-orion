@@ -88,6 +88,6 @@ describe('advise', () => {
     }))
     const advice = advise(situation({ distance: yd(157) }), DEFAULT_PROFILE, shots)
     expect(advice.club).toBe('7i')
-    expect(advice.notes.some((n) => n.includes('10 tracked'))).toBe(true)
+    expect(advice.tips.some((t) => t.text === 'Your 10 shots')).toBe(true)
   })
 })

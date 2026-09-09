@@ -33,8 +33,8 @@ export function insights(shots: Shot[], profile: Profile): Insight[] {
     out.push({
       kind: 'distance',
       club,
-      title: `${clubName(club)}: ${formatDistance(est.distance, unit)}, not ${formatDistance(est.chart, unit)}`,
-      body: `Your ${est.count} tracked shots run ${Math.round(Math.abs(diff) * 100)}% ${direction} than the ${profile.skill} chart. The advisor already plans with your number${est.source === 'learned' ? '' : ', and will trust it fully after ' + LEARNED_AT + ' shots'}.`,
+      title: `${clubName(club)} goes ${formatDistance(est.distance, unit)}`,
+      body: `${Math.round(Math.abs(diff) * 100)}% ${direction} than the chart, over ${est.count} shots. Already in the plan.`,
     })
   }
 
@@ -50,19 +50,19 @@ export function insights(shots: Shot[], profile: Profile): Insight[] {
       out.push({
         kind: 'tendency',
         title: `Short on ${Math.round(short * 100)}% of approaches`,
-        body: `On average ${formatDistance(-avg, unit)} short of the number. Most amateurs are: take one more club and swing smooth. The advisor now leans toward the longer club when two are close.`,
+        body: `${formatDistance(-avg, unit)} short on average. Take one more club.`,
       })
     } else if (short <= 0.35 && avg > 4) {
       out.push({
         kind: 'tendency',
         title: `Long on ${Math.round((1 - short) * 100)}% of approaches`,
-        body: `On average ${formatDistance(avg, unit)} past the number. Your chart is stale: the learned distances above already reflect it.`,
+        body: `${formatDistance(avg, unit)} past on average. Your numbers now say so.`,
       })
     } else {
       out.push({
         kind: 'tendency',
-        title: 'Distance control is on the number',
-        body: `Across ${approaches.length} approaches you're within ${formatDistance(Math.abs(avg), unit)} of the plan on average. Nice.`,
+        title: 'Dialled in',
+        body: `Within ${formatDistance(Math.abs(avg), unit)} of the plan across ${approaches.length} approaches.`,
       })
     }
   }
@@ -81,7 +81,7 @@ export function insights(shots: Shot[], profile: Profile): Insight[] {
         kind: 'consistency',
         club: a.club,
         title: `${clubName(b.club)} over ${clubName(a.club).toLowerCase()}`,
-        body: `${clubName(a.club)} scatters ${formatSpread(a.stats.stdDev, unit)} for only ${formatDistance(Math.max(0, gain), unit)} more than the ${clubName(b.club).toLowerCase()} (${formatSpread(b.stats.stdDev, unit)}). Off the deck the shorter club is the smarter play.`,
+        body: `It scatters ${formatSpread(a.stats.stdDev, unit)} for ${formatDistance(Math.max(0, gain), unit)} more.`,
       })
     }
   }
@@ -92,13 +92,13 @@ export function insights(shots: Shot[], profile: Profile): Insight[] {
     out.push({
       kind: 'progress',
       title: 'Track a few shots',
-      body: 'Mark each shot as you play and the caddie learns what you actually hit each club. Three shots with a club start moving its number; eight and it trusts you over the chart.',
+      body: 'Mark each shot and the caddie learns your real numbers.',
     })
   } else if (tracked_total < 20) {
     out.push({
       kind: 'progress',
       title: `${tracked_total} shot${tracked_total === 1 ? '' : 's'} tracked`,
-      body: 'Keep going. Clubs with three or more tracked shots already get their own number in the advisor.',
+      body: `Three with a club and the caddie starts using yours. ${LEARNED_AT} and it trusts you.`,
     })
   }
   return out

@@ -3,70 +3,75 @@ import { insights } from '../lib/coach'
 import { bagEstimates, clubStats } from '../lib/learning'
 import type { Profile } from '../lib/profile'
 import type { Shot } from '../lib/shots'
-import { formatDistance, formatSpread } from '../lib/units'
+import { toUnit } from '../lib/units'
 
 interface StatsViewProps {
   shots: Shot[]
   profile: Profile
 }
 
-const SOURCE_LABEL = { chart: 'chart', blended: 'blending', learned: 'yours' } as const
+const EMOJI = { distance: '📏', tendency: '🎯', consistency: '🎚️', progress: '🌱' } as const
 
+/**
+ * What the caddie has learned, as a picture.
+ *
+ * A table of five columns was a spreadsheet. The same truth fits in a bar per
+ * club: how far it goes, and whether that number is yours yet.
+ */
 export function StatsView({ shots, profile }: StatsViewProps) {
-  const unit = profile.unit
   const estimates = bagEstimates(profile, shots)
-  const tips = insights(shots, profile)
-  const tracked = shots.filter((s) => s.distance !== null).length
+  // Bars are scaled across the bag's own range, not from zero: every club in
+  // a bag carries a long way, so from zero they'd all look the same length.
+  const longest = estimates[0]?.distance ?? 1
+  const shortest = estimates[estimates.length - 1]?.distance ?? 0
+  const span = Math.max(1, longest - shortest)
+  const width = (metres: number) => 18 + ((metres - shortest) / span) * 82
 
   return (
     <div className="stack">
       <section className="card">
-        <h3>Coach</h3>
+        <h3 className="section-title">
+          <span aria-hidden="true">🧠</span> Coach
+        </h3>
         <ul className="insights">
-          {tips.map((tip, i) => (
-            <li key={i} className={`insight insight-${tip.kind}`}>
-              <strong>{tip.title}</strong>
-              <p>{tip.body}</p>
+          {insights(shots, profile).map((tip, i) => (
+            <li key={i} className="insight" style={{ animationDelay: `${i * 60}ms` }}>
+              <span className="emoji" aria-hidden="true">
+                {EMOJI[tip.kind]}
+              </span>
+              <div>
+                <strong>{tip.title}</strong>
+                <p>{tip.body}</p>
+              </div>
             </li>
           ))}
         </ul>
       </section>
 
       <section className="card">
-        <h3>Your distances</h3>
-        <p className="muted small">
-          {tracked} tracked shot{tracked === 1 ? '' : 's'}. The caddie plans with the middle column; it starts on the {profile.skill} chart and moves to your real numbers as you track.
-        </p>
-        <div className="table-wrap">
-          <table className="club-table">
-            <thead>
-              <tr>
-                <th>Club</th>
-                <th>Plans on</th>
-                <th>Chart</th>
-                <th>Tracked</th>
-                <th>Range</th>
-              </tr>
-            </thead>
-            <tbody>
-              {estimates.map((e) => {
-                const stats = clubStats(shots, e.club, profile)
-                return (
-                  <tr key={e.club} className={`source-${e.source}`}>
-                    <td>{clubName(e.club)}</td>
-                    <td>
-                      <strong>{formatDistance(e.distance, unit)}</strong> {formatSpread(e.spread, unit)}
-                      <small> {SOURCE_LABEL[e.source]}</small>
-                    </td>
-                    <td>{formatDistance(e.chart, unit)}</td>
-                    <td>{stats ? `${stats.count} · avg ${formatDistance(stats.mean, unit)}` : '—'}</td>
-                    <td>{stats && stats.count > 1 ? `${formatDistance(stats.shortest, unit)} – ${formatDistance(stats.longest, unit)}` : '—'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <h3 className="section-title">
+          <span aria-hidden="true">🏌️</span> Your bag
+        </h3>
+        <ul className="bars">
+          {estimates.map((e, i) => {
+            const stats = clubStats(shots, e.club, profile)
+            return (
+              <li key={e.club}>
+                <span className="name">{clubName(e.club)}</span>
+                <span className="track">
+                  <span
+                    className={`fill${e.source === 'learned' ? ' learned' : ''}`}
+                    style={{ width: `${width(e.distance)}%`, animationDelay: `${i * 45}ms` }}
+                  />
+                </span>
+                <span className="num">
+                  {Math.round(toUnit(e.distance, profile.unit))}
+                  {stats ? <small> ·{stats.count}</small> : null}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       </section>
     </div>
   )

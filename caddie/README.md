@@ -43,14 +43,13 @@ EasyPedal. Merging is the only step.
 - **GPS and the line.** A live dot for you, a flag for the hole, a dashed line
   between them with the distance written on it. Front and back of the green
   too, when the green's outline is known. Yards or meters.
-- **Tells you the club.** The recommendation card reads like a caddie:
-  *Go for it — 7 iron. 148 yd ±9, target 152. 12% hazard, 71% on the green.*
-  Then why: what it carries, what it has to carry over, and what the other
-  play is.
-- **Player and mindset toggles.** Beginner, intermediate, advanced or scratch
-  sets the stock distances and how much a shot scatters. Safe, balanced or
-  aggressive sets how much hazard risk the caddie accepts, whether it aims at
-  the flag or the middle of the green, and how far it lays up.
+- **Tells you the club.** One card, one call: **Send it — 7 iron, 148 yd**,
+  with the reasons as chips rather than paragraphs — 💦 carries it 94%,
+  ⛳ 71% on, 📈 your 10 shots.
+- **Two dials.** 🐢 😎 🔥 on the main screen sets how much hazard risk the
+  caddie accepts, whether it aims at the flag or the middle of the green, and
+  how far it lays up. Your level lives in Settings and sets the stock
+  distances and how much a shot scatters.
 - **Tracks every shot.** Mark a shot standing over the ball; the next mark
   measures how far it went. Pick the club (it starts on the caddie's
   suggestion), hit **Holed out** at the end. Type a distance if the GPS was
@@ -81,6 +80,30 @@ EasyPedal. Merging is the only step.
    wedge for the safe one.
 5. **Inside a full wedge** it's a pitch or a chip with the most lofted club in
    the bag, and those shots aren't used to learn distances.
+
+## How it looks, and why
+
+It's read at arm's length, in the sun, sometimes with a glove on. That
+settles most of the design:
+
+- **Light, not dark.** In direct sunlight dark-on-light gives the most
+  usable contrast. The yardage sits around 17:1 against the page, well past
+  the AAA bar, with a paper-coloured halo so it survives being drawn over
+  grass or water. The whole palette flips for anyone whose phone is in dark
+  mode.
+- **One loud thing per screen.** The yardage owns the map; the club owns the
+  card. Everything else is a chip, a pill or an icon.
+- **The primary action never moves.** Club strip and **Mark shot** are docked
+  above the tab bar in the thumb's easy reach, so they're never scrolled off.
+  Every target clears 44px.
+- **Motion explains, never delays.** Presses dip in 130ms; cards and chips
+  rise in 220ms on a decelerating curve; the setup steps slide at 450ms.
+  Springy overshoot is kept for the club card, which is a small reward.
+- **The number never rolls.** Rolling digits are unreadable at the exact
+  moment you're reading them, so a changed yardage flashes instead.
+- **Confetti is rationed.** It fires for a birdie or better, and nothing
+  else — a party for every routine tap stops meaning anything.
+- **`prefers-reduced-motion` turns all of it off**, with no loss of function.
 
 ## Data sources
 
