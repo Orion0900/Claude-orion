@@ -578,7 +578,7 @@ input[type='range'] {
 /* --nav-puck-y is set by MapView, which derives the rotor shift from the same
    number, so the camera centre and the puck can never disagree. */
 .map-viewport.navigating {
-  perspective: 900px;
+  perspective: var(--nav-perspective, 900px);
   perspective-origin: 50% var(--nav-puck-y, 62%);
 }
 
@@ -638,7 +638,12 @@ input[type='range'] {
 }
 
 /* Tilting makes the far edge of the map recede past the loaded tiles. A short
-   haze at the very top reads as distance without swallowing the map. */
+   haze at the very top reads as distance without swallowing the map. Flat on
+   there is no horizon to suggest, so it goes. */
+.map-viewport.navigating.flat::after {
+  display: none;
+}
+
 .map-viewport.navigating::after {
   content: '';
   position: absolute;
@@ -1024,5 +1029,17 @@ input[type='range'] {
   background: var(--bg);
   font-size: 12px;
   line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* Reads as a label rather than an icon, so it says which view you are in. */
+.nav-perspective {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.nav-perspective[aria-pressed='false'] {
   color: var(--text-dim);
 }

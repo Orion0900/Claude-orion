@@ -66,7 +66,7 @@ async function installStubs(context, counters) {
       elevation: lats.map((lat, i) => (30 * Math.max(0, toXY({ lat, lng: lngs[i] }).x)) / 1000),
     })})
   })
-  await context.route('**/tile.openstreetmap.org/**', (r) =>
+  await context.route('**/*.tile.openstreetmap.org/**', (r) =>
     r.fulfill({ status: 200, contentType: 'image/svg+xml', body: TILE }))
 }
 

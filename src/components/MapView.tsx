@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { splitPath, type LatLng } from '../lib/geo'
 import { createDoubleTapDetector } from '../lib/gestures'
+import type { MapPerspective } from '../lib/preferences'
 import type { RouteResult } from '../lib/routeSearch'
 
 interface MapViewProps {
@@ -17,6 +18,8 @@ interface MapViewProps {
   navigating: boolean
   /** Heading to point the map along, in degrees. Null until the runner moves. */
   heading: number | null
+  /** Third-person tilted view, or flat on. Both follow the runner. */
+  perspective: MapPerspective
   /** How far through the route the runner is, 0-1, for dimming ground covered. */
   traveled: number
   /**
@@ -47,9 +50,20 @@ const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
  * hidden behind the bottom card.
  */
 const PUCK_Y = 62
-/** Tilting pushes the rotor's far edge up-screen; oversizing hides that seam. */
-const ROTOR_SCALE = 2.6
-const ROTOR_SHIFT = (PUCK_Y - 50) / ROTOR_SCALE
+
+/**
+ * How much bigger than the screen the rotor is, per view.
+ *
+ * Tilting pushes the rotor's far edge up-screen, so the third-person view needs
+ * plenty of margin to hide the seam. Flat on, only the corners of a rotated
+ * square have to be covered, which needs far less — and loads far fewer tiles.
+ */
+const ROTOR_SCALE = { '3d': 2.6, '2d': 1.7 } as const
+
+/** Degrees the map is pitched back in the third-person view. */
+const TILT_DEGREES = 52
+
+const rotorShift = (scale: number) => (PUCK_Y - 50) / scale
 
 export function MapView({
   start,
@@ -59,6 +73,7 @@ export function MapView({
   position,
   navigating,
   heading,
+  perspective,
   traveled,
   browsing,
   onBrowse,
@@ -274,7 +289,7 @@ export function MapView({
     // look around.
     map.invalidateSize({ animate: false })
     if (navigating && !browsing) map.setZoom(17)
-  }, [navigating, browsing])
+  }, [navigating, browsing, perspective])
 
   // While following, the map tracks the runner rather than the whole route.
   useEffect(() => {
@@ -327,14 +342,18 @@ export function MapView({
           navigating
             ? ({
                 '--nav-puck-y': `${PUCK_Y}%`,
-                '--nav-rotor-size': `${ROTOR_SCALE * 100}%`,
+                '--nav-rotor-size': `${ROTOR_SCALE[perspective] * 100}%`,
+                // A flat map needs no vanishing point.
+                '--nav-perspective': perspective === '3d' ? '900px' : 'none',
               } as CSSProperties)
             : undefined
         }
       >
         <div
           className={
-            navigating && !browsing ? 'map-viewport navigating' : 'map-viewport'
+            navigating && !browsing
+              ? `map-viewport navigating${perspective === '2d' ? ' flat' : ''}`
+              : 'map-viewport'
           }
         >
           <div
@@ -345,7 +364,12 @@ export function MapView({
                     // Shift the map down so the runner sits low on screen with
                     // the road ahead filling the view. North-up until a heading
                     // is known, then the map turns to face the way you're going.
-                    transform: `translate(-50%, -50%) translateY(${ROTOR_SHIFT}%) rotateX(52deg) rotate(${-(heading ?? 0)}deg)`,
+                    // Both views turn to the heading and keep the runner in the
+                    // same place; only the pitch differs.
+                    transform:
+                      `translate(-50%, -50%) translateY(${rotorShift(ROTOR_SCALE[perspective])}%) ` +
+                      (perspective === '3d' ? `rotateX(${TILT_DEGREES}deg) ` : '') +
+                      `rotate(${-(heading ?? 0)}deg)`,
                   }
                 : undefined
             }
