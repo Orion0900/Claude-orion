@@ -173,6 +173,39 @@ describe('JobStore pipeline', () => {
     expect(done.transcriptSource).toBe('phone')
   })
 
+  it('accepts a transcript with the link and skips the caption hunt', async () => {
+    let ladderCalls = 0
+    const store = mk({
+      summarizer,
+      youtubeMirrors: [],
+      fetch: fakeFetch({
+        'https://www.youtube.com/oembed': JSON.stringify({ title: 'Why We Sleep (video)', author_name: 'Huberman Lab' }),
+        'https://www.youtube.com/watch': () => {
+          ladderCalls++
+          return new Response('', { status: 429 })
+        },
+        'https://www.youtube.com/youtubei': () => {
+          ladderCalls++
+          return new Response('', { status: 429 })
+        },
+      }),
+    })
+    const panel = Array.from({ length: 80 }, (_, i) => `0:${String(i).padStart(2, '0')}\nSleep fact number ${i} about glucose and memory consolidation.`).join('\n')
+    const job = await store.create(`https://youtu.be/${YT}`, { text: panel, source: 'phone' })
+    const done = await waitFor(store, job.id, ['done', 'failed'])
+    expect(done.stage).toBe('done')
+    expect(done.transcriptSource).toBe('phone')
+    expect(done.transcriptWords).toBeGreaterThan(500)
+    expect(done.episode?.title).toBe('Why We Sleep (video)')
+    // The blocked endpoints are never asked when the words are already here.
+    expect(ladderCalls).toBe(0)
+  })
+
+  it('rejects a too-short seeded transcript', async () => {
+    const store = mk({ summarizer, youtubeMirrors: [], fetch: fakeFetch({}) })
+    await expect(store.create(`https://youtu.be/${YT}`, { text: 'nope', source: 'phone' })).rejects.toThrow(/too short/)
+  })
+
   it('never dead-ends when YouTube itself is unreachable', async () => {
     const store = mk({
       summarizer,

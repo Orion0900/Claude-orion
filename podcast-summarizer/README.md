@@ -29,11 +29,16 @@ with timestamps, in a couple of minutes — on your phone, as an app.
    timestamped transcript produces: a TL;DR, every key point with detail and a
    timestamp, chapters, quotes, action items, and everything mentioned.
    Timestamps deep-link back into YouTube or Spotify at that moment.
-4. **One tap from YouTube, once set up.** Settings offers a bookmarklet: with
-   an episode's transcript panel open in Safari, tapping it reads the
-   transcript, creates the job, and opens the finished summary. No copying,
-   no app switching. It works because the API allows the cross-origin call
-   from youtube.com.
+4. **One tap from YouTube, once set up.** Settings offers a bookmarklet. On any
+   YouTube page — mobile site included — tapping it reads the episode's caption
+   track, sends it with the link in a single request, and opens the finished
+   summary. No desktop mode, no transcript panel, nothing to select or copy.
+
+   It works because code running *on* youtube.com may read youtube.com, and
+   because it carries the phone's own address, which YouTube serves while
+   refusing a cloud server. PodBrief's own pages cannot do this: a site may
+   only read another with that site's permission, and YouTube grants none.
+   That is why this is a bookmarklet rather than a button in the app.
 5. **Installs on an iPhone.** It's a Progressive Web App: Safari → Share →
    Add to Home Screen. Full screen, its own icon, and finished summaries are
    kept on the device so they open offline.
@@ -156,9 +161,9 @@ web/
   in sometimes on free hosting.
 - A YouTube video with captions disabled has nothing to read; paste is the
   only route.
-- Pasting on an iPhone needs Safari's **AA → Request Desktop Website** first:
-  YouTube's mobile site has no *Show transcript* panel at all, only the
-  desktop one does. The app says so at the point you need it.
+- The bookmarklet avoids the transcript panel entirely. Only the manual paste
+  fallback needs Safari's **AA → Request Desktop Website**, because YouTube's
+  mobile site has no *Show transcript* panel; the app says so where it matters.
 - Spotify-exclusive shows have no public RSS feed, so there's no audio to
   transcribe. The app will ask for a source it can't find.
 - Episode lookup without Spotify API credentials reads the public episode

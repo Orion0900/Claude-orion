@@ -57,7 +57,7 @@ export function TranscriptForm({
 
   return (
     <div className="card">
-      <h3>Paste the transcript</h3>
+      <h3>Get the transcript</h3>
       <p className="muted small">{message}</p>
 
       {auto === 'trying' && (
@@ -71,25 +71,26 @@ export function TranscriptForm({
         </p>
       )}
 
-      <ol className="plain steps-text small">
-        <li>
-          {videoUrl ? (
-            <a href={videoUrl} target="_blank" rel="noreferrer">
-              Open the video on youtube.com ↗
-            </a>
-          ) : (
-            'Open the video on youtube.com in Safari'
-          )}{' '}
-          — the website, not the app.
-        </li>
-        <li>
-          Tap <strong>AA</strong> in Safari’s address bar, then <strong>Request Desktop Website</strong>. YouTube’s mobile site
-          has no transcript; only the desktop one does.
-        </li>
-        <li>Under the video, tap <strong>…more</strong>, then <strong>Show transcript</strong>.</li>
-        <li>Press and hold the transcript, <strong>Select All</strong>, <strong>Copy</strong>.</li>
-        <li>Come back here, paste below, and tap Summarize.</li>
-      </ol>
+      {videoUrl && (
+        <p>
+          <a className="primary-link" href={videoUrl} target="_blank" rel="noreferrer">
+            Open this episode on YouTube ↗
+          </a>
+        </p>
+      )}
+      <p className="muted small">
+        With it open, tap the address bar and then your <strong>PodBrief</strong> favourite — it reads the captions and
+        sends them here on its own. <a href="#/settings">Set that up once</a> and you never paste again.
+      </p>
+      <details>
+        <summary className="muted small">Or copy the transcript by hand</summary>
+        <ol className="plain steps-text small">
+          <li>On the video, tap <strong>AA</strong> in Safari’s address bar, then <strong>Request Desktop Website</strong>. The mobile site has no transcript.</li>
+          <li>Under the video, tap <strong>…more</strong>, then <strong>Show transcript</strong>.</li>
+          <li>Press and hold it, <strong>Select All</strong>, <strong>Copy</strong>.</li>
+          <li>Come back here and paste below.</li>
+        </ol>
+      </details>
 
       <textarea
         rows={7}
@@ -100,8 +101,7 @@ export function TranscriptForm({
         autoCorrect="off"
       />
       <p className="muted small">
-        Timestamps are kept, so the summary can still point at the moment. Tired of copying?{' '}
-        <a href="#/settings">Set up the one-tap bookmarklet</a>.
+        Timestamps are kept, so the summary can still point at the moment.
       </p>
       <button className="primary wide" disabled={text.trim().length < 200 || auto === 'sending'} onClick={() => void submitManual()}>
         Summarize this transcript

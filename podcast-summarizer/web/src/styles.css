@@ -91,6 +91,8 @@ button.wide { width: 100%; margin-top: 8px; }
 button.link { background: none; border: none; padding: 6px 4px; color: var(--accent); cursor: pointer; font-weight: 500; min-height: 32px; }
 button.link.back { font-size: 17px; }
 button.link.danger { color: var(--danger); align-self: center; }
+.primary-link { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; padding: 12px 18px; border-radius: 12px; }
+details summary { cursor: pointer; padding: 8px 0; }
 
 .episode { display: flex; gap: 12px; align-items: center; }
 .episode .art { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: var(--accent-soft); }

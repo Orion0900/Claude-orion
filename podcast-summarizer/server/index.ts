@@ -93,8 +93,16 @@ app.get('/api/jobs', async (_req, res) => {
 app.post('/api/jobs', async (req, res) => {
   const url = typeof req.body?.url === 'string' ? req.body.url.trim() : ''
   if (!url) return res.status(400).json({ error: 'Send { "url": "https://open.spotify.com/episode/…" }' })
-  const job = await store.create(url)
-  res.status(202).json(job)
+  // The bookmarklet sends the transcript with the link, in one request.
+  const text = typeof req.body?.transcript === 'string' ? req.body.transcript : undefined
+  const format = typeof req.body?.transcriptFormat === 'string' ? req.body.transcriptFormat : undefined
+  const source = req.body?.transcriptSource === 'phone' ? 'phone' : 'manual'
+  try {
+    const job = await store.create(url, text ? { text, format, source } : undefined)
+    res.status(202).json(job)
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message })
+  }
 })
 
 app.get('/api/jobs/:id', async (req, res) => {

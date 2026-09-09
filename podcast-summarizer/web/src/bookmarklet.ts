@@ -1,11 +1,19 @@
 /**
- * A bookmarklet the user keeps in Safari's favourites. Tapped on a YouTube
- * watch page it reads the open transcript panel, creates a PodBrief job, posts
- * the transcript, and opens the summary — so the whole "select all, copy,
- * switch apps, paste" dance collapses into one tap.
+ * A bookmarklet the user keeps in Safari's favourites. Tapped on any
+ * youtube.com page it collects the episode's captions and hands them to
+ * PodBrief, then opens the summary.
  *
- * It runs on youtube.com, so it reaches the API cross-origin; the /api routes
- * send permissive CORS headers for exactly this reason.
+ * Why a bookmarklet rather than a button inside PodBrief: a page can only read
+ * another site with that site's permission, and YouTube gives none. Code that
+ * runs *on* youtube.com has no such limit — and it carries the phone's own
+ * address, which YouTube serves happily while it refuses a cloud server.
+ *
+ * It fetches the watch page relative to whatever YouTube origin it is on
+ * (m.youtube.com and www.youtube.com are different origins, so a relative URL
+ * is the only same-origin form), reads the caption track list out of the
+ * player data embedded in that HTML, and downloads the track. That means the
+ * transcript panel need not be open, the desktop site is not required, and
+ * nothing has to be selected or copied.
  */
 
 /** Source of the bookmarklet, with API_BASE substituted in at build time. */
@@ -22,51 +30,105 @@ const SOURCE = `(async () => {
     el.textContent = msg;
     return el;
   };
-  try {
-    const id = new URL(location.href).searchParams.get('v') || location.pathname.split('/').pop();
-    if (!id) return note('Open a YouTube video first.');
 
-    // Open the transcript panel if it is closed, then wait for it to fill.
-    const rows = () => document.querySelectorAll('ytd-transcript-segment-renderer');
-    if (!rows().length) {
-      const btn = [...document.querySelectorAll('button,tp-yt-paper-button,yt-button-shape button')]
-        .find((b) => /transcript/i.test((b.getAttribute('aria-label') || '') + ' ' + (b.textContent || '')));
-      if (btn) { btn.click(); note('Opening the transcript…'); }
-      for (let i = 0; i < 40 && !rows().length; i++) await new Promise((r) => setTimeout(r, 250));
-    }
-
-    let text = [...rows()].map((r) => {
-      const t = (r.querySelector('.segment-timestamp') || {}).textContent;
-      const x = (r.querySelector('.segment-text') || {}).textContent;
-      return t && x ? t.trim() + '\\n' + x.trim() : '';
-    }).filter(Boolean).join('\\n');
-
-    // Fall back to scraping visible text for timestamp lines.
-    if (text.split('\\n').length < 20) {
-      const lines = (document.body.innerText || '').split('\\n').map((l) => l.trim());
-      const out = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (/^(?:\\d{1,2}:)?\\d{1,2}:\\d{2}$/.test(lines[i]) && lines[i + 1]) out.push(lines[i], lines[i + 1]);
+  // The JSON blob is followed by other script text, so match braces rather
+  // than trusting a lazy regex to find its end.
+  const carveJson = (html, key) => {
+    const at = html.indexOf(key);
+    if (at < 0) return null;
+    const start = html.indexOf('{', at);
+    if (start < 0) return null;
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < html.length; i++) {
+      const c = html[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (c === '\\\\') esc = true;
+        else if (c === '"') inStr = false;
+        continue;
       }
-      if (out.length > text.split('\\n').length) text = out.join('\\n');
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) {
+        try { return JSON.parse(html.slice(start, i + 1)); } catch (e) { return null; }
+      }
     }
-    if (text.split('\\n').length < 20) {
-      return note('Open the transcript panel first (…more → Show transcript), then tap again.');
+    return null;
+  };
+
+  const pickTrack = (tracks) => {
+    const score = (t) => (t.kind === 'asr' ? 0 : 4) + (/^en/i.test(t.languageCode || '') ? 2 : 0);
+    return tracks.slice().sort((a, b) => score(b) - score(a))[0];
+  };
+
+  const stamp = (s) => {
+    const t = Math.max(0, Math.floor(s));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), x = t % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(x).padStart(2, '0');
+  };
+
+  try {
+    if (!/(^|\\.)youtube\\.com$/.test(location.hostname)) {
+      return note('Open a YouTube video first, then tap this.');
+    }
+    const id = new URL(location.href).searchParams.get('v')
+      || (location.pathname.match(/\\/(?:shorts|live|embed|v)\\/([A-Za-z0-9_-]{11})/) || [])[1];
+    if (!id) return note('Open a specific video first, then tap this.');
+
+    note('Reading the captions…');
+    let lines = [];
+
+    // Relative URL: same origin whether this is m.youtube.com or www.
+    for (const path of ['/watch?v=' + id + '&hl=en', '/watch?v=' + id + '&hl=en&app=desktop']) {
+      try {
+        const html = await (await fetch(path, { credentials: 'include' })).text();
+        const pr = carveJson(html, 'ytInitialPlayerResponse');
+        const tracks = pr && pr.captions && pr.captions.playerCaptionsTracklistRenderer
+          ? pr.captions.playerCaptionsTracklistRenderer.captionTracks || []
+          : [];
+        const track = pickTrack(tracks.filter((t) => t && t.baseUrl));
+        if (!track) continue;
+        const url = track.baseUrl + (track.baseUrl.indexOf('fmt=') < 0 ? '&fmt=json3' : '');
+        const data = await (await fetch(url, { credentials: 'include' })).json();
+        lines = (data.events || [])
+          .filter((e) => e.segs && e.tStartMs !== undefined)
+          .map((e) => {
+            const text = e.segs.map((s) => s.utf8 || '').join('').replace(/\\s+/g, ' ').trim();
+            return text ? stamp(e.tStartMs / 1000) + '\\n' + text : '';
+          })
+          .filter(Boolean);
+        if (lines.length > 10) break;
+      } catch (e) {
+        /* try the next shape */
+      }
     }
 
-    note('Sending ' + Math.round(text.length / 1000) + 'k of transcript to PodBrief…');
-    const post = (path, body) => fetch(BASE + path, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    // If YouTube changed shape, fall back to the transcript panel if it is open.
+    if (lines.length <= 10) {
+      lines = [].slice.call(document.querySelectorAll('ytd-transcript-segment-renderer')).map((r) => {
+        const t = (r.querySelector('.segment-timestamp') || {}).textContent;
+        const x = (r.querySelector('.segment-text') || {}).textContent;
+        return t && x ? t.trim() + '\\n' + x.trim() : '';
+      }).filter(Boolean);
+    }
+    if (lines.length <= 10) {
+      return note('No captions found for this video.');
+    }
+
+    const text = lines.join('\\n');
+    note('Sending ' + lines.length + ' caption lines to PodBrief…');
+    const res = await fetch(BASE + '/api/jobs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'https://www.youtube.com/watch?v=' + id,
+        transcript: text,
+        transcriptSource: 'phone',
+      }),
     }).then((r) => r.json());
-
-    const job = await post('/api/jobs', { url: 'https://www.youtube.com/watch?v=' + id });
-    if (!job || !job.id) throw new Error((job && job.error) || 'PodBrief did not accept the link');
-    // Give the server a moment to resolve the video before handing it words.
-    await new Promise((r) => setTimeout(r, 1500));
-    const res = await post('/api/jobs/' + job.id + '/transcript', { text: text, source: 'phone' });
-    if (res && res.error) throw new Error(res.error);
+    if (!res || !res.id) throw new Error((res && res.error) || 'PodBrief did not accept the transcript');
     note('Done. Opening PodBrief…');
-    location.href = BASE + '/#/job/' + job.id;
+    location.href = BASE + '/#/job/' + res.id;
   } catch (err) {
     note('PodBrief: ' + (err && err.message ? err.message : err));
   }

@@ -25,23 +25,24 @@ export function Bookmarklet() {
     <section className="card">
       <h3>One-tap grab from YouTube</h3>
       <p className="muted small">
-        Set this up once and summarizing an episode is: open the transcript, tap the bookmark. No copying, no pasting, no
-        switching apps.
+        Set this up once. After that, summarizing an episode is a single tap on any YouTube page — no desktop mode, no
+        transcript panel, nothing to copy.
       </p>
       <button className="primary wide" onClick={() => void copy()}>
         {copied ? 'Copied ✓' : 'Copy the bookmarklet'}
       </button>
+      <h4>Set up (once)</h4>
       <ol className="plain steps-text small">
         <li>Tap the button above to copy it.</li>
-        <li>In Safari, open any page and tap <strong>Share → Add Bookmark</strong>. Name it <strong>PodBrief</strong>, save it to <strong>Favourites</strong>.</li>
-        <li>Tap the address bar, then <strong>Edit</strong> (bottom right of the favourites grid). Tap your PodBrief bookmark.</li>
-        <li>Clear the <strong>Address</strong> field and paste. Tap <strong>Done</strong>.</li>
+        <li>In Safari, on any page, tap <strong>Share → Add Bookmark</strong>. Name it <strong>PodBrief</strong> and save it to <strong>Favourites</strong>.</li>
+        <li>Tap the address bar, then <strong>Edit</strong> under the favourites grid. Tap your PodBrief bookmark.</li>
+        <li>Clear the <strong>Address</strong> field, paste, and tap <strong>Done</strong>.</li>
       </ol>
-      <h4>Using it</h4>
+      <h4>Every episode after that</h4>
       <ol className="plain steps-text small">
-        <li>Open a YouTube episode in Safari, desktop site, transcript panel open.</li>
+        <li>Open the episode on youtube.com in Safari.</li>
         <li>Tap the address bar, then your <strong>PodBrief</strong> favourite.</li>
-        <li>It sends the transcript and opens the summary here.</li>
+        <li>It reads the captions, sends them, and opens the summary.</li>
       </ol>
     </section>
   )
