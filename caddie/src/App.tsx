@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdvisorCard } from './components/AdvisorCard'
+import { Confetti } from './components/Confetti'
 import { HoleHeader } from './components/HoleHeader'
 import { MapView, type TapMode } from './components/MapView'
 import { SettingsView } from './components/SettingsView'
 import { SetupView, type SetupStep } from './components/SetupView'
-import { ShotTracker } from './components/ShotTracker'
+import { ShotDock, ShotList } from './components/ShotTracker'
 import { StatsView } from './components/StatsView'
 import { advise, type Advice } from './lib/advisor'
 import { defaultBag, type ClubId, type SkillLevel } from './lib/clubs'
@@ -27,6 +28,12 @@ import { useGeolocation } from './services/geolocation'
 import { findNearbyCourses, type NearbyCourse } from './services/overpass'
 
 type Tab = 'play' | 'stats' | 'settings'
+
+const TABS: Array<{ id: Tab; icon: string; label: string }> = [
+  { id: 'play', icon: '⛳', label: 'Play' },
+  { id: 'stats', icon: '🧠', label: 'Coach' },
+  { id: 'settings', icon: '⚙️', label: 'You' },
+]
 
 const KEYS = {
   profile: 'caddieiq.profile',
@@ -60,6 +67,9 @@ export default function App() {
   )
   const [candidates, setCandidates] = useState<NearbyCourse[] | null>(null)
   const [searching, setSearching] = useState(false)
+  // Bumped to fire confetti. Reserved for a hole worth celebrating, because
+  // confetti for every routine tap stops meaning anything.
+  const [celebrate, setCelebrate] = useState(0)
 
   useEffect(() => writeJson(KEYS.profile, profile), [profile])
   useEffect(() => writeJson(KEYS.course, course), [course])
@@ -101,7 +111,6 @@ export default function App() {
     setLie(null)
     setPickedClub(null)
   }
-  const holeCount = course?.holes.length ?? 0
   const nextHole = () => {
     if (!course) return
     const after = course.holes.find((h) => h.number > holeNumber)
@@ -184,61 +193,46 @@ export default function App() {
 
   const finishHole = () => {
     if (!hole) return
+    const strokes = holeShots.length
     setShots((s) => holeOut(s, round.id, holeNumber, targetOf(hole)))
+    // Birdie or better, or an ace. Anything less is a fine hole, not a party.
+    if (strokes > 0 && ((hole.par !== null && strokes <= hole.par - 1) || strokes === 1)) {
+      setCelebrate((c) => c + 1)
+    }
     nextHole()
   }
 
-  const gpsStatus = manualPosition
-    ? 'Placed by hand'
-    : gps.status === 'live'
-      ? `GPS ±${Math.round(gps.accuracy ?? 0)} m`
-      : gps.status === 'waiting'
-        ? 'Finding you…'
-        : gps.status === 'denied'
-          ? 'Location denied'
-          : 'No GPS'
-
-  const tracker = (
-    <ShotTracker
+  const dock = (
+    <ShotDock
       shots={holeShots}
       bag={profile.bag}
       suggested={advice?.club ?? null}
       selected={pickedClub}
       onSelectClub={setPickedClub}
-      unit={profile.unit}
       canMark={position !== null}
       onMark={mark}
       onHoleOut={finishHole}
       onUndo={() => setShots((s) => undoLastShot(s, round.id, holeNumber))}
-      onDistance={(id, meters) => setShots((s) => s.map((shot) => (shot.id === id ? setManualDistance(shot, meters) : shot)))}
-      onDeleteShot={(id) => setShots((s) => s.filter((shot) => shot.id !== id))}
     />
   )
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        {setupStep !== null ? (
-          <header className="hole-header setup-header">
-            <div className="brand">
-              <strong>CaddieIQ</strong>
-              <span>A caddie that learns what you actually hit</span>
-            </div>
-          </header>
-        ) : (
-        <HoleHeader
-          hole={hole}
-          holeCount={holeCount}
-          distance={distance}
-          green={green}
-          unit={profile.unit}
-          gpsStatus={gpsStatus}
-          onPrev={prevHole}
-          onNext={nextHole}
-          onFrame={() => setFrameKey((k) => k + 1)}
-        />
+      <aside className="sheet">
+        {setupStep === null && (
+          <HoleHeader
+            hole={hole}
+            distance={distance}
+            green={green}
+            unit={profile.unit}
+            accuracy={manualPosition ? null : gps.accuracy}
+            live={gps.status === 'live' && !manualPosition}
+            onPrev={prevHole}
+            onNext={nextHole}
+            onFrame={() => setFrameKey((k) => k + 1)}
+          />
         )}
-        <div className="sidebar-scroll">
+        <div className="sheet-scroll">
           {setupStep !== null && (
             <SetupView
               step={setupStep}
@@ -274,8 +268,13 @@ export default function App() {
                   </div>
                 </section>
               )}
-              <AdvisorCard advice={advice} profile={profile} lie={effectiveLie} onLie={setLie} onSkill={setSkill} onAggressiveness={setAggressiveness} />
-              {tracker}
+              <AdvisorCard advice={advice} profile={profile} lie={effectiveLie} onLie={setLie} onAggressiveness={setAggressiveness} />
+              <ShotList
+                shots={holeShots}
+                unit={profile.unit}
+                onDistance={(id, meters) => setShots((s) => s.map((shot) => (shot.id === id ? setManualDistance(shot, meters) : shot)))}
+                onDeleteShot={(id) => setShots((s) => s.filter((shot) => shot.id !== id))}
+              />
             </div>
           )}
           {setupStep === null && tab === 'stats' && <StatsView shots={shots} profile={profile} />}
@@ -283,12 +282,12 @@ export default function App() {
             <SettingsView
               profile={profile}
               course={course}
-              courseStatus={courseStatus}
               hasPosition={position !== null}
               tapMode={tapMode}
               holeNumber={holeNumber}
               usingManualPosition={manualPosition !== null}
               onProfile={updateProfile}
+              onSkill={setSkill}
               onChangeCourse={() => {
                 setCandidates(null)
                 setCourseStatus(null)
@@ -312,10 +311,12 @@ export default function App() {
             />
           )}
         </div>
+        {setupStep === null && tab === 'play' && dock}
         <nav className="tabs" hidden={setupStep !== null}>
-          {(['play', 'stats', 'settings'] as Tab[]).map((t) => (
-            <button key={t} type="button" className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-              {t === 'play' ? 'Play' : t === 'stats' ? 'Coach' : 'Settings'}
+          {TABS.map((t) => (
+            <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+              <span aria-hidden="true">{t.icon}</span>
+              {t.label}
             </button>
           ))}
         </nav>
@@ -332,6 +333,7 @@ export default function App() {
         onTap={onTap}
         frameKey={frameKey}
       />
+      <Confetti trigger={celebrate} />
     </div>
   )
 }

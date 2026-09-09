@@ -1,6 +1,6 @@
 import type { Course } from '../lib/course'
 import type { NearbyCourse } from '../services/overpass'
-import { formatDistance, type Unit } from '../lib/units'
+import { formatAway, type Unit } from '../lib/units'
 
 export type SetupStep = 'course' | 'hole'
 
@@ -11,12 +11,10 @@ interface SetupViewProps {
   searching: boolean
   error: string | null
   hasPosition: boolean
-  /** The course chosen in step one. */
   course: Course | null
-  /** The hole the player is standing closest to, offered first. */
+  /** The hole the player is standing closest to. */
   suggested: number | null
   unit: Unit
-  /** True once a course has been played, so setup can be backed out of. */
   canCancel: boolean
   onSearch: () => void
   onPickCourse: (course: Course) => void
@@ -27,7 +25,6 @@ interface SetupViewProps {
   onCancel: () => void
 }
 
-/** A hand-built course starts with no holes, so offer a full round of them. */
 const MANUAL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1)
 
 export function SetupView(p: SetupViewProps) {
@@ -37,45 +34,45 @@ export function SetupView(p: SetupViewProps) {
 function CourseStep(p: SetupViewProps) {
   return (
     <div className="stack setup">
-      <section className="card">
-        <span className="step-mark">Step 1 of 2</span>
-        <h3>Which course are you at?</h3>
+      <section className="card big-ask">
+        <span className="mascot" aria-hidden="true">
+          {p.searching ? '🛰️' : '📍'}
+        </span>
+        <h3>Where are you?</h3>
+        <p>{p.hasPosition ? 'Pick your course' : 'Turn on location, or drop yourself on the map'}</p>
 
         {!p.hasPosition && (
-          <>
-            <p className="muted small">
-              The caddie needs to know where you are. Allow location when the phone asks, or drop yourself on the map.
-            </p>
-            <div className="button-row">
-              <button type="button" onClick={p.onPlaceByTap}>
-                Place me on the map
-              </button>
-            </div>
-          </>
+          <div className="row">
+            <button type="button" className="plain strong" onClick={p.onPlaceByTap}>
+              Drop me on the map
+            </button>
+          </div>
         )}
 
         {p.hasPosition && p.candidates === null && !p.searching && (
-          <>
-            <p className="muted small">Look for mapped courses within a mile and a half of you.</p>
-            <div className="button-row">
-              <button type="button" className="primary" onClick={p.onSearch}>
-                Find courses near me
-              </button>
-            </div>
-          </>
+          <div className="row">
+            <button type="button" className="plain strong" onClick={p.onSearch}>
+              Find my course
+            </button>
+          </div>
         )}
 
-        {p.searching && <p className="status">Looking for courses around you…</p>}
-        {p.error && <p className="status">{p.error}</p>}
+        {p.searching && <div className="spinner" role="status" aria-label="Searching" />}
+        {p.error && <p className="note warn">{p.error}</p>}
 
         {p.candidates !== null && p.candidates.length > 0 && (
           <ul className="course-list">
-            {p.candidates.map(({ course, distance }) => (
+            {p.candidates.map(({ course, distance }, i) => (
               <li key={course.id}>
-                <button type="button" onClick={() => p.onPickCourse(course)}>
-                  <strong>{course.name}</strong>
+                <button type="button" onClick={() => p.onPickCourse(course)} style={{ animationDelay: `${i * 60}ms` }}>
+                  <span className="pin" aria-hidden="true">
+                    ⛳
+                  </span>
                   <span>
-                    {course.holes.length} hole{course.holes.length === 1 ? '' : 's'} · {formatDistance(distance, p.unit)} away
+                    <strong>{course.name}</strong>
+                    <small>
+                      {course.holes.length} holes · {formatAway(distance, p.unit)}
+                    </small>
                   </span>
                 </button>
               </li>
@@ -83,32 +80,22 @@ function CourseStep(p: SetupViewProps) {
           </ul>
         )}
 
-        {p.candidates !== null && p.candidates.length === 0 && !p.searching && (
-          <p className="muted small">
-            No mapped courses within a mile and a half. Plenty of courses aren't in OpenStreetMap — set this one up by
-            hand and it'll work just the same.
-          </p>
+        {p.candidates !== null && p.candidates.length === 0 && !p.searching && !p.error && (
+          <p className="note">Nothing mapped nearby — build it yourself below.</p>
         )}
 
-        {p.hasPosition && p.candidates !== null && !p.searching && (
-          <div className="button-row">
-            <button type="button" onClick={p.onSearch}>
+        <div className="row">
+          {p.hasPosition && p.candidates !== null && !p.searching && (
+            <button type="button" className="plain" onClick={p.onSearch}>
               Search again
             </button>
-          </div>
-        )}
-      </section>
-
-      <section className="card">
-        <h4>Not listed?</h4>
-        <p className="muted small">Set the course up yourself: you tap where each flag is, hole by hole, as you play.</p>
-        <div className="button-row">
-          <button type="button" onClick={p.onManual}>
-            Set it up by hand
+          )}
+          <button type="button" className="plain" onClick={p.onManual}>
+            ✏️ By hand
           </button>
           {p.canCancel && (
-            <button type="button" onClick={p.onCancel}>
-              Keep the course I had
+            <button type="button" className="plain" onClick={p.onCancel}>
+              Cancel
             </button>
           )}
         </div>
@@ -125,37 +112,32 @@ function HoleStep(p: SetupViewProps) {
 
   return (
     <div className="stack setup">
-      <section className="card">
-        <span className="step-mark">Step 2 of 2</span>
-        <h3>Which hole are you starting on?</h3>
-        <p className="muted small">
-          {p.course?.name}
-          {p.suggested !== null ? ` · you're standing closest to hole ${p.suggested}` : ''}
-          {manual ? ' · pick a number and tap the map where its flag is' : ''}
-        </p>
+      <section className="card big-ask">
+        <span className="mascot" aria-hidden="true">
+          ⛳
+        </span>
+        <h3>Starting hole?</h3>
+        <p>{p.course?.name}</p>
 
         <div className="hole-grid">
-          {numbers.map((n) => {
-            const hole = byNumber.get(n)
-            return (
-              <button key={n} type="button" className={n === p.suggested ? 'on' : ''} onClick={() => p.onPickHole(n)}>
-                <strong>{n}</strong>
-                {hole?.par ? <span>par {hole.par}</span> : null}
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="button-row">
-          {p.suggested !== null && (
-            <button type="button" className="primary" onClick={() => p.onPickHole(p.suggested as number)}>
-              Start on hole {p.suggested}
+          {numbers.map((n, i) => (
+            <button
+              key={n}
+              type="button"
+              className={n === p.suggested ? 'on' : ''}
+              onClick={() => p.onPickHole(n)}
+              style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+              aria-label={`Hole ${n}`}
+            >
+              <strong>{n}</strong>
+              {byNumber.get(n)?.par ? <small>par {byNumber.get(n)?.par}</small> : null}
             </button>
-          )}
-          <button type="button" onClick={p.onBack}>
-            Back to courses
+          ))}
+        </div>
+
+        <div className="row">
+          <button type="button" className="plain" onClick={p.onBack}>
+            ‹ Back
           </button>
         </div>
       </section>
