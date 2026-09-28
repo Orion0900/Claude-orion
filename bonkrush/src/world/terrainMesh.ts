@@ -31,7 +31,8 @@ export function buildTerrainGeometries(field: HeightField, palette: TerrainPalet
   const low = new THREE.Color(palette.groundLow)
   const high = new THREE.Color(palette.groundHigh)
   const cliff = new THREE.Color(palette.cliff)
-  const lane = low.clone().lerp(high, 0.6).lerp(new THREE.Color('#fff4dc'), 0.3)
+  // A packed, sandy lane in every palette: it has to read as "the fast way down" at a glance.
+  const lane = low.clone().lerp(high, 0.6).lerp(new THREE.Color('#f0e2bc'), 0.4)
   const accent = new THREE.Color(palette.accent)
   const c = new THREE.Color()
 
@@ -48,7 +49,7 @@ export function buildTerrainGeometries(field: HeightField, palette: TerrainPalet
       if (across > RAMP_SHAPE.halfWidth - 0.9) c.multiplyScalar(0.8)
       else if (u > 0 && u < r.length) {
         const g = (u + across * CHEVRON_LEAN) / CHEVRON_PERIOD
-        if (g - Math.floor(g) < 0.24) c.lerp(accent, 0.55)
+        if (g - Math.floor(g) < 0.24) c.lerp(accent, 0.7)
       }
       return true
     }

@@ -33,7 +33,7 @@ const SHADOW_SPLIT_TRIANGLES = 2500
 const SHADOW_TILES = 4
 
 /** How much of a prop in the way the dither cuts out: a screen door, so the player shows through it. */
-export const SEE_THROUGH = 0.7
+const SEE_THROUGH = 0.7
 /** Seconds a prop takes to fade out of the way, or back in. */
 export const FADE_TIME = 0.15
 /**
@@ -234,11 +234,6 @@ export class PropLayer {
       this.geometries.push(rock)
       this.addBatch(rock, walls, this.solidMat, true, stone, null, 0)
     }
-  }
-
-  /** Draw calls this layer can issue at most (one per mesh), for budgeting. */
-  get meshCount(): number {
-    return this.meshes.length
   }
 
   update(dt: number): void {
