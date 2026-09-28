@@ -1,7 +1,6 @@
 import {
   conditionalMultiplier,
   idleBonus,
-  keyFreeChance,
   lifestealHeal,
   mergeMod,
   procChance,
@@ -61,12 +60,6 @@ describe('item scaling', () => {
 
   it('soul reaper adds a soul for every two extra stacks', () => {
     expect([0, 1, 2, 3, 4, 5].map(soulCount)).toEqual([0, 1, 1, 2, 2, 3])
-  })
-
-  it('rusty key follows k/(k+1)', () => {
-    expect(keyFreeChance(0)).toBe(0)
-    expect(keyFreeChance(1)).toBeCloseTo(0.1 / 1.1)
-    expect(keyFreeChance(10)).toBeCloseTo(0.5)
   })
 })
 

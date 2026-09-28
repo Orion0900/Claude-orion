@@ -17,7 +17,7 @@ export const CHAOS_TOME = 'chaos'
 /** Each tome grants `perLevel` once per level at common rarity; rarity multiplies the step. */
 export const TOMES: readonly TomeDef[] = [
   { id: 'damage', name: 'Tome of Might', icon: '💪', description: 'Hit harder with everything.', perLevel: [add('damage', 0.08)] },
-  { id: 'cooldown', name: 'Tome of Haste', icon: '⏱️', description: 'Weapons fire more often.', perLevel: [add('attackSpeed', 0.075)] },
+  { id: 'cooldown', name: 'Tome of Haste', icon: '⚡', description: 'Weapons fire more often.', perLevel: [add('attackSpeed', 0.075)] },
   { id: 'precision', name: 'Tome of Precision', icon: '🎯', description: 'More critical hits.', perLevel: [add('critChance', 0.07)] },
   { id: 'size', name: 'Tome of Girth', icon: '🔶', description: 'Bigger swings, blasts and projectiles.', perLevel: [add('size', 0.1)] },
   { id: 'velocity', name: 'Tome of Velocity', icon: '💨', description: 'Projectiles fly faster.', perLevel: [add('projectileSpeed', 0.15)] },

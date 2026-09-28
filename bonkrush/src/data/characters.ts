@@ -1,0 +1,131 @@
+import type { CharacterDef } from '../game/types'
+
+/**
+ * The playable roster. Passives are plain 'add' mods on the base stats, so
+ * the stats panel and the character cards describe them the same way.
+ * The first three are free; the rest are bought with silver.
+ */
+export const CHARACTERS: readonly CharacterDef[] = [
+  {
+    id: 'vix',
+    name: 'Vix',
+    icon: '🦊',
+    description: 'A lucky fox with a staff full of fireballs.',
+    startWeapon: 'firestaff',
+    passive: [
+      { stat: 'luck', op: 'add', value: 0.15 },
+      { stat: 'moveSpeed', op: 'add', value: 0.05 },
+    ],
+    passiveText: '+15% Luck, +5% Move Speed',
+    colors: { body: '#ff8a2b', accent: '#fff4e0', detail: '#3a2418' },
+    model: 'fox',
+    unlockCost: 0,
+  },
+  {
+    id: 'sir_bonkalot',
+    name: 'Sir Bonkalot',
+    icon: '🛡️',
+    description: 'A knight in dented armour who solves problems by bonking them.',
+    startWeapon: 'sword',
+    passive: [
+      { stat: 'armor', op: 'add', value: 0.15 },
+      { stat: 'maxHp', op: 'add', value: 20 },
+    ],
+    passiveText: '+15% Armor, +20 Max HP',
+    colors: { body: '#c9d3e0', accent: '#e23b3b', detail: '#ffd23f' },
+    model: 'knight',
+    unlockCost: 0,
+  },
+  {
+    id: 'rattles',
+    name: 'Rattles',
+    icon: '💀',
+    description: 'A cool skeleton who throws his spare bones.',
+    startWeapon: 'bone',
+    passive: [
+      { stat: 'moveSpeed', op: 'add', value: 0.12 },
+      { stat: 'damage', op: 'add', value: 0.08 },
+    ],
+    passiveText: '+12% Move Speed, +8% Damage',
+    colors: { body: '#f2ecd8', accent: '#16161e', detail: '#ff5fa2' },
+    model: 'skeleton',
+    unlockCost: 0,
+  },
+  {
+    id: 'gigabro',
+    name: 'Gigabro',
+    icon: '💪',
+    description: 'An enormous ogre whose sheer presence hurts.',
+    startWeapon: 'aura',
+    passive: [
+      { stat: 'maxHp', op: 'add', value: 40 },
+      { stat: 'size', op: 'add', value: 0.1 },
+      { stat: 'regen', op: 'add', value: 1 },
+    ],
+    passiveText: '+40 Max HP, +10% Size, +1 HP Regen/s',
+    colors: { body: '#7cc653', accent: '#8b5a2b', detail: '#ffd23f' },
+    model: 'ogre',
+    unlockCost: 60,
+  },
+  {
+    id: 'b0lt',
+    name: 'B0LT',
+    icon: '🤖',
+    description: 'A robot gunslinger with a targeting chip for weak spots.',
+    startWeapon: 'revolver',
+    passive: [
+      { stat: 'critChance', op: 'add', value: 0.12 },
+      { stat: 'critDamage', op: 'add', value: 0.2 },
+    ],
+    passiveText: '+12% Crit Chance, +20% Crit Damage',
+    colors: { body: '#4fb3ff', accent: '#ffd23f', detail: '#2b3140' },
+    model: 'robot',
+    unlockCost: 90,
+  },
+  {
+    id: 'kage',
+    name: 'Kage',
+    icon: '🥷',
+    description: 'A ninja who is never quite where the claws land.',
+    startWeapon: 'katana',
+    passive: [
+      { stat: 'evasion', op: 'add', value: 0.15 },
+      { stat: 'attackSpeed', op: 'add', value: 0.1 },
+    ],
+    passiveText: '+15% Evasion, +10% Attack Speed',
+    colors: { body: '#2d2f4a', accent: '#ff3b5c', detail: '#f2c79b' },
+    model: 'ninja',
+    unlockCost: 120,
+  },
+  {
+    id: 'bongo',
+    name: 'Bongo',
+    icon: '🐒',
+    description: 'A bouncy monkey with a boomerang banana and an extra jump.',
+    startWeapon: 'bananarang',
+    passive: [
+      { stat: 'extraJumps', op: 'add', value: 1 },
+      { stat: 'pickupRange', op: 'add', value: 0.1 },
+    ],
+    passiveText: '+1 Extra Jump, +10% Pickup Range',
+    colors: { body: '#9a5b2e', accent: '#f2c79b', detail: '#ffd23f' },
+    model: 'monkey',
+    unlockCost: 150,
+  },
+  {
+    id: 'frostine',
+    name: 'Frostine',
+    icon: '🧙',
+    description: 'A frost wizard who leaves the ground colder than she found it.',
+    startWeapon: 'frostwalker',
+    passive: [
+      { stat: 'duration', op: 'add', value: 0.15 },
+      { stat: 'size', op: 'add', value: 0.1 },
+      { stat: 'xpGain', op: 'add', value: 0.1 },
+    ],
+    passiveText: '+15% Duration, +10% Size, +10% XP Gain',
+    colors: { body: '#5a7bff', accent: '#e8f7ff', detail: '#8ee8ff' },
+    model: 'wizard',
+    unlockCost: 200,
+  },
+]

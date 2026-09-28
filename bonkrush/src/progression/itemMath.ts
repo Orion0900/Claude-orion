@@ -35,12 +35,6 @@ export function soulCount(stacks: number): number {
   return stacks > 0 ? 1 + Math.floor((stacks - 1) / 2) : 0
 }
 
-/** Rusty Key: chance a chest is free, k / (k + 1) with k = 0.1 per key. */
-export function keyFreeChance(stacks: number): number {
-  const k = 0.1 * Math.max(0, stacks)
-  return k / (k + 1)
-}
-
 /** Everything the conditional damage items look at for one hit. */
 export interface HitConditions {
   /** Enemy hp / maxHp. */
