@@ -24,19 +24,21 @@ controls.
 | Move | WASD / arrows | Left thumb |
 | Look | Mouse (click the game to capture it) | Drag on the right |
 | Jump, and jump again in the air | Space | ⤒ |
-| Slide (hold) | Shift or Ctrl | ⤓ |
+| Slide (hold) | Shift, C or right mouse | ⤓ |
 | Open, use, summon | E | ✋ |
 | Map and stats (hold) | Tab | — |
 | Pause | Esc or P | ❚❚ |
 
 **The trick is sliding downhill.** A slide on a long slope builds speed far
-past running pace, and jumping out of it keeps that speed. Chain jumps the
-moment you land and you keep it.
+past running pace, and every map has a few long ramps made for it. Jumping
+out of a slide keeps that speed, and chaining jumps the moment you land
+keeps it too.
 
 ## How a run goes
 
 - **Three stages:** Greenwood, Sunscorch Dunes and Hollow Crypt, on 10, 9 and
-  8 minute clocks. Weapons, tomes, items and your level carry over between
+  8 minute clocks. Each clock brings minibosses and a couple of moments when
+  the horde closes in around you in a ring. Weapons, tomes, items and your level carry over between
   them.
 - **Level up** from XP shards and pick one of three cards. A card is a new
   weapon, a new tome, or an upgrade to one you own. Each card rolls a rarity

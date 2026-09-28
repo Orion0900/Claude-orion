@@ -18,7 +18,7 @@ Units are metres and seconds, and the player is about 1.8 m tall.
 | Move | WASD / arrows | Left thumb joystick (appears where you touch) |
 | Look | Mouse (pointer lock; click the game to capture) | Drag on the right half |
 | Jump / air jump | Space | ⤒ button |
-| Slide | Shift or Ctrl (hold) | ⤓ button (hold) |
+| Slide | Shift, C or right mouse (hold) | ⤓ button (hold) |
 | Interact (chest, shrine, altar, portal) | E | ✋ button (shows only when something is in reach) |
 | Pause | Esc / P | ❚❚ button |
 | Stats panel | Tab (hold) | In the pause menu |
@@ -36,10 +36,11 @@ The movement is what makes the game fun. Tuning targets:
   puff ring.
 - **Slide:** hold Slide while grounded and moving over 3 m/s. Entering a slide
   gives a burst of ×1.3 speed (only when the slide cooldown of 0.6 s is up).
-  While sliding, friction drops to 0.6/s and steering is weak.
-  - **Slopes are speed.** Downhill accelerates you at g × sin(slope) × 1.6,
+  While sliding, friction drops to 0.3/s and steering is weak.
+  - **Slopes are speed.** Downhill accelerates you at g × sin(slope) × 2.0,
     and uphill slows you at g × sin(slope). A long hill should take a slide
-    to 3–4× base speed, the signature feel.
+    to 3–4× base speed, the signature feel. Every map has a few long, smooth
+    slide ramps (30–40 m at 15–25°) to make that happen on purpose.
   - The camera and hitbox drop, dust trails behind you, and the FOV widens
     with speed (70° → 85°).
 - **Bunny hop:** jumping within 0.12 s of landing skips that landing's
@@ -60,6 +61,9 @@ The movement is what makes the game fun. Tuning targets:
 
 - A run is **3 stages**: Greenwood (10:00), Sunscorch Dunes (9:00) and Hollow
   Crypt (8:00). The timer counts **down** on the HUD.
+- **Encirclements** close in at 5:30 and 3:30 left, or 4:30 and 3:15 on
+  stage 3. A ring of 30 + 10 × stage of the stage's first enemy spawns 16 m
+  around you after a "SURROUNDED!" warning.
 - **Minibosses** spawn at 7:00 and 2:00 left, or 6:30 and 3:00 on stage 3.
   - Greenwood: `stone_golem`
   - Dunes: `scorpion_king`
@@ -98,7 +102,8 @@ The movement is what makes the game fun. Tuning targets:
   - Each card rolls its rarity with luck (`progression/rarity.ts`).
 - **Slots:** 4 weapons and 4 tomes. Items have no limit.
 - **Per run:** 3 rerolls, 3 skips and 2 banishes. A skip gives 20% of the
-  level's XP back as gold.
+  level's XP back as gold. A banish removes that card's weapon, tome or item
+  from the run and deals fresh cards for the same level-up.
 - **Weapon upgrade:** a Common roll raises 1–2 random upgradable stats.
   - Uncommon and above always raise 2 stats; the Anvil item makes it 3.
   - Each step is `upgrades[stat] × RARITY_MULT[rarity]`.
@@ -318,8 +323,9 @@ elite.
 ## Director (`src/enemies/director.ts`, pure)
 
 - **Spawns per second:**
-  `rate(t) = min(12, 1.0 + 0.55 × min^1.25) × (1 + difficulty × 0.6)`,
-  with `min = stageTime/60`.
+  `rate(t) = min(14, 1.6 + 1.5 × stage + 0.6 × min^1.25) × (1 + difficulty × 0.6)`,
+  with `min = stageTime/60` and `stage` the 0-based stage index. The rate
+  halves while a boss is alive.
   - Enemies spawn in clumps of 3–8 on a ring 28–40 m from the player, never
     inside view distance behind props, and inside the map.
 - **Alive cap:** 300 (180 on low quality). When the map is at the cap, the
@@ -332,12 +338,22 @@ elite.
   - roster[4] from 4:30
   - roster[5] from 6:00
   - Weights favour the newest few.
+- **Roster weights:** tanks weigh 0.12 and chargers 0.45 against the
+  others, so each stage's big enemies stay a spice, not the staple.
 - **HP scale:** `(1 + 0.10 × min)^1.35 × stage.enemyScale × (1 + difficulty)`.
 - **Damage scale:** `(1 + 0.06 × min) × stage.enemyScale^0.6 × (1 + difficulty × 0.5)`.
 - **Waves:** every 60 s, a themed burst of 20–40 of one roster type in a
   ring, plus a banner-less HUD pulse.
 - **Final swarm:** the rate jumps to 14/s of `ghost`, and HP scales
-  ×(1 + 0.25 × swarmSeconds/30), with purple and red tiers.
+  ×(1 + 0.25 × swarmSeconds/30), with purple and red tiers. Far-off regular
+  enemies are cleared so the ghosts actually flood in instead of waiting for
+  room under the cap.
+- **Difficulty** is one number: the stat, which already includes greed and
+  curse shrines. It raises spawns, HP and damage, and pays for itself: XP
+  and gold per kill are × (1 + 0.5 × difficulty).
+- **Stage XP:** every kill's XP is × 1, 1.3 and 2.0 on stages 1, 2 and 3.
+- **Death fling:** a killed enemy is bonked away, tumbling for about half a
+  second before it vanishes.
 
 ## Economy
 
@@ -346,6 +362,7 @@ elite.
 - **Chests:**
   - About 26 per map, placed at `world.spots.chests`.
   - Price: `round(25 × 1.18^paid + 4 × paid)`, giving 25, 34, 43, 53…
+    `paid` counts the whole run, so prices keep climbing across stages.
   - Free chests come from bosses, minibosses, challenge shrines and the Rusty
     Key. They don't raise the price.
   - A chest gives one item rolled on the item table with luck. The UI shows a
@@ -361,7 +378,8 @@ elite.
     - When full, pick 1 of 3 stat boons, each rolled with luck.
     - Boon steps are one tome-level of a random stat × the rarity multiplier.
     - A golden shrine (1 in 10) is always legendary.
-  - **Greed** (×4, gold): +40 gold (raw) and +8% run curse (difficulty).
+  - **Greed** (×4, gold): +40 gold (raw) and +8% difficulty for the rest of
+    the run.
   - **Magnet** (×3, blue): vacuums every XP and gold pickup on the map.
   - **Challenge** (×3, purple): spawns 6 + stage × 3 elites around you. Kill
     them all to get a free chest at the shrine.
@@ -373,8 +391,8 @@ elite.
   - Health snacks heal 25.
   - A magnet powerup (rare drop, 0.4%) vacuums the whole map.
   - A bomb powerup (rare drop, 0.3%) deals 200 in 10 m.
-- **Silver:** paid at the end of a run (`silverForRun`) and spent on
-  characters.
+- **Silver:** paid at the end of a run (`silverForRun`), including a run
+  you quit, and spent on characters.
 
 ## HUD layout
 
