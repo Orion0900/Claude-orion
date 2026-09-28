@@ -57,6 +57,8 @@ export class Ui implements UiApi {
     host: HTMLElement,
   ) {
     this.root = el('div', 'ui-root', undefined, host)
+    // Touch layouts move the prompt clear of the thumbs.
+    this.root.classList.toggle('touch', shell.input.isTouch)
     this.hud = new Hud(this.root)
     this.notices = new Notices(this.root)
     this.title = new TitleScreen(shell, this.root, (id, opts) => this.sfx(id, opts), () => this.openSettings())

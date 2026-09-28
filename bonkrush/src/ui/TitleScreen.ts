@@ -1,7 +1,7 @@
 import type { CharacterDef, SfxId, ShellApi } from '../game/types'
 import { STAGES } from '../data/stages'
 import { weaponDef } from './defs'
-import { SHAKE, activateFocused, arrowDir, bouncyText, button, el, moveFocus, pulse } from './dom'
+import { SHAKE, activateFocused, arrowDir, bouncyText, button, el, moveFocus, pulse, scrollIntoBox } from './dom'
 import { bestStageLabel, formatCount, formatTime } from './format'
 
 type View = 'main' | 'chars' | 'records'
@@ -46,7 +46,8 @@ export class TitleScreen {
     private readonly openSettings: () => void,
   ) {
     this.root = el('div', 'title-screen hidden', undefined, parent)
-    this.selected = readLast() ?? shell.characters[0]?.id ?? ''
+    const last = readLast()
+    this.selected = shell.characters.some((c) => c.id === last) ? (last as string) : (shell.characters[0]?.id ?? '')
 
     // Main menu.
     this.main = el('div', 'title-main', undefined, this.root)
@@ -123,8 +124,9 @@ export class TitleScreen {
     if (!this.shownFlag) return false
     const panel = this.view === 'main' ? this.main : this.view === 'chars' ? this.chars : this.records
     if (e.key === 'Escape' || e.key === 'Backspace') {
-      if (this.view !== 'main' && !e.repeat) this.go('main')
-      return this.view !== 'main' || e.key === 'Escape'
+      if (this.view === 'main') return false
+      if (!e.repeat) this.go('main')
+      return true
     }
     const dir = arrowDir(e)
     if (dir) {
@@ -158,7 +160,7 @@ export class TitleScreen {
       this.refreshCards()
       const card = this.cards.find((c) => c.def.id === this.selected)
       if (!touch) (focusStart ? this.start : card?.card)?.focus({ preventScroll: true })
-      card?.card.scrollIntoView({ block: 'nearest' })
+      if (card) window.requestAnimationFrame(() => scrollIntoBox(card.card, this.grid))
     } else {
       this.buildRecords()
       if (!touch) this.records.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
@@ -202,7 +204,10 @@ export class TitleScreen {
         if (this.selected === def.id) this.startOrUnlock()
         else this.select(def.id)
       })
-      card.addEventListener('focus', () => this.select(def.id, false))
+      card.addEventListener('focus', () => {
+        this.select(def.id, false)
+        scrollIntoBox(card, this.grid)
+      })
       const cached = this.portraits.get(def.id)
       if (cached) this.setPortrait(entry, cached)
       return entry

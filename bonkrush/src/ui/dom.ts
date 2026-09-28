@@ -63,7 +63,7 @@ export function moveFocus(root: HTMLElement, dir: 'up' | 'down' | 'left' | 'righ
     ? document.activeElement
     : null
   if (!current) {
-    items[0].focus({ preventScroll: false })
+    focusInView(items[0])
     return items[0]
   }
   const a = current.getBoundingClientRect()
@@ -85,8 +85,30 @@ export function moveFocus(root: HTMLElement, dir: 'up' | 'down' | 'left' | 'righ
       best = item
     }
   }
-  if (best) best.focus()
+  if (best) focusInView(best)
   return best
+}
+
+/** The UI's own scroll boxes; nothing above them may scroll. */
+const SCROLLERS = '.modal, .char-grid, .settings-screen, .title-records, .tab-panel'
+
+/**
+ * Focuses without the browser's scroll-into-view (which would also scroll the
+ * game's overflow-hidden layers), then scrolls just the nearest UI scroll box
+ * enough to show the element.
+ */
+export function focusInView(node: HTMLElement): void {
+  node.focus({ preventScroll: true })
+  const box = node.parentElement?.closest<HTMLElement>(SCROLLERS)
+  if (box) scrollIntoBox(node, box)
+}
+
+/** Scrolls `box` (and nothing else) just enough to show `node`. */
+export function scrollIntoBox(node: HTMLElement, box: HTMLElement): void {
+  const r = node.getBoundingClientRect()
+  const c = box.getBoundingClientRect()
+  if (r.top < c.top) box.scrollTop -= c.top - r.top + 16
+  else if (r.bottom > c.bottom) box.scrollTop += r.bottom - c.bottom + 16
 }
 
 /** Arrow key → direction, or null. */
@@ -139,14 +161,23 @@ export function fitCanvas(canvas: HTMLCanvasElement): number {
   return size
 }
 
-/** A heading whose letters bounce one after another (`--i` staggers the CSS animation). */
+/**
+ * A heading whose letters bounce in one after another (`--i` staggers the CSS
+ * animation). Letters sit in per-word wrappers so narrow screens wrap between
+ * words, never inside one.
+ */
 export function bouncyText(text: string, className: string, parent?: HTMLElement): HTMLDivElement {
   const box = el('div', className, undefined, parent)
   box.setAttribute('aria-label', text)
-  Array.from(text).forEach((ch, i) => {
-    const s = el('span', ch === ' ' ? 'gap' : '', ch === ' ' ? ' ' : ch, box)
-    s.setAttribute('aria-hidden', 'true')
-    s.style.setProperty('--i', String(i))
+  let i = 0
+  text.split(' ').forEach((word, w) => {
+    if (w > 0) {
+      box.append(' ')
+      i++
+    }
+    const ws = el('span', 'word', undefined, box)
+    ws.setAttribute('aria-hidden', 'true')
+    for (const ch of Array.from(word)) el('span', 'ch', ch, ws).style.setProperty('--i', String(i++))
   })
   return box
 }

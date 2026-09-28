@@ -7,17 +7,18 @@ describe('rollDrops', () => {
     const rng = new Rng(1)
     const out = emptyDrops()
     let dropped = 0
+    const golds = new Set<number>()
+    let chests = 0
     const n = 20000
     for (let i = 0; i < n; i++) {
       rollDrops(rng, ENEMIES.goblin, 'normal', false, out)
-      expect(out.xp).toBe(1)
-      if (out.gold > 0) {
-        dropped++
-        expect(out.gold).toBeGreaterThanOrEqual(1)
-        expect(out.gold).toBeLessThanOrEqual(2)
-      }
-      expect(out.chest).toBe(false)
+      golds.add(out.gold)
+      if (out.gold > 0) dropped++
+      if (out.chest) chests++
     }
+    expect(out.xp).toBe(1)
+    expect([...golds].sort()).toEqual([0, 1, 2])
+    expect(chests).toBe(0)
     expect(dropped / n).toBeGreaterThan(0.23)
     expect(dropped / n).toBeLessThan(0.27)
   })
@@ -26,14 +27,18 @@ describe('rollDrops', () => {
     const rng = new Rng(2)
     const out = emptyDrops()
     let chests = 0
+    let lo = Infinity
+    let hi = -Infinity
     const n = 20000
     for (let i = 0; i < n; i++) {
       rollDrops(rng, ENEMIES.skeleton, 'normal', true, out)
-      expect(out.xp).toBe(20)
-      expect(out.gold).toBeGreaterThanOrEqual(8)
-      expect(out.gold).toBeLessThanOrEqual(15)
+      lo = Math.min(lo, out.gold)
+      hi = Math.max(hi, out.gold)
       if (out.chest) chests++
     }
+    expect(out.xp).toBe(20)
+    expect(lo).toBe(8)
+    expect(hi).toBe(15)
     expect(chests / n).toBeGreaterThan(0.085)
     expect(chests / n).toBeLessThan(0.115)
   })

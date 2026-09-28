@@ -95,8 +95,13 @@ export function clampToRadius(dx: number, dy: number, radius: number, out: Vec2)
 export const MOUSE_LOOK = 0.0022
 /** Radians per pixel of touch drag at sensitivity 1. */
 export const TOUCH_LOOK = 0.006
-/** One mouse event can't turn the camera more than this many pixels' worth (lock-acquire spikes). */
-export const MAX_MOUSE_STEP = 300
+/** Pixels in one mouse event beyond which it's a glitch (pointer-lock spikes), not a flick. */
+export const MAX_MOUSE_STEP = 500
+
+/** Browsers sometimes report a huge bogus jump, often right around locking; those are dropped, not clamped. */
+export function isMouseSpike(dx: number, dy: number): boolean {
+  return !Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > MAX_MOUSE_STEP || Math.abs(dy) > MAX_MOUSE_STEP
+}
 
 export interface Look {
   yaw: number

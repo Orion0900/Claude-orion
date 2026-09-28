@@ -7,7 +7,7 @@ import { hash2, smoothstep } from './noise'
 const DOME_RADIUS = 300
 const DISC_DISTANCE = 255
 
-/** Sun (or moon) disc and halo per stage: [disc radius, halo radius, halo opacity]. */
+/** Sun (or moon) per stage: disc and halo radii in metres at DISC_DISTANCE, and the halo's peak opacity. */
 const DISCS: ReadonlyArray<{ disc: number; halo: number; alpha: number; color: string; haloColor: string }> = [
   { disc: 10, halo: 34, alpha: 0.45, color: '#fffbe8', haloColor: '#fff1c4' },
   { disc: 24, halo: 72, alpha: 0.5, color: '#fff4d6', haloColor: '#ffd27a' },

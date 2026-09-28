@@ -220,17 +220,17 @@ function writeTint(attr: THREE.InstancedBufferAttribute, k: number, e: EnemyEnti
     b *= 1.3
   }
   if (e.burn > 0) {
-    const f = Math.floor(stepped * 10 + e.phase * 7) % 2 ? 1 : 0.8
-    r *= 1.45 * f + 0.1
-    g *= 0.8 * f + 0.05
-    b *= 0.5
+    const f = Math.floor(stepped * 10 + e.phase * 7) % 2 ? 1.25 : 1.1
+    r *= f
+    g *= 0.85
+    b *= 0.65
   }
   attr.setXYZ(k, r, g, b)
 }
 
 function writeFx(attr: THREE.InstancedBufferAttribute, k: number, e: EnemyEntity, time: number): void {
   let flash = e.hitFlash < HIT_FLASH_TIME ? 1 - e.hitFlash / HIT_FLASH_TIME : 0
-  if (e.windup && Math.floor(time * 12) % 2 === 0) flash = Math.max(flash, 0.65)
+  if (e.windup && Math.floor(time * 12) % 2 === 0) flash = Math.max(flash, e.tier === 'normal' ? 0.6 : 0.35)
   let rr = 0
   let rg = 0
   let rb = 0
@@ -238,18 +238,18 @@ function writeFx(attr: THREE.InstancedBufferAttribute, k: number, e: EnemyEntity
     rr = ELITE_RIM[0]
     rg = ELITE_RIM[1]
     rb = ELITE_RIM[2]
-  } else if (e.tier !== 'normal') {
-    rr = MINIBOSS_RIM[0] * 0.6
-    rg = MINIBOSS_RIM[1] * 0.6
-    rb = MINIBOSS_RIM[2] * 0.6
+  } else if (e.tier === 'miniboss') {
+    rr = MINIBOSS_RIM[0] * 0.4
+    rg = MINIBOSS_RIM[1] * 0.4
+    rb = MINIBOSS_RIM[2] * 0.4
   } else if (e.tintR !== 1 || e.tintB !== 1) {
     rr = e.tintR * 0.35
     rg = e.tintG * 0.35
     rb = e.tintB * 0.35
   }
   if (e.burn > 0) {
-    rr += 0.9
-    rg += 0.35
+    rr += 0.6
+    rg += 0.22
   } else if (e.freeze > 0) {
     rr += 0.25
     rg += 0.6
@@ -284,7 +284,7 @@ export function patchEnemyMaterial(mat: THREE.MeshLambertMaterial): void {
           'float bkFacing = clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );',
           'float bkRim = 1.0 - bkFacing;',
           'outgoingLight = mix( outgoingLight, diffuseColor.rgb * 1.15, vGlow );',
-          'outgoingLight += vFx.yzw * ( bkRim * bkRim * 1.4 + 0.1 );',
+          'outgoingLight += vFx.yzw * ( bkRim * bkRim * bkRim * 1.6 + 0.02 );',
           'outgoingLight = mix( outgoingLight, vec3( 1.0, 0.97, 0.9 ), vFx.x );',
           '#include <opaque_fragment>',
         ].join('\n'),

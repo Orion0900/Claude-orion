@@ -229,9 +229,9 @@ function fox(c: CharacterDef['colors']): Build {
     head,
     // A big bushy tail, the fox's silhouette from behind.
     tail: new Part()
-      .box(0.18, 0.18, 0.3, fur, [0, 0.04, -0.14], [0.5, 0, 0])
-      .box(0.28, 0.28, 0.34, fur, [0, 0.2, -0.38], [0.7, 0, 0])
-      .box(0.22, 0.22, 0.2, cream, [0, 0.36, -0.56], [0.8, 0, 0]),
+      .box(0.2, 0.2, 0.3, fur, [0, 0.06, -0.14], [0.6, 0, 0])
+      .box(0.34, 0.34, 0.42, fur, [0, 0.27, -0.38], [0.8, 0, 0])
+      .box(0.27, 0.27, 0.24, cream, [0, 0.5, -0.56], [0.9, 0, 0]),
   }
 }
 
@@ -399,7 +399,7 @@ function ogre(c: CharacterDef['colors']): Build {
   }
   return {
     // A huge torso on short legs, with a tiny head on top.
-    layout: { hipY: 0.62, hipX: 0.24, shoulderY: 0.74, shoulderX: 0.62, neckY: 0.9 },
+    layout: { hipY: 0.62, hipX: 0.24, shoulderY: 0.74, shoulderX: 0.62, neckY: 0.97 },
     leg: new Part()
       .box(0.34, 0.24, 0.36, cloth, [0, -0.08, 0])
       .box(0.3, 0.34, 0.3, skin, [0, -0.36, 0])
@@ -474,7 +474,11 @@ class Rig implements CharacterRig {
     this.body.rotation.x = p.lean
     this.head.rotation.x = p.head
     this.tilt.position.y = p.crouch
-    if (this.tail) this.tail.rotation.y = p.tail
+    if (this.tail) {
+      // Tails stay level whichever way the body leans, so a slide doesn't bury them.
+      this.tail.rotation.x = -p.lean
+      this.tail.rotation.y = p.tail
+    }
   }
 
   dispose(): void {

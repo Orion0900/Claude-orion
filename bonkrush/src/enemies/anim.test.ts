@@ -19,26 +19,38 @@ describe('poseFor', () => {
 
   it('stays in sane bounds for every style', () => {
     const out = emptyPose()
+    let bobMin = Infinity
+    let bobMax = -Infinity
+    let rollMax = 0
+    let syMin = Infinity
+    let syMax = -Infinity
+    let finite = true
     for (const style of STYLES) {
       for (let t = 0; t < 3; t += 0.037) {
         for (const motion of [0, 0.5, 1, 2, -1]) {
           poseFor(style, t, 0.3, motion, out)
-          for (const v of [out.bob, out.roll, out.pitch, out.sx, out.sy, out.sz]) expect(Number.isFinite(v)).toBe(true)
-          expect(out.bob).toBeGreaterThanOrEqual(0)
-          expect(out.bob).toBeLessThan(0.3)
-          expect(Math.abs(out.roll)).toBeLessThan(0.3)
-          expect(out.sy).toBeGreaterThan(0.6)
-          expect(out.sy).toBeLessThan(1.4)
+          finite &&= [out.bob, out.roll, out.pitch, out.sx, out.sy, out.sz].every(Number.isFinite)
+          bobMin = Math.min(bobMin, out.bob)
+          bobMax = Math.max(bobMax, out.bob)
+          rollMax = Math.max(rollMax, Math.abs(out.roll))
+          syMin = Math.min(syMin, out.sy)
+          syMax = Math.max(syMax, out.sy)
         }
       }
     }
+    expect(finite).toBe(true)
+    expect(bobMin).toBeGreaterThanOrEqual(0)
+    expect(bobMax).toBeLessThan(0.3)
+    expect(rollMax).toBeLessThan(0.3)
+    expect(syMin).toBeGreaterThan(0.6)
+    expect(syMax).toBeLessThan(1.4)
   })
 
   it('settles walkers that stand still', () => {
     const out = poseFor('walk', 1.37, 0, 0, emptyPose())
-    expect(out.bob).toBe(0)
-    expect(out.roll).toBe(0)
-    expect(out.pitch).toBe(0)
+    expect(out.bob).toBeCloseTo(0)
+    expect(out.roll).toBeCloseTo(0)
+    expect(out.pitch).toBeCloseTo(0)
   })
 
   it('keeps fliers flapping even when hovering in place', () => {

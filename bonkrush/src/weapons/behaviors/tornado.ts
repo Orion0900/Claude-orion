@@ -9,9 +9,9 @@ import type { WeaponBehavior } from './types'
 
 const MAX_TWISTERS = 24
 /** Seconds between damage ticks. */
-const TICK = 0.3
+const TICK = 0.4
 /** Reach of the pull as a multiple of the twister's size. */
-const PULL_REACH = 1.5
+const PULL_REACH = 1.4
 /** Fastest a twister veers, radians per second. */
 const WANDER = 3.5
 /** Twisters spawn this far out from the player. */

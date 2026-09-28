@@ -29,7 +29,7 @@ const TURN_RATE = 14
 const HARD_LANDING = 13
 const DUST_INTERVAL = 0.07
 const DEATH_FALL_TIME = 0.5
-/** A position change bigger than this between frames is a teleport (stage change), not movement. */
+/** A position change bigger than this between frames is a teleport, not movement. */
 const TELEPORT_DISTANCE = 6
 const BLINK_RATE = 16
 
@@ -169,7 +169,8 @@ export class Player implements PlayerApi {
       this.ctx.scene.add(this.rig.root)
       this.flashOn = false
     }
-    this.checkTeleport()
+    // Game calls this right after moving us to a new stage's start.
+    this.checkTeleport(0.01)
     this.placeModel()
   }
 
@@ -179,8 +180,8 @@ export class Player implements PlayerApi {
     if (!(dt > 0)) return
     const ctx = this.ctx
     const stats = ctx.progression.stats
-    if (stats.maxHp !== this.lastMaxHp || stats.shield !== this.lastShieldStat) this.syncStats()
-    this.checkTeleport()
+    if (stats.maxHp !== this.lastMaxHp || stats.shield !== this.lastShieldStat || !Number.isFinite(this.hp)) this.syncStats()
+    this.checkTeleport(TELEPORT_DISTANCE)
 
     this.iframes = Math.max(0, this.iframes - dt)
     this.sinceHit += dt
@@ -320,7 +321,7 @@ export class Player implements PlayerApi {
       this.dustTimer -= dt
       if (this.dustTimer <= 0) {
         this.dustTimer = DUST_INTERVAL
-        ctx.fx.burst(this.feetPos(), this.dust(), 2, 1.5 + speed * 0.05, 0.3)
+        ctx.fx.burst(this.feetPos(), this.dust(), 2, 1.5 + speed * 0.05, 0.22)
       }
     } else {
       this.dustTimer = 0
@@ -401,10 +402,13 @@ export class Player implements PlayerApi {
     this.hp = Math.min(this.hp, s.maxHp)
   }
 
-  /** Game moves us between stages by writing `pos`; forget the old air state so it can't become fall damage. */
-  private checkTeleport(): void {
+  /**
+   * Game moves us between stages by writing `pos`; a move we didn't make
+   * forgets the old air state so it can't turn into fall damage.
+   */
+  private checkTeleport(threshold: number): void {
     const p = this.move.pos
-    if (p.distanceToSquared(this.lastPos) > TELEPORT_DISTANCE * TELEPORT_DISTANCE) {
+    if (p.distanceToSquared(this.lastPos) > threshold * threshold) {
       resetAirState(this.move)
       this.lastPos.copy(p)
     }

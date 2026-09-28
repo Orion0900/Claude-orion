@@ -29,6 +29,11 @@ export const GHOST_TIER_TINT: ReadonlyArray<readonly [number, number, number]> =
   [1.55, 0.28, 0.3],
 ]
 
+/** Elites: ×1.6 size, ×6 HP, ×1.5 damage (and ×10 XP, see drops.ts). */
+export const ELITE_SCALE = 1.6
+export const ELITE_HP_MULT = 6
+export const ELITE_DAMAGE_MULT = 1.5
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
 /** Difficulty stat plus the stage's curse; never so negative that scales hit zero. */

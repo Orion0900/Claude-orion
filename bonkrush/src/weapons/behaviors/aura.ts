@@ -99,6 +99,7 @@ export class AuraBehavior implements WeaponBehavior {
     const kick = 1 - this.pulse / PULSE
     const radius = this.arm.eff.size * (1 + 0.07 * Math.sin(kick * Math.PI))
     const pos = this.positions
+    const centreY = kit.groundY(p.x, p.z) + LIFT
     for (let k = 0; k < RINGS.length; k++) {
       const r = radius * RINGS[k]
       const turn = k >= RIM - 1 ? this.phase : this.phase * -0.3
@@ -108,7 +109,7 @@ export class AuraBehavior implements WeaponBehavior {
         const z = p.z + Math.sin(a) * r
         const i = (k * SEGMENTS + j) * 3
         pos[i] = x
-        pos[i + 1] = kit.groundY(x, z) + LIFT
+        pos[i + 1] = r === 0 ? centreY : kit.groundY(x, z) + LIFT
         pos[i + 2] = z
       }
     }

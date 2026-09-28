@@ -8,9 +8,9 @@ import type { Synth } from './synth'
  */
 export type SfxRecipe = (s: Synth, out: AudioNode, t: number, p: number) => void
 
-/** Rarity stings take `pitch` 1 (common) to 2 (legendary); brightness follows it. */
+/** Rarity stings take `pitch` from about 0.9 (common) to 1.5 (legendary); brightness follows it. */
 function brightness(p: number): number {
-  return Math.min(1, Math.max(0, p - 1))
+  return Math.min(1, Math.max(0, (p - 0.9) / 0.6))
 }
 
 function pick<T>(list: readonly T[]): T {
@@ -137,7 +137,7 @@ export const SFX: Record<SfxId, SfxRecipe> = {
         filter: { type: 'lowpass', freq: 1300 + 5200 * b },
       })
     s.tone(out, t, { wave: 'triangle', freq: root / 2, dur: 0.6, hold: 0.15, gain: 0.15 })
-    if (b > 0.4) for (let i = 0; i < 3; i++) s.tone(out, t + 0.15 + i * 0.08, { wave: 'sine', freq: root * (4 + i), dur: 0.5, gain: 0.03 * b })
+    if (b > 0.5) for (let i = 0; i < 3; i++) s.tone(out, t + 0.15 + i * 0.08, { wave: 'sine', freq: root * (4 + i), dur: 0.5, gain: 0.03 * b })
   },
 
   /** A short buzzy grunt. */

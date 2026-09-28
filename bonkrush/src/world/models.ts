@@ -39,9 +39,9 @@ const BUILDERS: Record<string, Builder> = {
           [0.55, 1.4, 4.1, '#379660'],
         ]
       : [
-          [1.75, 2.0, 0.9, '#2e7d32'],
-          [1.35, 1.8, 2.0, '#388e3c'],
-          [0.95, 1.6, 3.0, '#43a047'],
+          [1.55, 2.0, 1.2, '#2e7d32'],
+          [1.25, 1.8, 2.2, '#388e3c'],
+          [0.9, 1.6, 3.1, '#43a047'],
         ]
     tiers.forEach(([r, h, y, c], k) => parts.push(part(cone(r, h, 7), c, { y: y + h / 2, ry: k * 0.45, shadeBottom: 0.3 })))
     return { body: merge(parts) }
@@ -64,12 +64,12 @@ const BUILDERS: Record<string, Builder> = {
 
   /** Near-white so the instance tint turns it into the stage's own stone. */
   rock(v) {
-    if (v === 0) return { body: merge([part(dodeca(1), '#f0f0f0', { y: 0.45, sx: 1.25, sy: 0.8, sz: 1.05, jitter: 0.1, shadeBottom: 0.25 })]) }
+    if (v === 0) return { body: merge([part(dodeca(1), '#f0f0f0', { y: 0.72, sx: 1.25, sy: 0.8, sz: 1.05, jitter: 0.1, shadeBottom: 0.25 })]) }
     return {
       body: merge([
-        part(ico(0.9), '#f2f2f2', { x: 0.2, y: 0.55, sx: 1.2, sy: 0.9, jitter: 0.1, shadeBottom: 0.25 }),
-        part(dodeca(0.55), '#e2e2e2', { x: -0.9, y: 0.3, z: 0.5, ry: 0.7, jitter: 0.1 }),
-        part(ico(0.4), '#e8e8e8', { x: 0.75, y: 0.2, z: -0.8, rx: 0.4, jitter: 0.1 }),
+        part(ico(0.9), '#f2f2f2', { x: 0.2, y: 0.77, sx: 1.2, sy: 0.9, jitter: 0.1, shadeBottom: 0.25 }),
+        part(dodeca(0.55), '#e2e2e2', { x: -0.9, y: 0.52, z: 0.5, ry: 0.7, jitter: 0.1 }),
+        part(ico(0.4), '#e8e8e8', { x: 0.75, y: 0.42, z: -0.8, rx: 0.4, jitter: 0.1 }),
       ]),
     }
   },
@@ -77,10 +77,10 @@ const BUILDERS: Record<string, Builder> = {
   bush() {
     return {
       body: merge([
-        part(ico(0.7), '#3d8b37', { y: 0.55, shadeBottom: 0.35 }),
-        part(ico(0.55), '#4a9e40', { x: 0.55, y: 0.4, z: 0.2, shadeBottom: 0.35 }),
-        part(ico(0.5), '#57b049', { x: -0.5, y: 0.38, z: -0.15, shadeBottom: 0.35 }),
-        part(ico(0.45), '#4a9e40', { x: 0.05, y: 0.35, z: -0.55, shadeBottom: 0.35 }),
+        part(ico(0.7), '#3d8b37', { y: 0.6, shadeBottom: 0.35 }),
+        part(ico(0.55), '#4a9e40', { x: 0.55, y: 0.48, z: 0.2, shadeBottom: 0.35 }),
+        part(ico(0.5), '#57b049', { x: -0.5, y: 0.46, z: -0.15, shadeBottom: 0.35 }),
+        part(ico(0.45), '#4a9e40', { x: 0.05, y: 0.42, z: -0.55, shadeBottom: 0.35 }),
         part(octa(0.08), '#e53935', { x: 0.35, y: 0.9, z: 0.45 }),
         part(octa(0.08), '#e53935', { x: -0.45, y: 0.72, z: 0.3 }),
         part(octa(0.08), '#e53935', { x: 0.62, y: 0.62, z: -0.2 }),
@@ -155,8 +155,8 @@ const BUILDERS: Record<string, Builder> = {
       body: merge([
         part(new THREE.SphereGeometry(0.5, 8, 5), '#4caf50', { y: 0.42, sy: 0.9, shadeBottom: 0.3 }),
         part(octa(0.1), '#ffd23f', { y: 0.9 }),
-        part(new THREE.SphereGeometry(0.28, 7, 4), '#43a047', { x: 0.55, y: 0.22, z: 0.25, shadeBottom: 0.3 }),
-        part(octa(0.07), '#ff6fa8', { x: 0.55, y: 0.5, z: 0.25 }),
+        part(new THREE.SphereGeometry(0.28, 7, 4), '#43a047', { x: 0.55, y: 0.27, z: 0.25, shadeBottom: 0.3 }),
+        part(octa(0.07), '#ff6fa8', { x: 0.55, y: 0.55, z: 0.25 }),
       ]),
     }
   },
@@ -178,8 +178,8 @@ const BUILDERS: Record<string, Builder> = {
         part(box(1.5, 0.4, 1.5), stone[2], { y: 0.2 }),
         part(cyl(0.5, 0.56, 2.3, 8), stone[0], { y: 1.55, shadeBottom: 0.2 }),
         part(cyl(0.48, 0.5, 0.7, 8), stone[1], { x: 0.25, y: 2.95, rz: -0.45 }),
-        part(dodeca(0.35), stone[1], { x: 1.2, y: 0.2, z: 0.3 }),
-        part(dodeca(0.28), stone[2], { x: -0.7, y: 0.15, z: 0.95 }),
+        part(dodeca(0.35), stone[1], { x: 1.2, y: 0.33, z: 0.3 }),
+        part(dodeca(0.28), stone[2], { x: -0.7, y: 0.27, z: 0.95 }),
       ]),
     }
   },

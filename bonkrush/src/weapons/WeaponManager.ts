@@ -98,7 +98,14 @@ export class WeaponManager implements WeaponApi, DamageSource {
 
   rollDamage(w: WeaponInstance, enemy: Enemy): DamageRoll {
     const slot = this.byId.get(w.def.id)
-    const arm: Armed = slot && slot.w === w ? slot : { w, eff: this.effective(w) }
+    let arm: Armed
+    if (slot && slot.w === w) {
+      // Callers outside the frame loop may have just changed stats.
+      this.refresh(slot)
+      arm = slot
+    } else {
+      arm = { w, eff: this.effective(w) }
+    }
     return this.rollInto(arm, enemy, { amount: 0, crit: false })
   }
 

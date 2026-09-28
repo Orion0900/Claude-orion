@@ -117,6 +117,7 @@ export class BoneBehavior implements WeaponBehavior {
     kit.hit(this.arm, e, s.vel.x, s.vel.z)
     s.hits.add(e.uid)
     kit.embers.burst(kit.centerOf(e, _c), this.spark, kit.count(4), 5, 0.1, 0.3)
+    kit.breakables(_c, 0.8)
     s.pierce--
     if (s.pierce > 0) return
     if (s.bounces > 0) {

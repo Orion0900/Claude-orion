@@ -224,10 +224,12 @@ function pickVariant(spec: PropSpec, rng: Rng): number {
 
 /** Uniform by area in the square |x|,|z| ≤ limit, outside a disc of radius `minR`. */
 function randomPoint(rng: Rng, minR: number, limit: number): [number, number] {
+  // Capped so the corners outside the disc always remain and this can't spin forever.
+  const r2 = Math.min(minR, limit) ** 2
   for (;;) {
     const x = rng.range(-limit, limit)
     const z = rng.range(-limit, limit)
-    if (x * x + z * z >= minR * minR) return [x, z]
+    if (x * x + z * z >= r2) return [x, z]
   }
 }
 

@@ -1,4 +1,4 @@
-import { MOUSE_LOOK, addLook, clampToRadius, isOneShot, joystickVector, keyIntent, moveFromKeys } from './intent'
+import { MAX_MOUSE_STEP, MOUSE_LOOK, addLook, clampToRadius, isMouseSpike, isOneShot, joystickVector, keyIntent, moveFromKeys } from './intent'
 
 describe('input intent', () => {
   it('maps physical keys and falls back to key names', () => {
@@ -78,5 +78,13 @@ describe('input intent', () => {
     expect(inv.pitch).toBeCloseTo(-0.22)
     const bad = addLook(Number.NaN, 5, MOUSE_LOOK, 1, false, { yaw: 0, pitch: 0 })
     expect(bad).toEqual({ yaw: 0, pitch: 0 })
+  })
+
+  it('drops glitchy mouse jumps but keeps real flicks', () => {
+    expect(isMouseSpike(120, -40)).toBe(false)
+    expect(isMouseSpike(-MAX_MOUSE_STEP, 0)).toBe(false)
+    expect(isMouseSpike(MAX_MOUSE_STEP + 1, 0)).toBe(true)
+    expect(isMouseSpike(0, -2000)).toBe(true)
+    expect(isMouseSpike(Number.NaN, 0)).toBe(true)
   })
 })

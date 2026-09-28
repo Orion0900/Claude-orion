@@ -130,7 +130,9 @@ export class MinesBehavior implements WeaponBehavior {
   /** One blinking light per mine: amber while arming, red and quickening as it ages. */
   private syncLights(): void {
     this.lights.clear()
-    for (const m of this.pool.active) {
+    const mines = this.pool.active
+    for (let i = 0; i < mines.length; i++) {
+      const m = mines[i]
       const l = this.lights.spawn()
       if (!l) break
       l.pos.set(0, 0.4 * m.size, 0).applyQuaternion(m.quat).add(m.pos)
@@ -155,7 +157,9 @@ export class MinesBehavior implements WeaponBehavior {
     _c.set(m.pos.x, m.pos.y + 0.4, m.pos.z)
     kit.hitArea(this.arm, _c, r, 1, 1, this.found)
     const reach2 = r * 0.8 * (r * 0.8)
-    for (const o of this.pool.active) {
+    const mines = this.pool.active
+    for (let i = 0; i < mines.length; i++) {
+      const o = mines[i]
       if (o === m || o.fuse !== Infinity || o.age < ARM_TIME) continue
       const dx = o.pos.x - m.pos.x
       const dz = o.pos.z - m.pos.z

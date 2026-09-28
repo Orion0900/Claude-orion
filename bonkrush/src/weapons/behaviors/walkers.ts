@@ -8,8 +8,14 @@ import type { WeaponBehavior } from './types'
 
 /** Frostwalker leaves a footprint this often while moving. */
 const FOOTSTEP_GAP = 0.25
-/** Seconds between a patch's damage ticks, before attack speed. */
+/** Seconds between hits on any one enemy, before attack speed, however many patches it stands in. */
 const TICK = 0.5
+/** How often each patch looks for enemies standing in it. */
+const CHECK = 0.1
+/** Patches crack pots on every this-many checks. */
+const BREAK_EVERY = 5
+/** How often hit times are forgotten. */
+const PRUNE_GAP = 1
 /** Slower than this (m/s) counts as standing still. */
 const MIN_MOVE = 1.5
 /** No footprints while this far above the ground. */
@@ -27,7 +33,8 @@ interface Patch extends Pooled {
   age: number
   life: number
   radius: number
-  tick: number
+  check: number
+  checks: number
 }
 
 const UP = new THREE.Vector3(0, 1, 0)
@@ -44,11 +51,14 @@ const _c = new THREE.Vector3()
 export class WalkerBehavior implements WeaponBehavior {
   private readonly pool: InstancePool<Patch>
   private readonly found: Enemy[] = []
+  /** Enemy uid → game time this weapon's patches last hit it. */
+  private readonly lastHit = new Map<number, number>()
   private readonly ice = new THREE.Color('#bff4ff')
   private readonly flame = new THREE.Color('#ff7a1a')
   private readonly ember = new THREE.Color('#ffd23f')
   private stepTimer = 0
   private stepSide = 1
+  private pruneTimer = PRUNE_GAP
 
   constructor(
     private readonly kit: WeaponKit,
@@ -60,7 +70,7 @@ export class WalkerBehavior implements WeaponBehavior {
       frost ? frostPatchGeometry() : firePatchGeometry(),
       frost ? polygonOffset(solidMaterial('#1d4a5c')) : glowMaterial(),
       128,
-      () => ({ ...pooled(), age: 0, life: 1, radius: 1, tick: 0 }),
+      () => ({ ...pooled(), age: 0, life: 1, radius: 1, check: 0, checks: 0 }),
       !frost,
     )
   }
@@ -77,6 +87,7 @@ export class WalkerBehavior implements WeaponBehavior {
       if (this.stepTimer <= 0 && this.step()) this.stepTimer = FOOTSTEP_GAP
     }
 
+    const now = kit.ctx.time
     const tickGap = TICK / Math.max(0.2, kit.ctx.progression.stats.attackSpeed)
     const emberChance = 5 * dt * kit.fxScale
     const list = this.pool.active
@@ -87,10 +98,10 @@ export class WalkerBehavior implements WeaponBehavior {
         this.pool.removeAt(i)
         continue
       }
-      s.tick -= dt
-      if (s.tick <= 0) {
-        s.tick += tickGap
-        this.tick(s)
+      s.check -= dt
+      if (s.check <= 0) {
+        s.check += CHECK
+        this.scorch(s, now, tickGap)
       }
       const k = Math.min(1, s.age / GROW) * Math.min(1, (s.life - s.age) / SHRINK)
       const r = s.radius * k
@@ -118,6 +129,13 @@ export class WalkerBehavior implements WeaponBehavior {
           )
         }
       }
+    }
+
+    this.pruneTimer -= dt
+    if (this.pruneTimer <= 0) {
+      this.pruneTimer = PRUNE_GAP
+      const forget = Math.max(PRUNE_GAP, tickGap)
+      for (const [uid, t] of this.lastHit) if (now - t > forget || now < t) this.lastHit.delete(uid)
     }
     this.pool.sync()
   }
@@ -159,7 +177,8 @@ export class WalkerBehavior implements WeaponBehavior {
     s.age = 0
     s.life = Math.max(GROW + SHRINK, this.arm.eff.duration)
     s.radius = this.arm.eff.size
-    s.tick = 0.05 + Math.random() * 0.05
+    s.check = Math.random() * CHECK
+    s.checks = 0
   }
 
   /** When the pool is full, the oldest patch makes way. */
@@ -170,19 +189,26 @@ export class WalkerBehavior implements WeaponBehavior {
     return best
   }
 
-  private tick(s: Patch): void {
+  /**
+   * Hurts whatever stands in the patch. The per-enemy gap is shared by every
+   * patch, so a trail of overlapping footprints hits no harder than one.
+   */
+  private scorch(s: Patch, now: number, gap: number): void {
     const kit = this.kit
     const eff = this.arm.eff
     const durationStat = kit.ctx.progression.stats.duration
-    const n = kit.inRadius(s.pos, s.radius, 0.6, 2.5, this.found)
+    const n = kit.inRadius(s.pos, s.radius * Math.min(1, s.age / GROW), 0.6, 2.5, this.found)
     for (let i = 0; i < n; i++) {
       const e = this.found[i]
+      const last = this.lastHit.get(e.uid)
+      if (last !== undefined && now - last < gap && now >= last) continue
+      this.lastHit.set(e.uid, now)
       kit.hit(this.arm, e, e.pos.x - s.pos.x, e.pos.z - s.pos.z)
       if (!e.alive) continue
       if (this.frost) kit.ctx.enemies.applySlow(e, SLOW * durationStat)
       else kit.ctx.enemies.applyBurn(e, eff.damage * BURN_SHARE, BURN_TIME * durationStat)
     }
-    kit.breakables(s.pos, s.radius)
+    if (s.checks++ % BREAK_EVERY === 0) kit.breakables(s.pos, s.radius)
   }
 
   /** A ring of frost that damages and freezes everything close. */
@@ -214,10 +240,12 @@ export class WalkerBehavior implements WeaponBehavior {
   clear(): void {
     this.pool.clear()
     this.pool.sync()
+    this.lastHit.clear()
   }
 
   dispose(): void {
     this.pool.dispose()
+    this.lastHit.clear()
   }
 }
 

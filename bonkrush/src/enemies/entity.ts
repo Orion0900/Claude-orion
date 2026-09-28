@@ -65,12 +65,52 @@ export class EnemyEntity implements Enemy {
   contactMult = 1
   /** True while winding up an attack: the renderer shakes and blinks it. */
   windup = false
+  /** A sweeping beam: seconds left, current angle (0 = +Z) and turn rate. */
+  sweepT = 0
+  sweepAngle = 0
+  sweepSpeed = 0
   /** Sets to false for enemies other systems hold on to (challenge elites, bosses), so the object is never reused. */
   recyclable = true
   diedAt = 0
 
   constructor(def: EnemyDef) {
     this.def = def
+  }
+
+  /** Back to a blank enemy of `def` (pooled objects are reused). */
+  reset(def: EnemyDef): void {
+    this.def = def
+    this.uid = 0
+    this.pos.set(0, 0, 0)
+    this.vel.set(0, 0, 0)
+    this.yaw = 0
+    this.hp = this.maxHp = 1
+    this.scale = 1
+    this.elite = this.boss = this.alive = false
+    this.slow = this.burn = this.burnDps = this.freeze = 0
+    this.hitFlash = 99
+    this.t = 0
+    this.state = 0
+    this.tier = 'normal'
+    this.damageScale = 1
+    this.tintR = this.tintG = this.tintB = 1
+    this.kbX = this.kbZ = this.moveX = this.moveZ = 0
+    this.burnTick = 0
+    this.age = 0
+    this.phase = 0
+    this.side = 1
+    this.hover = 0
+    this.groundY = 0
+    this.fireT = 0
+    this.dirX = 0
+    this.dirZ = 1
+    this.dashSpeed = this.dashT = 0
+    this.attackCd = this.attackIdx = this.busy = 0
+    this.contactMult = 1
+    this.windup = false
+    this.sweepT = this.sweepAngle = this.sweepSpeed = 0
+    this.recyclable = true
+    this.diedAt = 0
   }
 
   get radius(): number {
@@ -104,6 +144,7 @@ export function relocate(e: Enemy, x: number, y: number, z: number): void {
     e.dashT = 0
     e.contactMult = 1
     e.windup = false
+    e.sweepT = 0
   }
 }
 

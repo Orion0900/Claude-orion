@@ -67,7 +67,7 @@ export class Game implements ShellApi {
       powerPreference: 'high-performance',
     })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.domElement.className = 'game-canvas'
     host.appendChild(this.renderer.domElement)
 
@@ -355,6 +355,9 @@ export class Game implements ShellApi {
 
   private showTitle(): void {
     this.ui.showTitle()
+    // A run can end mid-sprint with the speed FOV still widened.
+    this.camera.fov = 70
+    this.camera.updateProjectionMatrix()
     if (this.titleWorld) return
     // A slowly orbiting view of the first stage sits behind the menus.
     // World only reads scene, stage, rng and settings when built.

@@ -58,7 +58,9 @@ export class LightningBehavior implements WeaponBehavior {
       s.chains = eff.bounces
       // Spare bolts beyond the targets found strike them again.
       s.target = found > 0 ? this.targets[k % found] : null
-      if (!s.target) {
+      // If the target dies before its bolt lands, the bolt still hits where it stood.
+      if (s.target) kit.centerOf(s.target, s.point)
+      else {
         const yaw = player.yaw + fanOffset(k, n, 0.5)
         const x = player.pos.x + forwardX(yaw) * GROUND_STRIKE_AHEAD
         const z = player.pos.z + forwardZ(yaw) * GROUND_STRIKE_AHEAD
