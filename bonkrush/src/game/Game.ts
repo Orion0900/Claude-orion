@@ -58,6 +58,7 @@ export class Game implements ShellApi {
   private readonly params = new URLSearchParams(location.search)
   private unsubs: Array<() => void> = []
   private ending = false
+  private readonly speed = Math.max(1, Math.min(16, Math.floor(Number(this.params.get('speed')) || 1)))
 
   constructor(private readonly host: HTMLElement) {
     this.meta = loadSave()
@@ -394,8 +395,10 @@ export class Game implements ShellApi {
     const dt = Math.min(MAX_DT, realDt)
 
     const ctx = this.run
-    if (ctx) this.tick(ctx, dt)
-    else this.tickTitle(dt)
+    if (ctx) {
+      // ?speed=N runs N simulation steps per frame, for fast unattended play-tests.
+      for (let i = 0; i < this.speed; i++) this.tick(ctx, dt)
+    } else this.tickTitle(dt)
 
     this.audio.update(realDt)
     this.ui.update(realDt)
