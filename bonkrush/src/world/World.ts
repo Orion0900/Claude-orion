@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { GameContext, PlayerApi, Vec3, WorldApi } from '../game/types'
 import { ColliderGrid } from './colliders'
-import { Lighting } from './lighting'
+import { Lighting, sunDirection } from './lighting'
 import { Motes } from './motes'
 import { PropLayer } from './props'
 import { boundaryRocks, scatterProps, type PropGroup } from './scatter'
@@ -56,7 +56,7 @@ export class World implements WorldApi {
 
     this.props = new PropLayer(this.root, scattered.groups, boundaryRocks(this.field, layout), this.field, stage.palette)
     this.lighting = new Lighting(this.root, stage, ctx.settings)
-    this.sky = new Sky(this.root, stage, this.lighting.sunDir, seed)
+    this.sky = new Sky(this.root, stage, sunDirection(stage.index, true), seed)
     const candles = scattered.groups.find((g) => g.kind === 'candle')
     if (candles) this.lighting.addTorches(torchSpots(candles), candles.spec.glow ?? '#ffc05a')
 

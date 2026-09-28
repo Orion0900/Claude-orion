@@ -6,7 +6,7 @@ import { SFX } from './sfx'
 import { Synth } from './synth'
 
 /** The music bus runs at this share of the music setting, so it sits under the effects. */
-const MUSIC_LEVEL = 0.55
+const MUSIC_LEVEL = 0.8
 /** How far ahead of the audio clock the sequencer schedules, in seconds. */
 const LOOKAHEAD = 0.2
 const MAX_VOICES = 32

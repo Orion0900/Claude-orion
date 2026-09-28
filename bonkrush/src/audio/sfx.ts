@@ -50,7 +50,7 @@ export const SFX: Record<SfxId, SfxRecipe> = {
 
   /** Air cut by a blade: a band of noise sweeping up. */
   swing(s, out, t, p) {
-    s.noise(out, t, { dur: 0.2, gain: 0.34, attack: 0.05, filter: { type: 'bandpass', freq: 480 * p, to: 2800 * p, q: 1.4 } })
+    s.noise(out, t, { dur: 0.2, gain: 0.6, attack: 0.05, filter: { type: 'bandpass', freq: 480 * p, to: 2800 * p, q: 1.4 } })
   },
 
   /** Chopped high noise and a falling saw: electric crackle. */
@@ -80,9 +80,9 @@ export const SFX: Record<SfxId, SfxRecipe> = {
   /** Two-note coin ding. */
   gold(s, out, t, p) {
     const soft = { type: 'lowpass', freq: 5200 } as const
-    s.tone(out, t, { wave: 'square', freq: 988 * p, dur: 0.075, hold: 0.05, gain: 0.07, filter: soft })
-    s.tone(out, t + 0.065, { wave: 'square', freq: 1319 * p, dur: 0.26, hold: 0.03, gain: 0.08, filter: soft })
-    s.tone(out, t + 0.065, { wave: 'sine', freq: 2638 * p, dur: 0.2, gain: 0.035 })
+    s.tone(out, t, { wave: 'square', freq: 988 * p, dur: 0.075, hold: 0.05, gain: 0.1, filter: soft })
+    s.tone(out, t + 0.065, { wave: 'square', freq: 1319 * p, dur: 0.26, hold: 0.03, gain: 0.11, filter: soft })
+    s.tone(out, t + 0.065, { wave: 'sine', freq: 2638 * p, dur: 0.2, gain: 0.05 })
   },
 
   heal(s, out, t, p) {
@@ -111,14 +111,14 @@ export const SFX: Record<SfxId, SfxRecipe> = {
       freq: 85 * p,
       to: 150 * p,
       dur: 0.4,
-      gain: 0.12,
+      gain: 0.4,
       attack: 0.04,
       vibrato: 70,
       vibratoRate: 17,
       filter: { type: 'bandpass', freq: 900, q: 6 },
     })
     const sparkle = [2093, 2637, 3136, 3520, 4186]
-    for (let i = 0; i < 6; i++) s.tone(out, t + 0.3 + i * 0.07, { wave: 'sine', freq: pick(sparkle) * p, dur: 0.14, gain: 0.05 })
+    for (let i = 0; i < 6; i++) s.tone(out, t + 0.3 + i * 0.07, { wave: 'sine', freq: pick(sparkle) * p, dur: 0.14, gain: 0.09 })
   },
 
   /** A strummed major chord; higher rarities are higher, brighter and shimmer. */
@@ -142,9 +142,9 @@ export const SFX: Record<SfxId, SfxRecipe> = {
 
   /** A short buzzy grunt. */
   hurt(s, out, t, p) {
-    s.tone(out, t, { wave: 'sawtooth', freq: 210 * p, to: 95 * p, glide: 0.18, dur: 0.22, gain: 0.2, vibrato: 80, vibratoRate: 30, filter: { type: 'lowpass', freq: 1100 } })
-    s.tone(out, t, { wave: 'square', freq: 105 * p, to: 60 * p, dur: 0.18, gain: 0.09, filter: { type: 'lowpass', freq: 600 } })
-    s.noise(out, t, { dur: 0.06, gain: 0.2, filter: { type: 'lowpass', freq: 800 } })
+    s.tone(out, t, { wave: 'sawtooth', freq: 210 * p, to: 95 * p, glide: 0.18, dur: 0.22, gain: 0.3, vibrato: 80, vibratoRate: 30, filter: { type: 'lowpass', freq: 1100 } })
+    s.tone(out, t, { wave: 'square', freq: 105 * p, to: 60 * p, dur: 0.18, gain: 0.14, filter: { type: 'lowpass', freq: 600 } })
+    s.noise(out, t, { dur: 0.06, gain: 0.3, filter: { type: 'lowpass', freq: 800 } })
   },
 
   /** A springy boing. */
@@ -160,8 +160,8 @@ export const SFX: Record<SfxId, SfxRecipe> = {
 
   /** Grit dragged over ground. */
   slide(s, out, t, p) {
-    s.noise(out, t, { dur: 0.32, gain: 0.2, attack: 0.02, hold: 0.12, filter: { type: 'bandpass', freq: 1400 * p, to: 900 * p, q: 2.5 } })
-    s.noise(out, t, { dur: 0.22, gain: 0.05, crackle: 10, filter: { type: 'highpass', freq: 5000 } })
+    s.noise(out, t, { dur: 0.32, gain: 0.4, attack: 0.02, hold: 0.12, filter: { type: 'bandpass', freq: 1400 * p, to: 900 * p, q: 2.5 } })
+    s.noise(out, t, { dur: 0.22, gain: 0.08, crackle: 10, filter: { type: 'highpass', freq: 5000 } })
   },
 
   /** A bell-like shimmer over a soft pad. */
@@ -190,7 +190,7 @@ export const SFX: Record<SfxId, SfxRecipe> = {
   },
 
   uiMove(s, out, t, p) {
-    s.tone(out, t, { wave: 'square', freq: 1900 * p, dur: 0.025, gain: 0.045, filter: { type: 'lowpass', freq: 6000 } })
+    s.tone(out, t, { wave: 'square', freq: 1900 * p, dur: 0.025, gain: 0.06, filter: { type: 'lowpass', freq: 6000 } })
   },
 
   uiSelect(s, out, t, p) {
@@ -214,12 +214,12 @@ export const SFX: Record<SfxId, SfxRecipe> = {
         glide: 0.8,
         dur,
         hold: last ? 0.4 : 0.15,
-        gain: 0.1,
+        gain: 0.14,
         vibrato: last ? 40 : 0,
         vibratoRate: 5,
         filter: { type: 'lowpass', freq: 2000 },
       })
-      s.tone(out, at, { wave: 'triangle', freq: f / 2, dur, hold: last ? 0.4 : 0.15, gain: 0.12 })
+      s.tone(out, at, { wave: 'triangle', freq: f / 2, dur, hold: last ? 0.4 : 0.15, gain: 0.17 })
     }
   },
 

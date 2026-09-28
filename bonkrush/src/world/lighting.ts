@@ -1,20 +1,26 @@
 import * as THREE from 'three'
 import type { Settings, StageDef } from '../game/types'
 
-/** Sun elevation and azimuth per stage, degrees. The dunes' sun hangs low and huge; the crypt's "sun" is the moon. */
-const SUN_ANGLES: ReadonlyArray<{ elevation: number; azimuth: number }> = [
-  { elevation: 52, azimuth: 35 },
-  { elevation: 26, azimuth: -55 },
-  { elevation: 40, azimuth: 150 },
+/**
+ * Sun elevation and azimuth per stage, degrees; the crypt's "sun" is the
+ * moon. The disc drawn in the sky sits lower on the same bearing than the
+ * light itself, so the huge dune sun and the moon actually show up in a
+ * third-person view while the ground stays brightly lit.
+ */
+const SUN_ANGLES: ReadonlyArray<{ elevation: number; azimuth: number; disc: number }> = [
+  { elevation: 52, azimuth: 35, disc: 30 },
+  { elevation: 38, azimuth: -55, disc: 14 },
+  { elevation: 55, azimuth: 150, disc: 22 },
 ]
 
 /** The shadow camera covers this far either side of the player. */
 const SHADOW_HALF = 22
 const LIGHT_DISTANCE = 90
 
-export function sunDirection(stageIndex: number, out = new THREE.Vector3()): THREE.Vector3 {
+/** Unit vector toward the light (or, with `disc`, toward where its disc is drawn). */
+export function sunDirection(stageIndex: number, disc = false, out = new THREE.Vector3()): THREE.Vector3 {
   const a = SUN_ANGLES[Math.min(Math.max(0, stageIndex), SUN_ANGLES.length - 1)]
-  const el = (a.elevation * Math.PI) / 180
+  const el = ((disc ? a.disc : a.elevation) * Math.PI) / 180
   const az = (a.azimuth * Math.PI) / 180
   return out.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)).normalize()
 }
