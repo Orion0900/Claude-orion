@@ -1,7 +1,8 @@
 import type { Vector3 } from 'three'
 import { Rng } from '../core/rng'
 import { STAGES } from '../data/stages'
-import { SPOT_CLEARANCE, SPOT_RULES, placeSpots } from './spots'
+import { laneDistance } from './ramps'
+import { SPOT_CLEARANCE, SPOT_RAMP_CLEAR, SPOT_RULES, placeSpots } from './spots'
 import { generateTerrain } from './terrain'
 
 const minGap = (list: readonly Vector3[]): number => {
@@ -62,6 +63,18 @@ describe('placeSpots', () => {
         expect(r).toBeGreaterThanOrEqual(SPOT_RULES.startClear)
         expect(p.y).toBeCloseTo(field.heightAt(p.x, p.z), 5)
         expect(field.flatness(p.x, p.z)).toBeGreaterThan(Math.cos((35 * Math.PI) / 180))
+      }
+    }
+  })
+
+  it('keeps every spot off the slide ramps, far enough that levelling a pad never dents one', () => {
+    for (const { spots, field } of layouts) {
+      expect(field.ramps.length).toBeGreaterThan(0)
+      for (const r of field.ramps) {
+        expect(laneDistance(r, spots.altar.x, spots.altar.z)).toBeGreaterThanOrEqual(SPOT_RAMP_CLEAR.altar)
+        for (const p of spots.shrines) expect(laneDistance(r, p.x, p.z)).toBeGreaterThanOrEqual(SPOT_RAMP_CLEAR.shrine)
+        for (const p of spots.chests) expect(laneDistance(r, p.x, p.z)).toBeGreaterThanOrEqual(SPOT_RAMP_CLEAR.chest)
+        for (const p of spots.pots) expect(laneDistance(r, p.x, p.z)).toBeGreaterThanOrEqual(SPOT_RAMP_CLEAR.pot)
       }
     }
   })

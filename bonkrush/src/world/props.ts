@@ -40,8 +40,8 @@ export const FADE_TIME = 0.15
  * Clearance kept around the camera→player line, widening toward the lens,
  * since anything that close to the camera fills the screen.
  */
-const LINE_MARGIN = 0.35
-const LENS_MARGIN = 1.2
+const LINE_MARGIN = 0.25
+const LENS_MARGIN = 0.8
 /** The line may pass this far over a prop's top and still count as blocked (its silhouette is lumpy). */
 const TOP_MARGIN = 0.2
 
@@ -269,7 +269,7 @@ export class PropLayer {
       const id = list[n]
       const target = this.wanted[id] === frame ? 1 : 0
       const was = this.fade[id]
-      const now = target > was ? Math.min(1, was + step) : Math.max(0, was - step)
+      const now = target === 1 ? Math.min(1, was + step) : Math.max(0, was - step)
       if (now !== was) {
         this.fade[id] = now
         const attr = this.fadeAttr[id]!

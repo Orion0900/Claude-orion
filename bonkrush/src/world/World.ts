@@ -71,7 +71,7 @@ export class World implements WorldApi {
       this.lighting.shadowFrustum,
     )
     this.sky = new Sky(this.root, stage, sunDirection(stage.index, true), seed)
-    // Built even when empty, so every stage compiles the same programs up front.
+    // On every stage; empty and hidden where nothing glows.
     this.glow = new GroundGlow(this.root, glowPools(scattered.groups), this.field)
 
     this.focus.copy(this.spots.playerStart)

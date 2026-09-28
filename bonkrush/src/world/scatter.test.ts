@@ -2,7 +2,8 @@ import { Rng } from '../core/rng'
 import { STAGES } from '../data/stages'
 import { ColliderGrid, PLAY_LIMIT } from './colliders'
 import { propSpec } from './propSpecs'
-import { boundaryRocks, scatterProps } from './scatter'
+import { laneDistance } from './ramps'
+import { RAMP_PROP_CLEAR, boundaryRocks, scatterProps } from './scatter'
 import { SPOT_CLEARANCE, placeSpots } from './spots'
 import { generateTerrain } from './terrain'
 
@@ -53,6 +54,38 @@ describe('scatterProps', () => {
           for (const s of spots.pots) check(s, SPOT_CLEARANCE.pot)
         }
       }
+    }
+  })
+
+  it('keeps every prop off the slide ramps', () => {
+    for (const { field, result } of layouts) {
+      expect(field.ramps.length).toBeGreaterThan(0)
+      for (const g of result.groups) {
+        const spec = propSpec(g.kind)
+        for (const p of g.instances) {
+          for (const r of field.ramps) expect(laneDistance(r, p.x, p.z)).toBeGreaterThanOrEqual(spec.radius * p.scale + RAMP_PROP_CLEAR)
+        }
+      }
+    }
+  })
+
+  it('links each solid prop to its own collider', () => {
+    for (const { result } of layouts) {
+      const seen = new Set<number>()
+      for (const g of result.groups) {
+        for (const p of g.instances) {
+          if (!g.solid) {
+            expect(p.collider).toBeUndefined()
+            continue
+          }
+          const c = result.colliders[p.collider!]
+          expect(c).toBeDefined()
+          expect(c.x).toBe(p.x)
+          expect(c.z).toBe(p.z)
+          seen.add(p.collider!)
+        }
+      }
+      expect(seen.size).toBe(result.colliders.length)
     }
   })
 

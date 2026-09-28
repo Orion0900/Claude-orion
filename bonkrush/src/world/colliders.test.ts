@@ -1,4 +1,4 @@
-import { ColliderGrid, PLAY_LIMIT } from './colliders'
+import { ColliderGrid, PLAY_LIMIT, segmentPointDistance } from './colliders'
 
 const HALF = 110
 
@@ -81,5 +81,40 @@ describe('ColliderGrid', () => {
     for (let k = 0; k < 30; k++) grid.collide(pos, 0.8)
     for (const c of circles) expect(Math.hypot(pos.x - c.x, pos.z - c.z)).toBeGreaterThan(c.r + 0.8 - 0.02)
     expect(pos.z).toBeGreaterThan(0)
+  })
+
+  it('finds every solid near a segment, each once, agreeing with a brute-force check', () => {
+    const circles = Array.from({ length: 600 }, (_, i) => ({
+      x: ((i * 73) % 190) - 95,
+      z: ((i * 131) % 190) - 95,
+      r: 0.3 + (i % 7) * 0.5,
+    }))
+    const grid = new ColliderGrid(circles, HALF)
+    const out: number[] = []
+    for (let i = 0; i < 300; i++) {
+      const ax = ((i * 17.3) % 180) - 90
+      const az = ((i * 29.1) % 180) - 90
+      const bx = ax + ((i * 7) % 13) - 6
+      const bz = az + ((i * 11) % 17) - 8
+      const pad = (i % 4) * 0.8
+      grid.querySegment(ax, az, bx, bz, pad, out)
+      expect(new Set(out).size).toBe(out.length)
+      const brute = circles.flatMap((c, n) => (segmentPointDistance(ax, az, bx, bz, c.x, c.z) < c.r + pad ? [n] : []))
+      expect([...out].sort((a, b) => a - b)).toEqual(brute)
+    }
+  })
+
+  it('answers an empty segment query on an empty grid', () => {
+    const out = [1, 2, 3]
+    expect(new ColliderGrid([], HALF).querySegment(0, 0, 10, 10, 2, out)).toEqual([])
+  })
+})
+
+describe('segmentPointDistance', () => {
+  it('measures to the nearest point of the segment, ends included', () => {
+    expect(segmentPointDistance(0, 0, 10, 0, 5, 3)).toBeCloseTo(3)
+    expect(segmentPointDistance(0, 0, 10, 0, -4, 3)).toBeCloseTo(5)
+    expect(segmentPointDistance(0, 0, 10, 0, 13, -4)).toBeCloseTo(5)
+    expect(segmentPointDistance(2, 2, 2, 2, 5, 6)).toBeCloseTo(5)
   })
 })
