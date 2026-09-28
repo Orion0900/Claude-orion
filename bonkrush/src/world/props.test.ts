@@ -148,9 +148,10 @@ describe('PropLayer see-through', () => {
 
   it('also clears props in view right in front of the lens, which would fill the screen', () => {
     const { layer } = scene()
-    // Looking down -z, the rock at (9, 12) is 1.6 m beside the view and a metre in front of a low camera.
+    // Looking down -z, the rock at (9, 12) is 1.6 m beside the view and a metre in front of a low camera:
+    // right against the lens, so it clears completely rather than dithering over the whole view.
     layer.updateOcclusion(1, new THREE.Vector3(10.6, 1.2, 13), new THREE.Vector3(10.6, 0, -10))
-    expect(layer.fadeOf(1)).toBe(1)
+    expect(layer.fadeOf(1)).toBeGreaterThan(1)
     // As far beside the view, but halfway along it, it is left alone.
     layer.updateOcclusion(1, new THREE.Vector3(10.6, 1.2, 24), new THREE.Vector3(10.6, 0, 0))
     expect(layer.fadeOf(1)).toBe(0)

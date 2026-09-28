@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { blocksSight, measureProfile, placedReach, sightMargin, type PlacedProfile, type Sightline } from './occlusion'
+import { blocksSight, lensInside, measureProfile, placedReach, sightMargin, type PlacedProfile, type Sightline } from './occlusion'
 
 /** A cone of radius 1 standing 2 m tall on y = 0, a slab 2 m wide (x), 0.2 m thick (z) and 1 m tall, and a 3 m pillar of radius 1. */
 const cone = new THREE.ConeGeometry(1, 2, 16).translate(0, 1, 0).toNonIndexed()
@@ -95,5 +95,17 @@ describe('sightMargin', () => {
     expect(sightMargin(1.25, 0.3, 1, 2.5)).toBeCloseTo(0.3 + 0.625, 9)
     expect(sightMargin(2.5, 0.3, 1, 2.5)).toBe(0.3)
     expect(sightMargin(6, 0.3, 1, 2.5)).toBe(0.3)
+  })
+})
+
+describe('lensInside', () => {
+  it('flags a prop the camera sits in or brushes against, and nothing further off', () => {
+    // The eye is 3 m up at z = 20: a 3 m pillar there has the lens inside it.
+    expect(lensInside(placed(pillar, 0, 20), view, 1.5)).toBe(true)
+    // Within 1.5 m of its side, still too close to dither.
+    expect(lensInside(placed(pillar, 2.2, 20), view, 1.5)).toBe(true)
+    expect(lensInside(placed(pillar, 0, 15), view, 1.5)).toBe(false)
+    // A low slab under the lens is well below it.
+    expect(lensInside(placed(slab, 0, 20), view, 1.5)).toBe(false)
   })
 })

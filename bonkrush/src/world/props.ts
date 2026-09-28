@@ -3,7 +3,7 @@ import type { StageDef } from '../game/types'
 import { PLAY_LIMIT, type ColliderGrid } from './colliders'
 import { buildCliffRock, buildPropModel, TUMBLEWEED_RADIUS } from './models'
 import { hash2 } from './noise'
-import { blocksSight, measureProfile, placedReach, sightMargin, type PlacedProfile, type Profile, type Sightline } from './occlusion'
+import { blocksSight, lensInside, measureProfile, placedReach, sightMargin, type PlacedProfile, type Profile, type Sightline } from './occlusion'
 import type { PropGroup, PropInstance } from './scatter'
 import type { HeightField } from './terrain'
 
@@ -47,6 +47,12 @@ const LINE_MARGIN = 0.3
 /** ...and near the lens, whatever is in view (a cone about 90° wide) over the first couple of metres. */
 const LENS_SPREAD = 1
 const LENS_REACH = 2.5
+/**
+ * A prop the lens is inside or brushing against would cover the whole view
+ * in dither, so it fades all the way out instead.
+ */
+const LENS_CLEAR = 1.5
+const FULL_FADE = 1 / SEE_THROUGH
 /** Most props of one batch that can be see-through at once; a crowd past that just stays solid. */
 export const FADE_SLOTS = 24
 
@@ -176,6 +182,8 @@ export class PropLayer {
   private readonly fade: Float32Array
   /** The frame each solid was last found in the way. */
   private readonly wanted: Int32Array
+  /** Wanted solids the camera is inside or right against; they fade out completely. */
+  private readonly nearLens: Uint8Array
   /** Solids that are faded, fading or wanted faded; everything else is left alone. */
   private readonly fading: number[] = []
   private readonly isFading: Uint8Array
@@ -206,6 +214,7 @@ export class PropLayer {
     this.solids = new Array(count)
     this.fade = new Float32Array(count)
     this.wanted = new Int32Array(count)
+    this.nearLens = new Uint8Array(count)
     this.isFading = new Uint8Array(count)
 
     // Rocks and walls take on the stage's stone colour, lightened a little so they read against the cliffs.
@@ -275,9 +284,9 @@ export class PropLayer {
     for (let n = list.length - 1; n >= 0; n--) {
       const id = list[n]
       const solid = this.solids[id]!
-      const target = this.wanted[id] === frame ? 1 : 0
+      const target = this.wanted[id] === frame ? (this.nearLens[id] ? FULL_FADE : 1) : 0
       const was = this.fade[id]
-      const now = target === 1 ? Math.min(1, was + step) : Math.max(0, was - step)
+      const now = target > was ? Math.min(target, was + step) : Math.max(target, was - step)
       if (now !== was) {
         this.fade[id] = now
         solid.batch.fade.array[solid.fadeSlot] = now
@@ -336,6 +345,7 @@ export class PropLayer {
         this.fading.push(id)
       }
       this.wanted[id] = frame
+      this.nearLens[id] = lensInside(solid, s, LENS_CLEAR) ? 1 : 0
     }
   }
 

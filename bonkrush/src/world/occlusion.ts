@@ -213,3 +213,16 @@ export function placedReach(p: PlacedProfile): number {
   for (const v of p.profile.radii) r = Math.max(r, v)
   return r * Math.max(p.sx, p.sz) + p.lean * p.profile.top * p.sy
 }
+
+/**
+ * Whether the camera sits inside a prop's bounds or within `clear` metres of
+ * them. Dithering such a prop would put a screen-door over the whole view,
+ * so it's faded out completely instead.
+ */
+export function lensInside(p: PlacedProfile, s: Sightline, clear: number): boolean {
+  const reach = placedReach(p) + clear
+  const dx = s.ex - p.x
+  const dz = s.ez - p.z
+  if (dx * dx + dz * dz > reach * reach) return false
+  return s.ey < p.y + p.profile.top * p.sy + clear && s.ey > p.y - clear
+}
