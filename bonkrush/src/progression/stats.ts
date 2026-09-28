@@ -39,7 +39,7 @@ const CAPS: Partial<Record<StatId, [number, number]>> = {
   maxHp: [1, 100000],
   armor: [0, 0.8],
   evasion: [0, 0.75],
-  lifesteal: [0, 1],
+  lifesteal: [0, 5],
   attackSpeed: [0.2, 10],
   size: [0.3, 6],
   moveSpeed: [0.3, 4],

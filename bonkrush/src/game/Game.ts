@@ -58,6 +58,8 @@ export class Game implements ShellApi {
   private readonly params = new URLSearchParams(location.search)
   private unsubs: Array<() => void> = []
   private ending = false
+  /** Whether the game currently holds mouse-look; see syncLook. */
+  private lookHeld = false
   private readonly speed = Math.max(1, Math.min(16, Math.floor(Number(this.params.get('speed')) || 1)))
 
   constructor(private readonly host: HTMLElement) {
@@ -170,6 +172,8 @@ export class Game implements ShellApi {
       bossDefeated: false,
       portalOpen: false,
       curse: 0,
+      greed: 0,
+      chestsPaid: 0,
     }
 
     const events = new EventBus<GameEvents>()
@@ -218,10 +222,12 @@ export class Game implements ShellApi {
     this.audio.startMusic(0)
     this.meta.runs++
     writeSave(this.meta)
-    if (!this.input.isTouch && !this.params.has('bot')) this.input.requestLook()
+    this.prewarm()
   }
 
   quitToTitle(): void {
+    // Quitting still ends the run properly: silver and bests are kept.
+    if (this.run && !this.ending) this.settleRun(this.run, false)
     this.teardownRun()
     this.showTitle()
   }
@@ -256,18 +262,19 @@ export class Game implements ShellApi {
 
   private async advanceStage(): Promise<void> {
     const ctx = this.run
-    if (!ctx || this.ending) return
+    if (!ctx || this.ending || !ctx.player.alive) return
     ctx.events.emit('stageCleared', { stageIndex: ctx.run.stageIndex })
     const next = ctx.run.stageIndex + 1
-    this.meta.bestStage = Math.max(this.meta.bestStage, next)
     if (next >= STAGES.length) {
       await this.endRun(true)
       return
     }
-    this.input.releaseLook()
     this.audio.play('portal')
     await this.ui.openModal({ kind: 'stageClear', nextStage: next })
-    if (this.run !== ctx) return
+    // The player can die in the same tick they step through; that run is over.
+    if (this.run !== ctx || this.ending || !ctx.player.alive) return
+    this.meta.bestStage = Math.max(this.meta.bestStage, next)
+    writeSave(this.meta)
     this.disposeStage(ctx)
     this.buildStage(ctx, STAGES[next])
     const start = ctx.world.spots.playerStart
@@ -277,25 +284,30 @@ export class Game implements ShellApi {
     ctx.camera.snap()
     this.ui.attach(ctx)
     this.audio.startMusic(next)
-    if (!this.input.isTouch && !this.params.has('bot')) this.input.requestLook()
+    this.prewarm()
   }
 
   private async endRun(victory: boolean): Promise<void> {
     const ctx = this.run
     if (!ctx || this.ending) return
     this.ending = true
+    this.settleRun(ctx, victory)
+    this.audio.stopMusic()
+    this.audio.play(victory ? 'victory' : 'death')
+    await this.ui.openModal({ kind: victory ? 'victory' : 'gameOver' })
+  }
+
+  /** Pays silver and records bests for a finished run. */
+  private settleRun(ctx: MutableContext, victory: boolean): void {
     const r = ctx.run
-    const earned = silverForRun({ ...r, silverGain: ctx.progression.stats.silverGain })
+    const cleared = r.stageIndex + (victory ? 1 : 0)
+    const earned = silverForRun({ ...r, stageIndex: cleared, silverGain: ctx.progression.stats.silverGain })
     r.silver = earned
     this.meta.silver += earned
     this.meta.bestTime = Math.max(this.meta.bestTime, r.totalTime)
     this.meta.bestKills = Math.max(this.meta.bestKills, r.kills)
-    this.meta.bestStage = Math.max(this.meta.bestStage, r.stageIndex + (victory ? 1 : 0))
+    this.meta.bestStage = Math.max(this.meta.bestStage, cleared)
     writeSave(this.meta)
-    this.input.releaseLook()
-    this.audio.stopMusic()
-    this.audio.play(victory ? 'victory' : 'death')
-    await this.ui.openModal({ kind: victory ? 'victory' : 'gameOver' })
   }
 
   private listen(ctx: MutableContext): void {
@@ -348,6 +360,7 @@ export class Game implements ShellApi {
     ctx.events.clear()
     this.audio.stopMusic()
     this.input.releaseLook()
+    this.lookHeld = false
     this.run = null
     this.clearScene()
   }
@@ -356,6 +369,7 @@ export class Game implements ShellApi {
 
   private showTitle(): void {
     this.ui.showTitle()
+    this.audio.startMusic(-1)
     // A run can end mid-sprint with the speed FOV still widened.
     this.camera.fov = 70
     this.camera.updateProjectionMatrix()
@@ -397,23 +411,53 @@ export class Game implements ShellApi {
     const ctx = this.run
     if (ctx) {
       // ?speed=N runs N simulation steps per frame, for fast unattended play-tests.
-      for (let i = 0; i < this.speed; i++) this.tick(ctx, dt)
+      // One-frame input (a jump press, a look delta) belongs to the first step only.
+      for (let i = 0; i < this.speed; i++) {
+        this.tick(ctx, dt)
+        if (i < this.speed - 1) this.input.endFrame()
+      }
     } else this.tickTitle(dt)
 
     this.audio.update(realDt)
     this.ui.update(realDt)
+    this.syncLook()
     this.input.endFrame()
     this.renderer.render(this.scene, this.camera)
   }
 
+  /**
+   * One place decides whether the mouse drives the camera: during play,
+   * never behind a menu or modal. Chest, shrine, level-up, pause and
+   * tab-switch pauses all release it and get it back the same way. The
+   * relock runs right after a modal closes, inside the click or key
+   * press's user activation, so the browser allows it; if it's refused,
+   * the next click on the game captures the mouse.
+   */
+  private syncLook(): void {
+    const ctx = this.run
+    const want =
+      !!ctx && !this.ending && ctx.player.alive && !this.ui.menuOpen && !this.input.isTouch && !this.params.has('bot')
+    if (want === this.lookHeld) return
+    this.lookHeld = want
+    if (want) this.input.requestLook()
+    else this.input.releaseLook()
+  }
+
+  /**
+   * Compiles every material in the scene now, behind the stage-start
+   * banner, instead of stuttering the first time each one is seen.
+   */
+  private prewarm(): void {
+    try {
+      this.renderer.compile(this.scene, this.camera)
+    } catch {
+      // A failed prewarm only costs a stutter later.
+    }
+  }
+
   private tick(ctx: MutableContext, dt: number): void {
     const input = this.input.state
-    if (input.pausePressed && !this.ui.modalOpen && !this.ending) {
-      this.input.releaseLook()
-      void this.ui.openModal({ kind: 'pause' }).then(() => {
-        if (this.run === ctx && !this.input.isTouch && !this.params.has('bot')) this.input.requestLook()
-      })
-    }
+    if (input.pausePressed && !this.ui.modalOpen && !this.ending) void this.ui.openModal({ kind: 'pause' })
 
     const paused = this.ui.modalOpen || this.ending
     if (!paused) {
@@ -422,6 +466,11 @@ export class Game implements ShellApi {
       ctx.run.totalTime += dt
 
       if (input.interactPressed) ctx.interactables.interact()
+      // Opening a chest or the portal pauses the world from this very tick.
+      if (this.ui.modalOpen) {
+        ctx.camera.update(0)
+        return
+      }
 
       ctx.progression.update(dt)
       ctx.player.update(dt)
@@ -435,11 +484,7 @@ export class Game implements ShellApi {
       this.audio.setIntensity(ctx.spawner.intensity)
 
       if (ctx.progression.pendingLevelUps > 0 && !this.ui.modalOpen && ctx.player.alive) {
-        this.input.releaseLook()
-        void this.ui.openModal({ kind: 'levelUp' }).then(() => {
-          if (this.run === ctx && !this.ui.modalOpen && !this.input.isTouch && !this.params.has('bot'))
-            this.input.requestLook()
-        })
+        void this.ui.openModal({ kind: 'levelUp' })
       }
     } else {
       // Keep floating numbers and particles settled while paused.
@@ -482,9 +527,6 @@ export class Game implements ShellApi {
 
   private onVisibility = () => {
     const ctx = this.run
-    if (document.hidden && ctx && !this.ui.modalOpen && !this.ending) {
-      this.input.releaseLook()
-      void this.ui.openModal({ kind: 'pause' })
-    }
+    if (document.hidden && ctx && !this.ui.modalOpen && !this.ending) void this.ui.openModal({ kind: 'pause' })
   }
 }

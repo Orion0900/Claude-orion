@@ -36,6 +36,8 @@ export function makeHarness(opts: { stage?: StageDef; seed?: number; halfSize?: 
     seed: 1, characterId: 'vix', stageIndex: stage.index, stageTime: 0, totalTime: 0, stageDuration: stage.duration,
     kills: 0, gold: 0, silver: 0, damageDealt: 0, damageTaken: 0, chestsOpened: 0, shrinesUsed: 0,
     bossesKilled: 0, elitesKilled: 0, bossSpawned: false, bossDefeated: false, portalOpen: false, curse: 0,
+      greed: 0,
+      chestsPaid: 0,
   }
   events.on('bossSpawned', () => (run.bossSpawned = true))
 

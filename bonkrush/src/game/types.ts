@@ -445,6 +445,7 @@ export interface AudioApi {
   play(id: SfxId, opts?: { volume?: number; pitch?: number; pos?: Vec3 }): void
   /** 0 = calm, 1 = final swarm. */
   setIntensity(level: number): void
+  /** Stage song by index; -1 is the calmer title theme. */
   startMusic(stageIndex: number): void
   stopMusic(): void
   setVolumes(master: number, music: number, sfx: number): void
@@ -509,7 +510,10 @@ export interface TomeInstance {
 }
 
 export interface ProgressionApi {
-  /** Final player stats: base + character + tomes + items + shrines, capped. */
+  /**
+   * Final player stats: base + character + tomes + items + shrines, capped.
+   * `difficulty` already includes run.curse + run.greed; nobody else adds them.
+   */
   readonly stats: Readonly<StatBlock>
   readonly tomes: readonly TomeInstance[]
   readonly maxTomes: number
@@ -535,7 +539,10 @@ export interface ProgressionApi {
   skipLevelUp(): void
   /** Uses a reroll charge; returns false if none left. */
   useReroll(): boolean
-  /** Uses a banish charge; the offer's id never appears again this run. */
+  /**
+   * Uses a banish charge; the offer's id never appears again this run. It
+   * does not use up the level-up: the UI rolls fresh cards for the same level.
+   */
   banish(offer: Offer): boolean
   addItem(id: string, count?: number): void
   /**
@@ -577,8 +584,12 @@ export interface RunState {
   bossSpawned: boolean
   bossDefeated: boolean
   portalOpen: boolean
-  /** Extra difficulty from curse shrines etc. (added to the difficulty stat). */
+  /** Extra difficulty from curse shrines this stage; reset every stage. */
   curse: number
+  /** Extra difficulty from greed shrines; lasts the whole run. */
+  greed: number
+  /** Paid chests opened this run; the chest price climbs with it across stages. */
+  chestsPaid: number
 }
 
 export interface GameEvents {
@@ -606,6 +617,8 @@ export interface GameEvents {
   weaponAdded: { id: string }
   itemAdded: { id: string; stacks: number }
   statsChanged: Record<string, never>
+  /** A themed burst (every 60 s) or an encirclement (a ring closing in around the player). */
+  wave: { defId: string; count: number; encircle: boolean }
 }
 
 /** Modal requests the UI must show; the game is paused while one is open. */
