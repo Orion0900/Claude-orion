@@ -2,7 +2,7 @@ import type { Offer } from '../../game/types'
 import { runLookups } from '../defs'
 import { SHAKE, type ActionButton, actionButton, activateFocused, arrowDir, bouncyText, digitKey, el, moveFocus, pulse } from '../dom'
 import { charges, describeOffer } from '../format'
-import { offerCard } from '../panels'
+import { offerCard, peekOnHold } from '../panels'
 import { Modal, type ModalEnv } from './Modal'
 
 /** Seconds the picked card flashes before the next round or the close. */
@@ -133,6 +133,7 @@ export class LevelUpModal extends Modal {
     this.roundAt = this.age
     this.cards = this.offers.map((offer, i) => {
       const card = offerCard(describeOffer(offer, look), i, touch ? '' : String(i + 1))
+      peekOnHold(card, this.env.tooltip)
       card.addEventListener('click', () => this.choose(i))
       this.row.appendChild(card)
       return card
@@ -160,7 +161,7 @@ export class LevelUpModal extends Modal {
     this.hint.textContent = this.banishing
       ? 'Banish a card: it never shows up again this run, and you get fresh cards'
       : this.env.shell.input.isTouch
-        ? 'Tap a card to take it'
+        ? 'Tap a card to take it · hold one to read it all'
         : `Press 1–${Math.max(1, this.cards.length)} or click a card · skipping pays 20% of the level in gold`
   }
 

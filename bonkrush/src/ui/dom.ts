@@ -28,6 +28,50 @@ export function setTip(node: HTMLElement, title: string, body: string, color?: s
   else delete node.dataset.tipColor
 }
 
+/** How long a finger must rest on a control before it counts as a hold, ms. */
+export const HOLD_MS = 450
+
+/**
+ * A touch hold on `node`: `start` runs once a finger has rested there for
+ * HOLD_MS, `end` when it lifts. The click that ends a hold is swallowed, so a
+ * hold never activates the node. Mouse and pen are left alone. The click
+ * guard is a capture listener, so it runs before the node's own click.
+ */
+export function onHold(node: HTMLElement, start: () => void, end: () => void): void {
+  let timer = 0
+  let held = false
+  const lift = () => {
+    window.clearTimeout(timer)
+    timer = 0
+    if (held) end()
+  }
+  node.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return
+    held = false
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      timer = 0
+      // The modal may have closed under the finger.
+      if (!node.isConnected || node.closest('[inert]')) return
+      held = true
+      start()
+    }, HOLD_MS)
+  })
+  node.addEventListener('pointerup', lift)
+  node.addEventListener('pointercancel', lift)
+  node.addEventListener(
+    'click',
+    (e) => {
+      // detail 0 is a keyboard click, never the end of a hold.
+      if (!held || e.detail === 0) return
+      held = false
+      e.stopImmediatePropagation()
+      e.preventDefault()
+    },
+    { capture: true },
+  )
+}
+
 /**
  * A springy one-shot animation through the Web Animations API, which runs on
  * the compositor and, unlike toggling a class, needs no forced reflow.

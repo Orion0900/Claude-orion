@@ -274,7 +274,7 @@ Items stack without limit. Every "chance" rolls per hit or per event.
 | `soul_reaper` | Soul Reaper | legendary | kills release 1 homing soul (20 dmg), +1 per 2 more stacks |
 | `vacuum` | Vacuum Magnet | legendary | every 15 s (−2 s per extra stack, min 5), pull all XP on the map |
 | `holy_book` | Holy Book | legendary | maxHp +100, regen +2 |
-| `reaper_dagger` | Reaper's Dagger | legendary | 1% chance on hit to execute a non-boss enemy |
+| `reaper_dagger` | Reaper's Dagger | legendary | 1% chance on hit to execute a regular enemy (never bosses or minibosses) |
 | `stopwatch` | Stopwatch | legendary | once per stage, fatal damage instead leaves you at 1 HP, invulnerable for 2 s, and freezes enemies for 2 s |
 | `storm_orb` | Storm Orb | legendary | 8% chance on hit to call lightning (50% of the hit, chains 2) |
 

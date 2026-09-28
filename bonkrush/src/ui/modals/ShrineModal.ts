@@ -2,7 +2,7 @@ import type { Offer } from '../../game/types'
 import { runLookups } from '../defs'
 import { activateFocused, arrowDir, bouncyText, button, digitKey, el, moveFocus } from '../dom'
 import { describeOffer } from '../format'
-import { offerCard } from '../panels'
+import { offerCard, peekOnHold } from '../panels'
 import { Modal, type ModalEnv } from './Modal'
 
 const PICK_DELAY = 0.24
@@ -28,6 +28,7 @@ export class ShrineModal extends Modal {
     const touch = env.shell.input.isTouch
     this.cards = offers.map((offer, i) => {
       const card = offerCard(describeOffer(offer, look), i, touch ? '' : String(i + 1))
+      peekOnHold(card, env.tooltip)
       card.addEventListener('click', () => this.choose(i))
       row.appendChild(card)
       return card

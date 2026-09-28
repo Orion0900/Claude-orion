@@ -389,6 +389,14 @@ export function describeOffer(offer: Offer, look: DefLookups): OfferView {
 }
 
 /**
+ * A card's whole text for the touch peek (holding a card): effect lines, then
+ * the rules text, which short screens clamp.
+ */
+export function offerPeek(view: Pick<OfferView, 'lines' | 'description'>): string {
+  return [...view.lines, view.description].filter((s) => s !== '').join('\n')
+}
+
+/**
  * A shrine boon is named after the stat it raises, like a tome card; its
  * lines carry the numbers (the offer's own label repeats those lines).
  */

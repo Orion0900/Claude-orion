@@ -55,7 +55,11 @@ export class Tooltip {
     }
   }
 
-  show(target: HTMLElement): void {
+  /**
+   * `beside` puts it to the right or left of the target when there is room
+   * (a held card: above or below would sit under the finger or off screen).
+   */
+  show(target: HTMLElement, beside = false): void {
     this.target = target
     this.title.textContent = target.dataset.tipTitle ?? ''
     this.body.textContent = target.dataset.tip ?? ''
@@ -69,7 +73,12 @@ export class Tooltip {
     const vh = window.innerHeight
     let x = r.left + r.width / 2 - w / 2
     let y = r.top - h - 10
-    if (y < 8) y = r.bottom + 10
+    const right = r.right + 10
+    const left = r.left - w - 10
+    if (beside && (right + w <= vw - 8 || left >= 8)) {
+      x = right + w <= vw - 8 ? right : left
+      y = r.top + r.height / 2 - h / 2
+    } else if (y < 8) y = r.bottom + 10
     x = Math.max(8, Math.min(vw - w - 8, x))
     y = Math.max(8, Math.min(vh - h - 8, y))
     this.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`

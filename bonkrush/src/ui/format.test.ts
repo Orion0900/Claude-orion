@@ -10,6 +10,7 @@ import {
   formatTime,
   fraction,
   objectiveLabel,
+  offerPeek,
   promptLabel,
   sumMods,
   timerKey,
@@ -266,6 +267,13 @@ describe('describeOffer', () => {
   it('handles gold and heal offers', () => {
     expect(describeOffer({ type: 'gold', amount: 1500, rarity: 'common' }, LOOK).lines).toEqual(['+1.5k Gold'])
     expect(describeOffer({ type: 'heal', amount: 25, rarity: 'common' }, LOOK).lines).toEqual(['Heal 25 HP'])
+  })
+
+  it('peeks the whole card text: lines, then the rules text', () => {
+    expect(offerPeek({ lines: ['9 Damage', '2.5s Cooldown'], description: 'Icy footprints.' })).toBe('9 Damage\n2.5s Cooldown\nIcy footprints.')
+    expect(offerPeek({ lines: ['+10% Damage'], description: '' })).toBe('+10% Damage')
+    expect(offerPeek({ lines: [], description: 'Each level grants a random stat.' })).toBe('Each level grants a random stat.')
+    expect(offerPeek({ lines: [], description: '' })).toBe('')
   })
 
   it('survives unknown ids', () => {

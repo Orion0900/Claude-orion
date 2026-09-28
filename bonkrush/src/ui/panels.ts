@@ -3,11 +3,13 @@ import type { GameContext, StatBlock, StatId } from '../game/types'
 import { RARITY_COLOR, RARITY_LABEL } from '../progression/rarity'
 import { BASE_STATS, STAT_IDS, STAT_INFO, describeMod, formatStat } from '../progression/stats'
 import { itemDef } from './defs'
-import { el, setTip } from './dom'
+import type { Tooltip } from './Tooltip'
+import { el, onHold, setTip } from './dom'
 import {
   STAT_ICON,
   barShares,
   formatCount,
+  offerPeek,
   sumMods,
   weaponStatRows,
   type OfferView,
@@ -143,5 +145,19 @@ export function offerCard(view: OfferView, index: number, keyHint: string): HTML
     // Short screens clamp the rules text; hovering still reads all of it.
     card.title = view.description
   }
+  // Touch has no hover: holding the card shows this (see peekOnHold).
+  setTip(card, view.name, offerPeek(view), RARITY_COLOR[view.rarity])
   return card
+}
+
+/**
+ * Holding a card on touch shows its whole text beside it instead of taking
+ * it; lifting the finger hides it again. Call before adding the card's click.
+ */
+export function peekOnHold(card: HTMLElement, tooltip: Tooltip): void {
+  onHold(
+    card,
+    () => tooltip.show(card, true),
+    () => tooltip.hide(),
+  )
 }
