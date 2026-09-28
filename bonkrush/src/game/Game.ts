@@ -17,6 +17,7 @@ import { Input } from '../input/Input'
 import { InteractableManager } from '../interactables/InteractableManager'
 import { PickupManager } from '../pickups/PickupManager'
 import { Player } from '../player/Player'
+import { renderCharacterPortrait } from '../player/PlayerModel'
 import { Progression } from '../progression/Progression'
 import { Ui } from '../ui/Ui'
 import { WeaponManager } from '../weapons/WeaponManager'
@@ -124,6 +125,16 @@ export class Game implements ShellApi {
     this.meta.unlockedCharacters.push(id)
     this.saveMeta()
     return true
+  }
+
+  renderPortrait(characterId: string, size: number): string {
+    const def = this.characters.find((c) => c.id === characterId)
+    if (!def) return ''
+    try {
+      return renderCharacterPortrait(this.renderer, def, size)
+    } catch {
+      return ''
+    }
   }
 
   saveMeta(): void {

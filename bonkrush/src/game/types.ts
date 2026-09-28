@@ -316,8 +316,8 @@ export interface SpawnerApi {
   /** 0..1 intensity for music/UI. */
   readonly intensity: number
   readonly finalSwarm: boolean
-  /** Spawns a group of elites around the player (challenge shrine). */
-  spawnChallenge(count: number): void
+  /** Spawns a ring of elites around `center` (challenge shrine); returns them so the shrine can track the fight. */
+  spawnChallenge(count: number, center: Vec3): Enemy[]
   summonBoss(): void
   update(dt: number): void
   reset(): void
@@ -403,6 +403,8 @@ export interface FxApi {
   ring(pos: Vec3, radius: number, color: string, duration?: number): void
   /** Camera shake, 0..1 strength. */
   shake(strength: number): void
+  /** Current shake displacement; the camera adds it every frame. Zero when shake is off in settings. */
+  readonly shakeOffset: Vec3
   /** Brief full-screen tint (e.g. red on damage). */
   flash(color: string, strength: number): void
   update(dt: number): void
@@ -640,6 +642,12 @@ export interface UiApi {
 /** What the UI can ask of the game shell outside of a run. */
 export interface ShellApi {
   readonly meta: MetaSave
+  readonly input: InputApi
+  /**
+   * A PNG data URL of the character's 3D model, rendered with the game's
+   * renderer (for character select). Empty string if rendering failed.
+   */
+  renderPortrait(characterId: string, size: number): string
   /** The current run, or null on the title screen. */
   readonly ctx: GameContext | null
   readonly characters: readonly CharacterDef[]
