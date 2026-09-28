@@ -21,6 +21,10 @@ end at your door.
 > tells you what club to hit for your level and mindset, and learns your real
 > distances shot by shot. Ships at `/caddie/`. See
 > [caddie/README.md](caddie/README.md).
+> [Bonkrush](bonkrush/) — a low-poly 3D survivors roguelike in the spirit of
+> Megabonk: auto-firing weapons, slides and bunny hops, chests, shrines,
+> bosses and a final swarm, all generated in code. Ships at `/bonkrush/`. See
+> [bonkrush/README.md](bonkrush/README.md).
 
 ## What it does
 

@@ -1,0 +1,17 @@
+{
+  "name": "Bonkrush",
+  "short_name": "Bonkrush",
+  "description": "Run, jump and slide through hordes in a low-poly 3D roguelike.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#14102a",
+  "theme_color": "#14102a",
+  "categories": ["games"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
