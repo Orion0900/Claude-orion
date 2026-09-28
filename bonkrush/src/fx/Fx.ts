@@ -61,7 +61,7 @@ export class Fx implements FxApi {
     if (!(n > 0)) return
     const world = this.ctx.world
     const ground = world ? world.heightAt(pos.x, pos.z) : pos.y - 50
-    this.particles.emit(pos.x, pos.y, pos.z, ground, this.color(color), n, speed > 0 ? speed : 7, size > 0 ? size : 0.22)
+    this.particles.emit(pos.x, pos.y, pos.z, ground, this.color(color), n, bounded(speed, 7, 60), bounded(size, 0.22, 4))
   }
 
   number(pos: Vec3, text: string, kind: 'damage' | 'crit' | 'heal' | 'player' | 'gold' | 'xp' | 'info'): void {
@@ -71,7 +71,7 @@ export class Fx implements FxApi {
   }
 
   ring(pos: Vec3, radius: number, color: string, duration = 0.5): void {
-    if (this.disposed || !finite(pos) || !(radius > 0)) return
+    if (this.disposed || !finite(pos) || !(radius > 0) || !Number.isFinite(radius)) return
     const world = this.ctx.world
     let y = pos.y
     _tilt.identity()
@@ -81,7 +81,7 @@ export class Fx implements FxApi {
       world.normalAt(pos.x, pos.z, _normal)
       if (_normal.lengthSq() > 0.5) _tilt.setFromUnitVectors(UP, _normal)
     }
-    this.rings.spawn(pos.x, y, pos.z, _tilt, radius, this.color(color), duration > 0 ? duration : 0.5)
+    this.rings.spawn(pos.x, y, pos.z, _tilt, Math.min(radius, 200), this.color(color), bounded(duration, 0.5, 10))
   }
 
   shake(strength: number): void {
@@ -207,4 +207,9 @@ export class Fx implements FxApi {
 
 function finite(v: Vec3): boolean {
   return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z)
+}
+
+/** A caller's optional positive number, or `fallback` if it is missing or nonsense, capped at `max`. */
+function bounded(v: number, fallback: number, max: number): number {
+  return v > 0 && Number.isFinite(v) ? Math.min(v, max) : fallback
 }

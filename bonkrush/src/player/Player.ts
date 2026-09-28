@@ -157,7 +157,7 @@ export class Player implements PlayerApi {
     this.shield = r.shield
     if (r.healed <= 0 && r.shieldGained <= 0) return
     this.ctx.events.emit('playerHealed', { amount: r.healed })
-    if (r.healed >= 0.5) this.ctx.fx.number(this.headPos(true), `+${Math.round(r.healed)}`, 'heal')
+    if (r.healed >= 0.5) this.ctx.fx.number(this.headPos(), `+${Math.round(r.healed)}`, 'heal')
   }
 
   refresh(): void {
@@ -233,7 +233,7 @@ export class Player implements PlayerApi {
       this.iframes = IFRAMES
       this.blink = false
       ctx.events.emit('playerDodged', {})
-      ctx.fx.number(this.headPos(true), 'DODGE', 'info')
+      ctx.fx.number(this.headPos(), 'DODGE', 'info')
       return 0
     }
 
@@ -263,7 +263,7 @@ export class Player implements PlayerApi {
     ctx.fx.flash('#ff2a2a', 0.35)
     ctx.fx.shake(0.4)
     ctx.audio.play('hurt')
-    ctx.fx.number(this.headPos(true), String(Math.max(1, Math.round(hit.total))), 'player')
+    ctx.fx.number(this.headPos(), String(Math.max(1, Math.round(hit.total))), 'player')
     return hit.total
   }
 
@@ -433,10 +433,9 @@ export class Player implements PlayerApi {
     return v.copy(this.move.pos).setY(this.move.pos.y + 0.1)
   }
 
-  /** Floating text keeps its position, so it gets its own vector. */
-  private headPos(fresh: boolean): THREE.Vector3 {
-    const v = fresh ? new THREE.Vector3() : this.fxPos[(this.fxIndex = (this.fxIndex + 1) % this.fxPos.length)]
-    return v.copy(this.move.pos).setY(this.move.pos.y + this.rig.height + 0.2)
+  /** Floating text may keep its position for its whole life, so it gets its own vector (hits are rare). */
+  private headPos(): THREE.Vector3 {
+    return new THREE.Vector3(this.move.pos.x, this.move.pos.y + this.rig.height + 0.2, this.move.pos.z)
   }
 }
 

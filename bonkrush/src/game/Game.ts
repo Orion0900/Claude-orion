@@ -198,7 +198,7 @@ export class Game implements ShellApi {
       advanceStage() {
         void game.advanceStage()
       },
-    } as MutableContext
+    } as unknown as MutableContext
     this.run = ctx
 
     // Per-run systems first, then the stage.
@@ -343,6 +343,7 @@ export class Game implements ShellApi {
     this.disposeStage(ctx)
     ctx.weapons?.dispose()
     ctx.player?.dispose()
+    ctx.progression?.dispose()
     ctx.events.clear()
     this.audio.stopMusic()
     this.input.releaseLook()

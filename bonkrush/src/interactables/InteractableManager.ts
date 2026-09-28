@@ -36,7 +36,6 @@ import {
   chargeText,
   chestCost as priceOfChest,
   CURSE_CURSE,
-  forceLegendary,
   GOLDEN_SHRINE_CHANCE,
   GREED_CURSE,
   GREED_GOLD,
@@ -863,8 +862,7 @@ export class InteractableManager implements InteractableApi {
 
   private completeCharge(shrine: Shrine): void {
     const ctx = this.ctx
-    let offers = ctx.progression.rollShrineOffers()
-    if (shrine.golden) offers = offers.map(forceLegendary)
+    const offers = ctx.progression.rollShrineOffers(shrine.golden)
     ctx.audio.play('shrine')
     this.useShrine(shrine)
     void ctx.ui.openModal({ kind: 'shrine', offers })

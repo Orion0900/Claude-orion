@@ -10,7 +10,7 @@ export const TERRAIN_SHAPE = {
   startRadius: 12,
   /** ...and blends back into the hills over this distance. */
   startBlend: 10,
-  /** Where (in max(|x|, |z|)) the rim starts to rise and where it tops out. */
+  /** Where (in distance from the centre, measured squarish) the rim starts to rise and where it tops out. */
   rimStart: 78,
   rimEnd: 108,
   /** Rim height on top of the stage amplitude. */
@@ -144,7 +144,10 @@ export function makeHeightFunction(params: TerrainParams): (x: number, z: number
     const r = Math.sqrt(x * x + z * z)
     const flat = 1 - smoothstep(s.startRadius, s.startRadius + s.startBlend, r)
     if (flat > 0) h += (startLevel - h) * flat
-    const edge = Math.max(Math.abs(x), Math.abs(z)) + rim.noise(x * 0.035, z * 0.035) * 6
+    // A superellipse: square along the sides, rounded at the corners so they don't crease.
+    const ax = Math.abs(x) / s.rimEnd
+    const az = Math.abs(z) / s.rimEnd
+    const edge = Math.pow(ax ** 6 + az ** 6, 1 / 6) * s.rimEnd + rim.noise(x * 0.035, z * 0.035) * 6
     const t = smoothstep(s.rimStart, s.rimEnd, edge)
     if (t > 0) {
       const lumpy = 0.8 + 0.4 * (rim.noise(x * 0.09 + 40, z * 0.09 - 40) * 0.5 + 0.5)

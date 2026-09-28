@@ -67,7 +67,7 @@ export function scatterProps(
   const density = (spec: PropSpec, kind: string, x: number, z: number): number => {
     switch (spec.field) {
       case 'forest':
-        return smoothstep(-0.05, 0.3, forest.fbm(x * 0.028, z * 0.028, 2))
+        return smoothstep(0.02, 0.28, forest.fbm(x * 0.028, z * 0.028, 2))
       case 'meadow':
         return smoothstep(0.0, 0.3, -forest.fbm(x * 0.028, z * 0.028, 2)) * smoothstep(-0.2, 0.25, noiseFor('meadow').fbm(x * 0.07, z * 0.07, 2))
       default: {
@@ -128,7 +128,7 @@ export function scatterProps(
         sy: scale * stretch,
         sz: scale,
         scale,
-        variant: spec.variants > 1 ? kindRng.int(0, spec.variants - 1) : 0,
+        variant: pickVariant(spec, kindRng),
       })
       same.add({ x, z, r: 0 })
       if (solid) {
@@ -212,6 +212,14 @@ export function boundaryRocks(field: HeightField, rng: Rng): PropInstance[] {
     }
   }
   return out
+}
+
+function pickVariant(spec: PropSpec, rng: Rng): number {
+  if (spec.variants <= 1) return 0
+  const w = spec.variantWeights
+  if (!w || w.length !== spec.variants) return rng.int(0, spec.variants - 1)
+  const indices = w.map((_, i) => i)
+  return rng.weighted(indices, (i) => w[i])
 }
 
 /** Uniform by area in the square |x|,|z| ≤ limit, outside a disc of radius `minR`. */

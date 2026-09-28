@@ -190,9 +190,9 @@ export function fakeContext(spots: FakeSpots = {}, seed = 1): FakeContext {
       addXp: (n: number) => {
         log.xp += n
       },
-      rollShrineOffers: (): Offer[] => [
-        { type: 'stat', rarity: 'common', label: 'Damage', mods: [{ stat: 'damage', op: 'add', value: 0.08 }] },
-        { type: 'stat', rarity: 'rare', label: 'Luck', mods: [{ stat: 'luck', op: 'add', value: 0.098 }] },
+      rollShrineOffers: (golden = false): Offer[] => [
+        { type: 'stat', rarity: golden ? 'legendary' : 'common', label: 'Damage', mods: [{ stat: 'damage', op: 'add', value: 0.08 }] },
+        { type: 'stat', rarity: golden ? 'legendary' : 'rare', label: 'Luck', mods: [{ stat: 'luck', op: 'add', value: 0.098 }] },
         { type: 'stat', rarity: 'legendary', label: 'Size', mods: [{ stat: 'size', op: 'add', value: 0.2 }] },
       ],
       rollChestItem: (): Offer => ({ type: 'item', id: 'clover', rarity: 'rare' }),

@@ -526,8 +526,8 @@ export interface ProgressionApi {
   addXp(amount: number): void
   /** Three (or more with luck) level-up offers. */
   rollLevelUpOffers(): Offer[]
-  /** Offers for a charge shrine: stat boons. */
-  rollShrineOffers(): Offer[]
+  /** Offers for a charge shrine: stat boons (all legendary from a golden shrine). */
+  rollShrineOffers(golden?: boolean): Offer[]
   /** One item out of a chest, rarity rolled with luck. */
   rollChestItem(): Offer
   applyOffer(offer: Offer): void
@@ -550,6 +550,8 @@ export interface ProgressionApi {
   /** Recomputes `stats` (call after any change); cheap. */
   recompute(): void
   update(dt: number): void
+  /** Frees item effect visuals at the end of a run. */
+  dispose(): void
 }
 
 /** Numbers for the HUD and the end screen. */
