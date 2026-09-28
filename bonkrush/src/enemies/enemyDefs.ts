@@ -44,7 +44,7 @@ const LIST: EnemyDef[] = [
   }),
   // ── Sunscorch Dunes ──
   def('scarab', {
-    name: 'Scarab', behavior: 'swarmer', hp: 10, damage: 6, speed: 7, radius: 0.4, height: 0.5, xp: 1,
+    name: 'Scarab', behavior: 'swarmer', hp: 10, damage: 6, speed: 7, radius: 0.4, height: 0.6, xp: 1,
     color: '#26a69a', accent: '#ffd23f', weight: 0.05,
   }),
   def('mummy', {
@@ -56,7 +56,7 @@ const LIST: EnemyDef[] = [
     color: '#5e4838', accent: '#ff9aa2', weight: 0.1,
   }),
   def('scorpion', {
-    name: 'Scorpion', behavior: 'ranged', hp: 36, damage: 10, speed: 3.2, radius: 0.7, height: 0.85, xp: 3,
+    name: 'Scorpion', behavior: 'ranged', hp: 36, damage: 10, speed: 3.2, radius: 0.7, height: 1.05, xp: 3,
     color: '#e0862e', accent: '#7a3a1a', weight: 0.4,
     projectile: { damage: 10, speed: 14, cooldown: 2, range: 20, color: '#b8ff3b' },
   }),

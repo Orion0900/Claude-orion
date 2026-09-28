@@ -30,7 +30,7 @@ import {
   yawTowards,
   type Steer,
 } from './behaviors'
-import { WARN, initBoss, updateBoss, updateSweep, type BossHost } from './bosses'
+import { WARN, hasPattern, initBoss, updateBoss, updateSweep, type BossHost } from './bosses'
 import {
   ELITE_DAMAGE_MULT,
   ELITE_HP_MULT,
@@ -93,6 +93,8 @@ interface Shockwave {
 
 const _v = new THREE.Vector3()
 const _drop = new THREE.Vector3()
+/** Where a hit on the player came from; separate so nested damage (item hooks) can't move it. */
+const _from = new THREE.Vector3()
 
 export class EnemyManager implements EnemyApi, BossHost {
   readonly ctx: GameContext
@@ -149,7 +151,7 @@ export class EnemyManager implements EnemyApi, BossHost {
 
   spawn(defId: string, pos: Vec3, opts: { elite?: boolean; boss?: boolean; hpScale?: number } = {}): Enemy | null {
     const def = ENEMIES[defId]
-    if (!def) return null
+    if (!def || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return null
     const tier = tierOf(def)
     const isBoss = !!opts.boss || tier === 'boss'
     if (this.living >= MAX_ENEMIES && !isBoss) return null
@@ -241,7 +243,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     }
     ctx.audio.play(crit ? 'crit' : 'bonk', { pitch: 0.9 + Math.random() * 0.25, volume: opts.noProcs ? 0.4 : 0.8 })
     const kb = opts.knockback
-    if (kb && e.freeze <= 0) {
+    if (kb && e.freeze <= 0 && Number.isFinite(kb.x) && Number.isFinite(kb.z)) {
       const k = 1 - Math.min(1, e.def.weight + (e.elite ? 0.15 : 0))
       e.kbX += kb.x * k
       e.kbZ += kb.z * k
@@ -358,7 +360,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     if (d > radius + player.radius) return
     const feet = player.pos.y - ctx.world.heightAt(player.pos.x, player.pos.z)
     if (feet > clearance) return
-    if (player.hurt(damage, e.def.id, _v) > 0) this.shove(dx, dz, d, 9, 5)
+    if (player.hurt(damage, e.def.id, _from.set(x, y, z)) > 0) this.shove(dx, dz, d, 9, 5)
   }
 
   shockwave(e: EnemyEntity, x: number, z: number, from: number, to: number, speed: number, damage: number): void {
@@ -378,7 +380,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     const slowMul = e.slow > 0 ? 0.5 : 1
     const speed = def.speed * slowMul
 
-    if (e.tier !== 'normal') {
+    if (e.tier !== 'normal' && hasPattern(def.id)) {
       updateBoss(this, e, dt, dx, dz, dist, steer)
       if (e.dashT > 0) {
         e.dashT -= dt
@@ -531,7 +533,7 @@ export class EnemyManager implements EnemyApi, BossHost {
       const dz = player.pos.z - e.pos.z
       const d = Math.hypot(dx, dz)
       if (d <= radius + player.radius && Math.abs(player.pos.y - e.pos.y) < radius) {
-        if (player.hurt(e.def.damage * e.damageScale, e.def.id, _v) > 0) this.shove(dx, dz, d, 8, 4)
+        if (player.hurt(e.def.damage * e.damageScale, e.def.id, _from.copy(e.pos)) > 0) this.shove(dx, dz, d, 8, 4)
       }
     }
     // Blowing itself up is not a kill: no drops, no kill credit.
@@ -553,6 +555,11 @@ export class EnemyManager implements EnemyApi, BossHost {
     const vz = e.moveZ + e.kbZ
     e.pos.x += vx * dt
     e.pos.z += vz * dt
+    if (!Number.isFinite(e.pos.x) || !Number.isFinite(e.pos.z)) {
+      // Something fed us NaN; drop the enemy rather than poison every query.
+      this.despawn(e)
+      return
+    }
     this.separate(e, index)
 
     // Keep out of the player's body, so crowds ring them instead of stacking inside.

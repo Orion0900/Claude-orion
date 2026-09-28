@@ -160,7 +160,7 @@ export class TitleScreen {
       this.refreshCards()
       const card = this.cards.find((c) => c.def.id === this.selected)
       if (!touch) (focusStart ? this.start : card?.card)?.focus({ preventScroll: true })
-      if (card) window.requestAnimationFrame(() => scrollIntoBox(card.card, this.grid))
+      if (card) scrollIntoBox(card.card, this.grid)
     } else {
       this.buildRecords()
       if (!touch) this.records.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })

@@ -183,7 +183,8 @@ export class Hud {
     pulse(this.hpBar, SHAKE, 260)
   }
 
-  swarm(): void {
+  /** The timer slams in as FINAL SWARM (called when the countdown crosses zero). */
+  private swarm(): void {
     pulse(this.timerBox, [{ transform: 'scale(2.2)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 1 }, { transform: 'scale(1)' }], 600)
   }
 
@@ -212,6 +213,11 @@ export class Hud {
         this.stats.update(ctx.progression.stats)
       }
     }
+  }
+
+  /** Whether the Tab overlay is showing (the UI hides banners and toasts under it). */
+  get tabVisible(): boolean {
+    return this.tabOpen
   }
 
   private setTab(open: boolean, ctx: GameContext | null): void {

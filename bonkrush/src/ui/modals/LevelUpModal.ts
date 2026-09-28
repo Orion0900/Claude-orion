@@ -8,6 +8,8 @@ import { Modal, type ModalEnv } from './Modal'
 /** Seconds the picked card flashes before the next round or the close. */
 const PICK_DELAY = 0.24
 const BANISH_DELAY = 0.3
+/** Each new round of cards ignores picks this long, so mashing a key can't choose unseen. */
+const ROUND_GUARD = 0.3
 
 /**
  * Level-up: loops while level-ups are pending, one round of cards each.
@@ -19,6 +21,7 @@ export class LevelUpModal extends Modal {
   private banishing = false
   private busy = 0
   private next: (() => void) | null = null
+  private roundAt = 0
   private readonly sub: HTMLDivElement
   private readonly row: HTMLDivElement
   private readonly hint: HTMLDivElement
@@ -117,7 +120,7 @@ export class LevelUpModal extends Modal {
     const look = runLookups(ctx)
     const touch = shell.input.isTouch
     this.row.replaceChildren()
-    this.row.classList.toggle('four', this.offers.length >= 4)
+    this.roundAt = this.age
     this.cards = this.offers.map((offer, i) => {
       const card = offerCard(describeOffer(offer, look), i, touch ? '' : String(i + 1))
       card.addEventListener('click', () => this.choose(i))
@@ -152,7 +155,8 @@ export class LevelUpModal extends Modal {
   }
 
   private choose(i: number): void {
-    if (!this.ready || this.busy > 0) return
+    const roundReady = this.age - this.roundAt >= ROUND_GUARD || this.env.autoPick()
+    if (!this.ready || !roundReady || this.busy > 0) return
     const offer = this.offers[i]
     const card = this.cards[i]
     if (!offer || !card) return

@@ -50,6 +50,7 @@ export class Ui implements UiApi {
   private unsubs: Array<() => void> = []
   private touchShown: boolean | null = null
   private modalClass = false
+  private tabClass = false
   private disposed = false
 
   constructor(
@@ -103,7 +104,6 @@ export class Ui implements UiApi {
       ev.on('playerDamaged', ({ amount }) => {
         if (amount > 0) this.hud.hurt()
       }),
-      ev.on('finalSwarm', () => this.hud.swarm()),
     )
     // Every stage opens with its name; attach runs once per stage.
     this.notices.banner(ctx.stage.name.toUpperCase(), ctx.stage.subtitle, ctx.stage.palette.accent)
@@ -286,6 +286,12 @@ export class Ui implements UiApi {
       this.notices.update(step)
     }
     if (this.title.visible) this.title.update()
+
+    const tab = !!ctx && this.hud.tabVisible
+    if (tab !== this.tabClass) {
+      this.tabClass = tab
+      this.root.classList.toggle('tab-open', tab)
+    }
 
     const wantTouch = !!ctx && !this.menuOpen && this.shell.input.isTouch
     if (wantTouch !== this.touchShown) {

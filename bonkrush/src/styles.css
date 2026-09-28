@@ -364,7 +364,9 @@ body {
 
 .ui-root.modal-up .prompt,
 .ui-root.modal-up .banners,
-.ui-root.modal-up .tab-overlay {
+.ui-root.modal-up .tab-overlay,
+.ui-root.tab-open .banners,
+.ui-root.tab-open .toasts {
   visibility: hidden;
 }
 
@@ -772,6 +774,7 @@ body {
 }
 
 .tab-panel {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(300px, 380px);
   grid-template-rows: auto 1fr;
@@ -1484,9 +1487,14 @@ body {
   animation: card-banish 0.3s ease-in 0s forwards;
 }
 
+/* Each card sets --rc inline, so banish mode recolours the parts directly. */
 .modal-levelup.banishing .card {
-  --rc: #ff4d5e;
+  border-color: var(--red);
   animation: shake-soft 0.5s ease-in-out infinite;
+}
+
+.modal-levelup.banishing .card::after {
+  box-shadow: 0 0 28px 6px var(--red);
 }
 
 .modal-levelup.banishing .card-icon::after {
@@ -1981,7 +1989,7 @@ body {
   width: min(540px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   animation: pop-in 0.32s var(--spring) backwards;
 }
 
@@ -1993,8 +2001,8 @@ body {
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
+  gap: 4px;
+  padding: 8px 14px;
   border-radius: 16px;
   background: rgba(0, 0, 0, 0.24);
 }
@@ -2011,7 +2019,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 42px;
+  min-height: 38px;
 }
 
 .settings-label {
@@ -2281,6 +2289,7 @@ body {
 }
 
 .char-grid {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -2931,7 +2940,8 @@ body {
 
 /* ─────────────────────────── small screens ─────────────────────────── */
 
-/* Portrait phones (375×667 and friends). */
+/* Portrait phones (375×667 and friends). Two HUD rows: vitals and counters on
+   top; slots, timer and minimap under them, side by side. */
 @media (max-width: 640px) {
   .hud-tl {
     left: calc(8px + var(--sal));
@@ -2939,51 +2949,56 @@ body {
     gap: 6px;
   }
 
+  .hp-row {
+    gap: 6px;
+  }
+
   .lvl-badge {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     border-width: 2px;
   }
 
   .lvl-cap {
-    top: 3px;
+    top: 2px;
     font-size: 7px;
   }
 
   .lvl-num {
     margin-top: 6px;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .hpbar {
-    width: 128px;
+    width: 118px;
     height: 20px;
     border-width: 2px;
   }
 
   .hpbar-text {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .slot,
   .slot-row.tomes .slot {
-    width: 27px;
-    height: 27px;
+    width: 24px;
+    height: 24px;
     border-width: 2px;
-    border-radius: 8px;
+    border-radius: 7px;
   }
 
   .slot-row.tomes .slot {
     border-radius: 50%;
   }
 
-  .slot-row {
+  .slot-row,
+  .slots {
     gap: 4px;
   }
 
   .slot-icon,
   .slot-row.tomes .slot-icon {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .slot-lvl {
@@ -2993,38 +3008,42 @@ body {
   }
 
   .hud-tc {
-    top: calc(6px + var(--sat));
-    width: min(210px, 42vw);
+    top: calc(46px + var(--sat));
+    width: 140px;
   }
 
   .timer {
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .timer-box.swarm .timer {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   .timer-sub {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .stage-name {
-    font-size: 9px;
-    letter-spacing: 0.08em;
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
     white-space: nowrap;
   }
 
-  .bossbar-name {
-    font-size: 11px;
+  .bossbar {
+    margin-top: 4px;
   }
 
-  .bossbar-hp {
+  .bossbar-name {
     font-size: 10px;
   }
 
+  .bossbar-hp {
+    font-size: 9px;
+  }
+
   .bossbar-track {
-    height: 13px;
+    height: 12px;
     border-width: 2px;
   }
 
@@ -3035,23 +3054,22 @@ body {
   }
 
   .counters {
-    flex-direction: column;
-    align-items: flex-end;
     gap: 3px;
   }
 
   .counter {
-    padding: 2px 8px 2px 5px;
-    font-size: 12px;
+    gap: 3px;
+    padding: 2px 6px 2px 4px;
+    font-size: 11.5px;
   }
 
   .counter-icon {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .minimap-wrap {
-    width: 92px;
-    height: 92px;
+    width: 84px;
+    height: 84px;
     border-width: 3px;
   }
 
@@ -3139,9 +3157,18 @@ body {
     font-size: 11px;
   }
 
+  .modal-actions {
+    gap: 8px;
+  }
+
   .modal-actions .btn {
-    font-size: 15px;
-    padding: 0.55em 0.9em;
+    min-height: 40px;
+    font-size: 14px;
+    padding: 0.5em 0.7em;
+  }
+
+  .stat-icon {
+    display: none;
   }
 
   .btn-big {
@@ -3185,7 +3212,8 @@ body {
   }
 
   .stat-list {
-    font-size: 12px;
+    font-size: 11.5px;
+    gap: 0 10px;
   }
 
   .chest-scene {
@@ -3201,8 +3229,8 @@ body {
 
   .char-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    padding: 8px 2px 14px;
+    gap: 12px;
+    padding: 12px 8px 16px;
   }
 
   .char-emoji {
@@ -3451,6 +3479,93 @@ body {
 
   .tab-panel {
     grid-template-columns: auto minmax(260px, 340px);
+  }
+
+  .banners {
+    top: 30%;
+  }
+
+  .logo {
+    font-size: min(11vw, 17vh);
+  }
+
+  .modal-sub {
+    font-size: 14px;
+  }
+
+  /* Four cards must share one row. */
+  .card {
+    width: min(168px, calc((100vw - 90px) / 4));
+    padding: 18px 8px 8px;
+  }
+
+  .card-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-key {
+    display: none;
+  }
+
+  .chars-head .screen-title {
+    font-size: 26px;
+  }
+
+  .char-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    padding: 12px 10px 14px;
+  }
+
+  .char-art {
+    width: 70%;
+  }
+
+  /* Matches the 70% art: 15% of the content box beside it, plus the 10px padding. */
+  .char-lock {
+    left: calc(7px + 15%);
+    right: calc(7px + 15%);
+  }
+
+  .char-name {
+    font-size: 15px;
+  }
+
+  .char-passive,
+  .char-weapon {
+    font-size: 10.5px;
+  }
+
+  .chars-foot {
+    padding: 8px 12px;
+  }
+
+  .chars-info-name {
+    font-size: 17px;
+  }
+
+  .chars-info-desc {
+    font-size: 12px;
+  }
+
+  .pause-side {
+    width: 210px;
+    gap: 10px;
+  }
+
+  .pause-side .modal-title {
+    font-size: 40px;
+  }
+
+  .stat-list {
+    font-size: 11.5px;
+    gap: 0 10px;
+  }
+
+  .stat-icon {
+    display: none;
   }
 }
 

@@ -30,7 +30,7 @@ export interface BossHost {
   /** Hurts the player within `radius` of (x, z) unless they are more than `clearance` m above the ground. */
   blast(e: EnemyEntity, x: number, z: number, radius: number, damage: number, color: string, clearance: number): void
   /** A ground ring expanding from `from` to `to` metres; jump over it. */
-  shockwave(e: EnemyEntity, x: number, z: number, from: number, to: number, speed: number, damage: number, color: string): void
+  shockwave(e: EnemyEntity, x: number, z: number, from: number, to: number, speed: number, damage: number): void
   /** A normal enemy arriving at (x, z) with the current scaling. */
   summon(defId: string, x: number, z: number): void
 }
@@ -75,7 +75,7 @@ function slam(radius: number, windup: number, mult: number, wave?: { to: number;
       h.blast(e, x, z, radius, hitDamage(e, mult), e.def.accent, 1.1)
       h.ctx.fx.shake(0.4)
       h.ctx.audio.play('explode', { pos: e.pos, pitch: 0.55, volume: 0.9 })
-      if (wave) h.shockwave(e, x, z, radius, wave.to, wave.speed, hitDamage(e, wave.mult), e.def.accent)
+      if (wave) h.shockwave(e, x, z, radius, wave.to, wave.speed, hitDamage(e, wave.mult))
     })
     return windup + 0.45
   }
@@ -319,7 +319,8 @@ export function updateBoss(h: BossHost, e: EnemyEntity, dt: number, dx: number, 
   }
   const speed = e.def.speed * (e.slow > 0 ? 0.5 : 1)
   if (pattern.keep > 0) keepDistance(dx, dz, dist, pattern.keep, speed, e.side, steer)
-  else if (dist > e.radius + 0.6) {
+  // Walk right into the player: contact damage is part of the fight.
+  else if (dist > e.radius + 0.2) {
     steer.x = (dx / dist) * speed
     steer.z = (dz / dist) * speed
   } else steer.x = steer.z = 0

@@ -55,6 +55,8 @@ const _identity = new THREE.Quaternion()
 
 export class EnemyRenderer {
   private readonly batches = new Map<string, Batch>()
+  /** The same batches as a list, so the per-frame passes don't allocate iterators. */
+  private readonly batchList: Batch[] = []
   private readonly material: THREE.MeshLambertMaterial
   private readonly shadows: THREE.InstancedMesh
   private readonly markers: THREE.InstancedMesh
@@ -101,6 +103,7 @@ export class EnemyRenderer {
     if (this.batches.has(def.id)) return
     const batch = new Batch(def, this.material, capacity)
     this.batches.set(def.id, batch)
+    this.batchList.push(batch)
     this.scene.add(batch.mesh)
   }
 
@@ -110,7 +113,7 @@ export class EnemyRenderer {
 
   /** Writes every living enemy's instance for this frame. */
   render(list: readonly EnemyEntity[], time: number): void {
-    for (const b of this.batches.values()) b.n = 0
+    for (let i = 0; i < this.batchList.length; i++) this.batchList[i].n = 0
     let shadows = 0
     let markers = 0
     const stepped = stepTime(time)
@@ -166,7 +169,8 @@ export class EnemyRenderer {
       }
     }
 
-    for (const b of this.batches.values()) {
+    for (let i = 0; i < this.batchList.length; i++) {
+      const b = this.batchList[i]
       b.mesh.count = b.n
       b.mesh.visible = b.n > 0
       if (b.n > 0) {
@@ -184,12 +188,13 @@ export class EnemyRenderer {
   }
 
   dispose(): void {
-    for (const b of this.batches.values()) {
+    for (const b of this.batchList) {
       this.scene.remove(b.mesh)
       b.mesh.geometry.dispose()
       b.mesh.dispose()
     }
     this.batches.clear()
+    this.batchList.length = 0
     this.material.dispose()
     for (const m of [this.shadows, this.markers]) {
       this.scene.remove(m)

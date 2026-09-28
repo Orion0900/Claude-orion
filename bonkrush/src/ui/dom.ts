@@ -103,12 +103,22 @@ export function focusInView(node: HTMLElement): void {
   if (box) scrollIntoBox(node, box)
 }
 
-/** Scrolls `box` (and nothing else) just enough to show `node`. */
+/**
+ * Scrolls `box` (and nothing else) just enough to show `node`. Uses layout
+ * offsets rather than client rects, so entrance animations that transform the
+ * node don't skew it; `box` must be positioned to sit in the offsetParent chain.
+ */
 export function scrollIntoBox(node: HTMLElement, box: HTMLElement): void {
-  const r = node.getBoundingClientRect()
-  const c = box.getBoundingClientRect()
-  if (r.top < c.top) box.scrollTop -= c.top - r.top + 16
-  else if (r.bottom > c.bottom) box.scrollTop += r.bottom - c.bottom + 16
+  let top = 0
+  let n: Element | null = node
+  while (n instanceof HTMLElement && n !== box) {
+    top += n.offsetTop
+    n = n.offsetParent
+  }
+  if (n !== box) return
+  const bottom = top + node.offsetHeight
+  if (top < box.scrollTop) box.scrollTop = top - 16
+  else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + 16
 }
 
 /** Arrow key → direction, or null. */

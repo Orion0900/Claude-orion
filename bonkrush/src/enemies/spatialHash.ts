@@ -134,9 +134,10 @@ export class SpatialHash {
     return best
   }
 
+  /** NaN lands in cell 0 rather than corrupting the counting sort. */
   private axisCell(v: number): number {
     const c = Math.floor((v - this.origin) * this.inv)
-    return c < 0 ? 0 : c >= this.dim ? this.dim - 1 : c
+    return c >= 0 ? (c < this.dim ? c : this.dim - 1) : 0
   }
 
   private cellIndex(x: number, z: number): number {
