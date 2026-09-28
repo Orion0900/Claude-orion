@@ -54,6 +54,25 @@ export function aliveCap(quality: Settings['quality']): number {
   return quality === 'low' ? 180 : 300
 }
 
+/** Hard ceiling on live enemies (the renderer's capacity); only bosses and minibosses may pass it. */
+export const MAX_ENEMIES = 420
+/** Slots set pieces never fill, kept for a challenge shrine's elites and a boss's summons. */
+export const SET_PIECE_RESERVE = 20
+
+/**
+ * How many may be alive after a wave that found nothing far off to make
+ * room: a fifth over the alive cap. The spawner then drains the overflow
+ * back down to the cap.
+ */
+export function waveCeiling(cap: number): number {
+  return Math.min(Math.floor(cap * 1.2), MAX_ENEMIES - SET_PIECE_RESERVE)
+}
+
+/** An encirclement may go its own size past the wave ceiling (it is the point), but not into the reserve. */
+export function encircleCeiling(cap: number, count: number): number {
+  return Math.min(waveCeiling(cap) + Math.max(0, count), MAX_ENEMIES - SET_PIECE_RESERVE)
+}
+
 /**
  * Spawns per second: min(14, 1.6 + 1.5 × stage + 0.6 × min^1.25) × (1 + difficulty × 0.6),
  * halved while a boss is alive. The stage term keeps later stages from

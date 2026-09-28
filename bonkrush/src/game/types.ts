@@ -305,6 +305,8 @@ export interface EnemyApi {
   applySlow(enemy: Enemy, seconds: number): void
   applyBurn(enemy: Enemy, dps: number, seconds: number): void
   applyFreeze(enemy: Enemy, seconds: number): void
+  /** Despawns one enemy silently: no drops, no events (swarm and wave room-making). */
+  remove(enemy: Enemy): void
   /** Removes every non-boss enemy (stage transitions). */
   clear(includeBoss?: boolean): void
   update(dt: number): void

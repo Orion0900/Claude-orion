@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { STAGES } from '../data/stages'
 import type { Enemy } from '../game/types'
-import { ENCIRCLE_RADIUS, GHOST_TIER_TINT, SPAWN_RING_MAX, SPAWN_RING_MIN, encircleTimes } from './director'
+import { ENCIRCLE_RADIUS, GHOST_TIER_TINT, MAX_ENEMIES, SPAWN_RING_MAX, SPAWN_RING_MIN, encircleCeiling, encircleTimes, minibossTimes, waveCeiling } from './director'
 import type { EnemyEntity } from './entity'
 import { makeHarness } from './testContext'
 
@@ -140,7 +140,7 @@ describe('Spawner', () => {
     expect(wave.count).toBeGreaterThanOrEqual(15)
     // Over the cap, but not without bound.
     expect(h.enemies.aliveCount).toBeGreaterThan(180)
-    expect(h.enemies.aliveCount).toBeLessThanOrEqual(Math.floor(180 * 1.35))
+    expect(h.enemies.aliveCount).toBeLessThanOrEqual(waveCeiling(180))
   })
 
   it('warns, then surrounds the player with a ring of the first roster type', () => {
@@ -181,6 +181,66 @@ describe('Spawner', () => {
     expect(alive(h, 'sprout').length).toBeGreaterThanOrEqual(30)
     expect(h.enemies.aliveCount).toBeLessThanOrEqual(181)
     expect(h.events.filter((e) => e.type === 'enemyKilled')).toHaveLength(0)
+  })
+
+  it('drains a set-piece overflow back down to the cap', () => {
+    const h = makeHarness()
+    fillToCap(h, 20)
+    // What a wave left over the cap: some out in the fog, some left far behind (frozen, so they stay there).
+    for (let i = 0; i < 40; i++) {
+      const e = h.enemies.spawn('goblin', new THREE.Vector3(i < 20 ? 55 : -90, 0, (i % 20) - 10)) as Enemy
+      h.enemies.applyFreeze(e, 60)
+    }
+    expect(h.enemies.aliveCount).toBe(220)
+    h.ctx.run.stageTime = 20
+    h.step(0.05, 240)
+    expect(h.enemies.aliveCount).toBeLessThanOrEqual(180)
+    expect(alive(h).filter((e) => Math.hypot(e.pos.x, e.pos.z) > 45)).toHaveLength(0)
+    // Shed, not killed: no drops, no kill credit.
+    expect(h.events.filter((e) => e.type === 'enemyKilled')).toHaveLength(0)
+  })
+
+  it('stops set pieces short of the hard ceiling, so minibosses and challenges still fit', () => {
+    const h = makeHarness()
+    h.ctx.settings.quality = 'high'
+    // A crowd nobody is killing, all close in, so nothing far off can make room.
+    for (let i = 0; i < 300; i++) {
+      const a = (i / 300) * Math.PI * 2
+      h.enemies.spawn('goblin', new THREE.Vector3(Math.cos(a) * 20, 0, Math.sin(a) * 20))
+    }
+    const rings = encircleTimes(0, h.ctx.run.stageDuration)
+    // Every set piece of the first seven minutes, back to back.
+    const due = [60, 120, 180, 240, rings[0], 300, 360, rings[1], 420].sort((a, b) => a - b)
+    let peak = 0
+    for (const t of due) {
+      h.ctx.run.stageTime = t - 0.05
+      h.step(0.1)
+      peak = Math.max(peak, h.enemies.aliveCount - alive(h).filter((e) => e.def.id === 'stone_golem').length)
+    }
+    // The second ring still forms at the ceiling: the wave stragglers behind it give way.
+    const rings2 = waves(h).filter((w) => w.encircle)
+    expect(rings2).toHaveLength(2)
+    expect(rings2[1].count).toBeGreaterThanOrEqual(20)
+    expect(peak).toBeGreaterThan(300)
+    expect(peak).toBeLessThanOrEqual(encircleCeiling(300, 30))
+    expect(encircleCeiling(300, 30)).toBeLessThanOrEqual(MAX_ENEMIES - 12)
+    expect(h.spawner.spawnChallenge(12, new THREE.Vector3(0, 0, 0))).toHaveLength(12)
+    // Both minibosses turned up on the way.
+    expect((h.ctx.ui.banner as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === 'MINIBOSS')).toHaveLength(1)
+    h.ctx.run.stageTime = minibossTimes(0, h.ctx.run.stageDuration)[1] - 0.05
+    h.step(0.1)
+    expect((h.ctx.ui.banner as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === 'MINIBOSS')).toHaveLength(2)
+  })
+
+  it('tries a miniboss again rather than losing it when the spawn is refused', () => {
+    const h = makeHarness()
+    const real = h.enemies.spawn.bind(h.enemies)
+    let refusals = 3
+    h.enemies.spawn = (id, pos, opts) => (id === 'stone_golem' && refusals-- > 0 ? null : real(id, pos, opts))
+    h.ctx.run.stageTime = minibossTimes(0, h.ctx.run.stageDuration)[0] - 0.05
+    h.step(0.05, 10)
+    expect(alive(h, 'stone_golem')).toHaveLength(1)
+    expect((h.ctx.ui.banner as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === 'MINIBOSS')).toHaveLength(1)
   })
 
   it("doesn't spring an encirclement the clock jumped past", () => {
@@ -250,6 +310,22 @@ describe('Spawner', () => {
     expect(h.enemies.aliveCount).toBeLessThanOrEqual(180)
     run(300)
     expect(alive(h, 'ghost').length).toBeGreaterThan(0.9 * h.enemies.aliveCount)
+  })
+
+  it('drains an overflowing horde while the ghosts arrive', () => {
+    const h = makeHarness()
+    fillToCap(h, 30)
+    // An encirclement's worth over the cap, close in, when the clock runs out.
+    for (let i = 0; i < 50; i++) h.enemies.spawn('goblin', new THREE.Vector3(Math.cos(i) * 16, 0, Math.sin(i) * 16))
+    h.ctx.run.stageTime = h.ctx.run.stageDuration - 0.01
+    let a = 0
+    for (let i = 0; i < 200; i++) {
+      a += (7 / 30) * 0.05
+      h.ctx.player.pos.set(Math.cos(a) * 30, 0, Math.sin(a) * 30)
+      h.step(0.05)
+    }
+    expect(h.enemies.aliveCount).toBeLessThanOrEqual(180)
+    expect(alive(h, 'ghost').length).toBeGreaterThan(90)
   })
 
   it('turns ghosts purple and tougher after three minutes of swarm', () => {

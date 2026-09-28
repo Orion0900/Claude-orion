@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { STAGES } from '../data/stages'
 import type { Enemy, StatBlock } from '../game/types'
 import { CHARGE_DASH, CHARGE_WINDUP } from './behaviors'
-import { ELITE_HP_MULT, ELITE_SCALE, hpScale } from './director'
+import { ELITE_HP_MULT, ELITE_SCALE, MAX_ENEMIES, hpScale } from './director'
 import { DEATH_FLING, DEATH_NONE, DEATH_TOPPLE, type EnemyEntity } from './entity'
 import { makeHarness } from './testContext'
 
@@ -432,16 +432,32 @@ describe('EnemyManager', () => {
     expect(h.hurt.mock.calls.some((c) => c[1] === 'scorpion')).toBe(true)
   })
 
-  it('lets a slide duck under swooping bats', () => {
-    const bitten = (sliding: boolean) => {
+  it('lets a slide duck under a swooping bat, but not forever', () => {
+    /** Seconds until a bat 1.5 m away bites, or Infinity. */
+    const bittenAfter = (sliding: boolean) => {
       const h = makeHarness()
       slide(h, sliding)
       h.enemies.spawn('bat', at(1.5, 0))
-      h.step(0.02, 150)
-      return h.hurt.mock.calls.some((c) => c[1] === 'bat')
+      for (let i = 1; i <= 150; i++) {
+        h.step(0.02)
+        if (h.hurt.mock.calls.some((c) => c[1] === 'bat')) return i * 0.02
+      }
+      return Infinity
     }
-    expect(bitten(false)).toBe(true)
-    expect(bitten(true)).toBe(false)
+    const standing = bittenAfter(false)
+    const sliding = bittenAfter(true)
+    expect(standing).toBeLessThan(0.45)
+    // The swoop misses; a bat that has watched the slide for a while dives lower.
+    expect(sliding).toBeGreaterThan(0.6)
+    expect(sliding).toBeLessThan(1.5)
+  })
+
+  it('lets a miniboss past the hard ceiling that turns the horde away', () => {
+    const h = makeHarness()
+    for (let i = 0; i < MAX_ENEMIES; i++) h.enemies.spawn('sprout', at(30 + (i % 20), Math.floor(i / 20)))
+    expect(h.enemies.aliveCount).toBe(MAX_ENEMIES)
+    expect(h.enemies.spawn('sprout', at(10, 0))).toBeNull()
+    expect(h.enemies.spawn('stone_golem', at(-20, 0))).not.toBeNull()
   })
 
   it('removes every mesh it added on dispose', () => {

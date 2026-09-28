@@ -1,4 +1,6 @@
 import {
+  MAX_ENEMIES,
+  SET_PIECE_RESERVE,
   aliveCap,
   behaviorSpawnWeight,
   bossHpScale,
@@ -6,6 +8,7 @@ import {
   damageScale,
   effectiveDifficulty,
   eliteChance,
+  encircleCeiling,
   encircleCount,
   encircleTimes,
   ghostTier,
@@ -18,6 +21,7 @@ import {
   swarmHpMultiplier,
   swarmRate,
   unlockedCount,
+  waveCeiling,
   waveCount,
   waveIndex,
 } from './director'
@@ -225,6 +229,24 @@ describe('caps and intensity', () => {
     expect(aliveCap('high')).toBe(300)
     expect(aliveCap('medium')).toBe(300)
     expect(aliveCap('low')).toBe(180)
+  })
+
+  it('lets waves overflow the cap by a fifth and encirclements by their size', () => {
+    expect(waveCeiling(180)).toBe(216)
+    expect(encircleCeiling(180, 50)).toBe(266)
+    expect(waveCeiling(300)).toBe(360)
+    expect(encircleCeiling(300, 30)).toBe(390)
+  })
+
+  it('keeps set pieces out of the reserve for challenge elites and boss summons', () => {
+    // A stage-3 challenge (12 elites) and a boss summon (6) still fit on top of a full ring.
+    expect(SET_PIECE_RESERVE).toBeGreaterThanOrEqual(18)
+    for (const cap of [180, 300, 400]) {
+      expect(encircleCeiling(cap, 50)).toBeLessThanOrEqual(MAX_ENEMIES - SET_PIECE_RESERVE)
+      expect(waveCeiling(cap)).toBeLessThanOrEqual(encircleCeiling(cap, 50))
+    }
+    expect(encircleCeiling(300, 50)).toBe(MAX_ENEMIES - SET_PIECE_RESERVE)
+    expect(encircleCeiling(300, -5)).toBe(waveCeiling(300))
   })
 
   it('is 1 in the swarm and rises with time and crowd', () => {

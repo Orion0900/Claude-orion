@@ -161,7 +161,6 @@ export class EnemyEntity implements Enemy {
   }
 }
 
-
 /**
  * Moves an enemy to a fresh spot as if it had just arrived (the spawner
  * recycles far stragglers this way). Works on any `Enemy`, but only clears

@@ -36,6 +36,7 @@ import {
   ELITE_DAMAGE_MULT,
   ELITE_HP_MULT,
   ELITE_SCALE,
+  MAX_ENEMIES,
   bossDamageScale,
   bossHpScale,
   damageScale,
@@ -51,8 +52,6 @@ import { EnemyRenderer } from './EnemyRenderer'
 import { SpatialHash } from './spatialHash'
 import { Telegraphs } from './Telegraphs'
 
-/** Hard ceiling on live enemies, above the spawner's cap so summons and challenge elites still fit. */
-export const MAX_ENEMIES = 420
 /** Seconds a dead enemy's object rests before the pool hands it out again. */
 const QUARANTINE = 4
 /** Enemies overlap a little before separation pushes them apart; packs look denser. */
@@ -76,8 +75,14 @@ const BIG_RADIUS = 1.3
 /** How tall the player is to enemy contact and shots, standing and sliding. */
 const PLAYER_HEIGHT = 1.7
 const SLIDE_HEIGHT = 0.9
-/** Melee fliers swoop to about head height, so a slide ducks under them. */
+/**
+ * Melee fliers swoop to about head height, so ducking into a slide makes a
+ * swoop miss. After FLIER_REACT seconds of sliding they dive for the slider
+ * too: a slide dodges a swoop, it isn't a shield against every bat.
+ */
 const FLIER_BITE_HEIGHT = 1.0
+const FLIER_SLIDE_BITE_HEIGHT = 0.4
+const FLIER_REACT = 0.6
 /** Straight shots aim at the chest of a standing player (a slide ducks under) or the body of a sliding one. */
 const AIM_HEIGHT = 1.3
 const AIM_HEIGHT_SLIDING = 0.45
@@ -146,6 +151,8 @@ export class EnemyManager implements EnemyApi, BossHost {
   private bossRef: EnemyEntity | null = null
   private maxRadius = 0.5
   private lastKillSound = -1
+  /** How long the player has been sliding (0 when not), so fliers can follow them down. */
+  private slideFor = 0
   private excluded: ReadonlySet<number> | null = null
 
   constructor(ctx: GameContext) {
@@ -182,7 +189,8 @@ export class EnemyManager implements EnemyApi, BossHost {
     if (!def || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return null
     const tier = tierOf(def)
     const isBoss = !!opts.boss || tier === 'boss'
-    if (this.living >= MAX_ENEMIES && !isBoss) return null
+    // Bosses and minibosses are never turned away; their own batch capacity bounds them.
+    if (this.living >= MAX_ENEMIES && !isBoss && tier === 'normal') return null
     this.renderer.prepare(def, capacityFor(def))
     const live = this.perDef.get(def.id) ?? 0
     if (live >= this.renderer.capacityOf(def.id)) return null
@@ -335,6 +343,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     const px = player.pos.x
     const py = player.pos.y
     const pz = player.pos.z
+    this.slideFor = player.sliding ? this.slideFor + dt : 0
     const n = this.entities.length
     for (let i = 0; i < n; i++) {
       const e = this.entities[i]
@@ -626,9 +635,12 @@ export class EnemyManager implements EnemyApi, BossHost {
       e.pos.x = clamp(e.pos.x, -limit, limit)
       e.pos.z = clamp(e.pos.z, -limit, limit)
       const ground = world.heightAt(e.pos.x, e.pos.z)
-      // Fliers hover, then swoop down to head height when close enough to bite.
+      // Fliers hover, then swoop down to head height when close enough to bite (lower once a slide has gone on).
       let target = ground + e.hover
-      if (!e.def.projectile && dist < 3.5) target = Math.max(ground + 0.3, py + FLIER_BITE_HEIGHT)
+      if (!e.def.projectile && dist < 3.5) {
+        const bite = this.slideFor > FLIER_REACT ? FLIER_SLIDE_BITE_HEIGHT : FLIER_BITE_HEIGHT
+        target = Math.max(ground + 0.3, py + bite)
+      }
       const before = e.pos.y
       e.pos.y += (target - e.pos.y) * Math.min(1, dt * 3)
       if (e.pos.y < ground + 0.3) e.pos.y = ground + 0.3

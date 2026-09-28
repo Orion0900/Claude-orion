@@ -23,6 +23,7 @@ import {
   clumpSize,
   effectiveDifficulty,
   eliteChance,
+  encircleCeiling,
   encircleCount,
   encircleTimes,
   ghostTier,
@@ -34,6 +35,7 @@ import {
   swarmDamageMultiplier,
   swarmHpMultiplier,
   swarmRate,
+  waveCeiling,
   waveCount,
   waveIndex,
   type GhostTier,
@@ -50,8 +52,8 @@ const CHALLENGE_RADIUS = 9
 const BOSS_DISTANCE = 14
 /** Spawn budget can't pile up past this while the map is full. */
 const MAX_BUDGET = 24
-/** Waves may push the crowd this far over the alive cap when nothing far off can make room. */
-const SET_PIECE_OVERFLOW = 1.35
+/** Over the cap, this many far-off normals a second leave on top of what clumps shed. */
+const DRAIN_PER_SECOND = 8
 /**
  * In the final swarm at the cap, the furthest old-roster enemy gives way to
  * each arriving ghost; only the ones already in the player's face stay put.
@@ -60,6 +62,8 @@ const SWARM_REPLACE_DISTANCE = 8
 const MIST = '#e8e8ff'
 /** Seconds late after which a scheduled encirclement is skipped. */
 const ENCIRCLE_STALE = 3
+/** At its ceiling an encirclement still forms: normals further out than this give way to it. */
+const ENCIRCLE_ROOM = ENCIRCLE_RADIUS + 10
 const WARN = '#ff3b3b'
 
 /** EnemyManager.remove: a despawn with no kill. Not on the EnemyApi contract, so it is looked up. */
@@ -115,7 +119,8 @@ export class Spawner implements SpawnerApi {
       this.straggleTimer -= dt
       if (this.straggleTimer <= 0) {
         this.straggleTimer = 1
-        this.recycleStragglers(8)
+        this.recycleStragglers(8, cap)
+        this.drain(DRAIN_PER_SECOND, cap)
       }
 
       if (!this.swarm && t >= run.stageDuration) this.startSwarm()
@@ -131,7 +136,7 @@ export class Spawner implements SpawnerApi {
         // Beating the boss skips the clock; don't dump every skipped set piece at once.
         if (!run.bossDefeated) {
           this.checkMinibosses(t)
-          this.checkEncirclements(t)
+          this.checkEncirclements(t, cap)
           this.checkWaves(t, cap)
         }
         this.budget += spawnRate(t, diff, ctx.stage.index, !!ctx.enemies.boss) * dt
@@ -243,27 +248,29 @@ export class Spawner implements SpawnerApi {
     const times = minibossTimes(this.ctx.stage.index, this.ctx.run.stageDuration)
     for (let k = 0; k < times.length; k++) {
       if (this.minibossDone[k] || t < times[k]) continue
-      this.minibossDone[k] = true
-      this.spawnMiniboss()
+      // Only done once it has actually arrived: a refused spawn tries again next frame.
+      if (this.spawnMiniboss()) this.minibossDone[k] = true
     }
   }
 
-  private spawnMiniboss(): void {
+  /** False if the enemy system turned it away; true once spawned (or if the stage has none). */
+  private spawnMiniboss(): boolean {
     const ctx = this.ctx
     const id = MINIBOSSES[Math.min(ctx.stage.index, MINIBOSSES.length - 1)]
     const def = id ? ENEMIES[id] : undefined
-    if (!def) return
+    if (!def) return true
     const p = ctx.player.pos
     ringPoint(this.rng, p.x, p.z, 20, 26, this.limit(), this.spot)
     const e = ctx.enemies.spawn(def.id, this.settle(this.spot.x, this.spot.z, def.radius))
-    if (!e) return
+    if (!e) return false
     ctx.ui.banner('MINIBOSS', def.name, '#ff9a3d')
     ctx.audio.play('bossRoar', { pitch: 1.15 })
     ctx.fx.shake(0.3)
+    return true
   }
 
   /** Twice a stage a ring of the stage's first enemy closes in around the player, a second after a warning. */
-  private checkEncirclements(t: number): void {
+  private checkEncirclements(t: number, cap: number): void {
     const times = encircleTimes(this.ctx.stage.index, this.ctx.run.stageDuration)
     for (let k = 0; k < times.length; k++) {
       if (this.encircleDone[k]) continue
@@ -278,7 +285,7 @@ export class Spawner implements SpawnerApi {
       }
       if (t >= times[k]) {
         this.encircleDone[k] = true
-        this.encircle()
+        this.encircle(cap)
       }
     }
   }
@@ -292,15 +299,17 @@ export class Spawner implements SpawnerApi {
     ctx.fx.ring(this.at.set(p.x, ctx.world.heightAt(p.x, p.z) + 0.1, p.z), ENCIRCLE_RADIUS, WARN, ENCIRCLE_WARNING)
   }
 
-  private encircle(): void {
+  private encircle(cap: number): void {
     const ctx = this.ctx
     const id = ctx.stage.roster.find((r) => ENEMIES[r])
     if (!id) return
     const p = ctx.player.pos
-    const n = ringSpots(encircleCount(ctx.stage.index), ENCIRCLE_RADIUS, p.x, p.z, this.rng.next() * Math.PI * 2, this.limit(), this.ring)
+    const count = encircleCount(ctx.stage.index)
+    const n = ringSpots(count, ENCIRCLE_RADIUS, p.x, p.z, this.rng.next() * Math.PI * 2, this.limit(), this.ring)
+    const ceiling = encircleCeiling(cap, count)
     let placed = 0
-    // The ring is the point: it ignores the alive cap (far-off enemies still make room first).
-    for (let k = 0; k < n; k++) if (this.placeSetPiece(id, this.ring[k].x, this.ring[k].z, Infinity, false)) placed++
+    // The ring is the point: it goes over the alive cap (far-off enemies still make room first).
+    for (let k = 0; k < n; k++) if (this.placeSetPiece(id, this.ring[k].x, this.ring[k].z, cap, ceiling, false, ENCIRCLE_ROOM)) placed++
     if (placed === 0) return
     ctx.audio.play('explode', { pitch: 0.6, volume: 0.4 })
     ctx.events.emit('wave', { defId: id, count: placed, encircle: true })
@@ -318,10 +327,10 @@ export class Spawner implements SpawnerApi {
     const count = waveCount(t, ENEMIES[id].behavior, this.rng.next())
     const radius = WAVE_RADIUS + (this.rng.next() - 0.5) * 4
     const n = ringSpots(count, radius, p.x, p.z, this.rng.next() * Math.PI * 2, this.limit(), this.ring)
-    const overflow = Math.floor(cap * SET_PIECE_OVERFLOW)
+    const ceiling = waveCeiling(cap)
     let placed = 0
     for (let k = 0; k < n; k++) {
-      if (this.placeSetPiece(id, this.ring[k].x, this.ring[k].z, overflow, this.rng.chance(eliteChance(t)))) placed++
+      if (this.placeSetPiece(id, this.ring[k].x, this.ring[k].z, cap, ceiling, this.rng.chance(eliteChance(t)), Infinity)) placed++
     }
     if (placed > 0) ctx.events.emit('wave', { defId: id, count: placed, encircle: false })
   }
@@ -329,15 +338,18 @@ export class Spawner implements SpawnerApi {
   /**
    * One member of a wave or encirclement. Set pieces don't wait for room:
    * at the cap a far-off normal is retired to make some, and failing that
-   * the set piece goes over the cap, up to `limit` alive.
+   * the set piece goes over the cap, up to `ceiling` alive (the spawner
+   * drains the overflow afterwards). At the ceiling, a normal further than
+   * `room` from the player gives way, or the member is skipped.
    */
-  private placeSetPiece(id: string, x: number, z: number, limit: number, elite: boolean): Enemy | null {
+  private placeSetPiece(id: string, x: number, z: number, cap: number, ceiling: number, elite: boolean, room: number): Enemy | null {
     const def = ENEMIES[id]
     if (!def) return null
-    const ctx = this.ctx
-    const cap = aliveCap(ctx.settings.quality)
-    if (ctx.enemies.aliveCount >= cap && !this.retireFurthest(RECYCLE_DISTANCE, false) && ctx.enemies.aliveCount >= limit) return null
-    return ctx.enemies.spawn(id, this.settle(x, z, def.radius), { elite })
+    const enemies = this.ctx.enemies
+    if (enemies.aliveCount >= cap && !this.retireFurthest(RECYCLE_DISTANCE, false) && enemies.aliveCount >= ceiling) {
+      if (!(room < RECYCLE_DISTANCE) || !this.retireFurthest(room, false)) return null
+    }
+    return enemies.spawn(id, this.settle(x, z, def.radius), { elite })
   }
 
   // ─────────────────────────────── spawning ───────────────────────────────
@@ -362,15 +374,23 @@ export class Spawner implements SpawnerApi {
     return placed > 0
   }
 
-  /** Spawns one enemy here, or at the cap moves a far-off normal here instead. */
+  /**
+   * Spawns one enemy here, or at the cap moves a far-off normal here
+   * instead. Over the cap (a set piece overflowed it) a far-off normal is
+   * shed rather than moved, so the crowd drains back down to the cap.
+   */
   private place(id: string, x: number, z: number, t: number, diff: number, cap: number): boolean {
     const ctx = this.ctx
     const def = ENEMIES[id]
     if (!def) return false
-    if (ctx.enemies.aliveCount >= cap) {
+    const alive = ctx.enemies.aliveCount
+    if (alive >= cap) {
+      const over = alive > cap
       // In the swarm the ghosts take the old horde's place instead of waiting for room.
       const room = this.swarm && id === SWARM_ENEMY && this.retireFurthest(SWARM_REPLACE_DISTANCE, true)
-      if (!room) return this.recycleTo(this.settle(x, z, def.radius))
+      if (!room) return over ? this.retireFurthest(RECYCLE_DISTANCE, false) : this.recycleTo(this.settle(x, z, def.radius))
+      // Over the cap the old horde thins two for one, so ghosts keep arriving while it drains.
+      if (over) this.retireFurthest(SWARM_REPLACE_DISTANCE, true)
     }
     const pos = this.settle(x, z, def.radius)
     if (this.swarm) {
@@ -406,9 +426,10 @@ export class Spawner implements SpawnerApi {
 
   /**
    * Normals left far behind (a long slide) come back around to the ring.
-   * In the final swarm the old roster doesn't come back: it's retired.
+   * Over the cap, or from the old roster in the final swarm, they don't
+   * come back: they're retired.
    */
-  private recycleStragglers(max: number): void {
+  private recycleStragglers(max: number, cap: number): void {
     const ctx = this.ctx
     const p = ctx.player.pos
     const far2 = STRAGGLER_DISTANCE * STRAGGLER_DISTANCE
@@ -421,7 +442,8 @@ export class Spawner implements SpawnerApi {
       const dz = e.pos.z - p.z
       if (dx * dx + dz * dz < far2) continue
       moved++
-      if (this.swarm && e.def.id !== SWARM_ENEMY && this.retire(e, false)) continue
+      const shed = ctx.enemies.aliveCount > cap || (this.swarm && e.def.id !== SWARM_ENEMY)
+      if (shed && this.retire(e, false)) continue
       ringPoint(this.rng, p.x, p.z, SPAWN_RING_MIN, SPAWN_RING_MAX, limit, this.spot)
       const pos = this.settle(this.spot.x, this.spot.z, e.def.radius)
       relocate(e, pos.x, pos.y, pos.z)
@@ -460,6 +482,13 @@ export class Spawner implements SpawnerApi {
       const dx = e.pos.x - p.x
       const dz = e.pos.z - p.z
       if (dx * dx + dz * dz > min2) this.retire(e, false)
+    }
+  }
+
+  /** A set piece left the map over the cap: up to `max` normals out in the fog quietly leave. */
+  private drain(max: number, cap: number): void {
+    for (let k = 0; k < max && this.ctx.enemies.aliveCount > cap; k++) {
+      if (!this.retireFurthest(RECYCLE_DISTANCE, false)) return
     }
   }
 
