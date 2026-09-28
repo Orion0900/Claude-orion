@@ -2,7 +2,7 @@ import type { CharacterDef, SfxId, ShellApi } from '../game/types'
 import { STAGES } from '../data/stages'
 import { weaponDef } from './defs'
 import { SHAKE, activateFocused, arrowDir, bouncyText, button, el, moveFocus, pulse, scrollIntoBox } from './dom'
-import { bestStageLabel, formatCount, formatTime } from './format'
+import { bestStageLabel, controlsHint, formatCount, formatTime } from './format'
 
 type View = 'main' | 'chars' | 'records'
 
@@ -15,6 +15,8 @@ interface CharCard {
 
 const PORTRAIT_SIZE = 256
 const LAST_KEY = 'bonkrush.lastCharacter'
+/** Seconds an armed "Spend N silver?" confirmation waits for the second press. */
+const UNLOCK_CONFIRM = 3
 
 /**
  * The title: logo and main menu, character select with portraits and
@@ -38,6 +40,8 @@ export class TitleScreen {
   /** Rendered portraits by character id; '' means rendering failed, keep the emoji. */
   private readonly portraits = new Map<string, string>()
   private shownFlag = false
+  /** Seconds left on an armed unlock; buying silver-locked characters always takes a confirming press. */
+  private unlockArmed = 0
 
   constructor(
     private readonly shell: ShellApi,
@@ -60,14 +64,7 @@ export class TitleScreen {
     button('Characters', 'btn-purple', () => this.go('chars', false), menu)
     button('Settings', 'btn-blue', () => this.openSettings(), menu)
     button('Records', 'btn-green', () => this.go('records'), menu)
-    el(
-      'div',
-      'title-hint',
-      shell.input.isTouch
-        ? 'Left thumb: move · Drag right: look · ⤒ jump · ⤓ slide · ✋ interact'
-        : 'WASD move · Mouse look · Space jump · Shift slide · E interact · Tab stats · Esc pause',
-      this.main,
-    )
+    el('div', 'title-hint', controlsHint(shell.input.isTouch), this.main)
 
     // Character select.
     this.chars = el('div', 'title-chars hidden', undefined, this.root)
@@ -109,8 +106,12 @@ export class TitleScreen {
   }
 
   /** Portraits render one per frame while the character grid is open, so it never hitches. */
-  update(): void {
+  update(dt: number): void {
     if (!this.shownFlag || this.view !== 'chars') return
+    if (this.unlockArmed > 0) {
+      this.unlockArmed -= dt
+      if (this.unlockArmed <= 0) this.refreshCards()
+    }
     for (const c of this.cards) {
       if (this.portraits.has(c.def.id)) continue
       const url = this.shell.renderPortrait(c.def.id, PORTRAIT_SIZE)
@@ -133,7 +134,13 @@ export class TitleScreen {
       const scope = this.view === 'chars' && !(document.activeElement instanceof HTMLButtonElement && this.grid.contains(document.activeElement))
         ? this.grid
         : panel
-      if (moveFocus(scope, dir)) this.sfx('uiMove', { volume: 0.5 })
+      const moved = moveFocus(scope, dir)
+      if (moved) {
+        this.sfx('uiMove', { volume: 0.5 })
+        // Arrowing onto a card selects it; mouse and touch select on the first click instead.
+        const card = this.cards.find((c) => c.card === moved)
+        if (card) this.select(card.def.id, false)
+      }
       return true
     }
     if (e.repeat) return false
@@ -148,6 +155,7 @@ export class TitleScreen {
 
   private go(view: View, focusStart = false): void {
     this.view = view
+    this.unlockArmed = 0
     this.main.classList.toggle('hidden', view !== 'main')
     this.chars.classList.toggle('hidden', view !== 'chars')
     this.records.classList.toggle('hidden', view !== 'records')
@@ -200,13 +208,12 @@ export class TitleScreen {
       const cost = el('span', 'char-lock-cost ol', formatCount(def.unlockCost), lock)
       cost.prepend(el('span', 'coin silver'))
       const entry: CharCard = { def, card, art, lock }
+      // First click selects, a second one starts (or arms the unlock). Selection
+      // never follows focus: Chrome and Firefox focus a button on mouse or touch
+      // down, which would turn every first click into a second one.
       card.addEventListener('click', () => {
-        if (this.selected === def.id) this.startOrUnlock()
+        if (this.selected === def.id) this.startOrUnlock(true)
         else this.select(def.id)
-      })
-      card.addEventListener('focus', () => {
-        this.select(def.id, false)
-        scrollIntoBox(card, this.grid)
       })
       const cached = this.portraits.get(def.id)
       if (cached) this.setPortrait(entry, cached)
@@ -225,6 +232,7 @@ export class TitleScreen {
   private select(id: string, sound = true): void {
     if (this.selected === id) return
     this.selected = id
+    this.unlockArmed = 0
     writeLast(id)
     if (sound) this.sfx('uiMove')
     this.refreshCards()
@@ -244,20 +252,27 @@ export class TitleScreen {
     this.footName.textContent = `${def.icon} ${def.name}`
     this.footDesc.textContent = def.description
     this.start.replaceChildren()
+    const armed = !unlocked && this.unlockArmed > 0
     if (unlocked) {
       this.start.textContent = 'Start ▶'
       this.start.disabled = false
-      this.start.classList.remove('btn-green')
     } else {
-      this.start.append(`Unlock `)
+      this.start.append(armed ? 'Spend ' : 'Unlock ')
       el('span', 'coin silver', undefined, this.start)
-      this.start.append(` ${formatCount(def.unlockCost)}`)
+      this.start.append(` ${formatCount(def.unlockCost)}${armed ? '?' : ''}`)
       this.start.disabled = silver < def.unlockCost
-      this.start.classList.add('btn-green')
     }
+    this.start.classList.toggle('btn-green', !unlocked)
+    this.start.classList.toggle('confirm', armed)
   }
 
-  private startOrUnlock(): void {
+  /**
+   * Starts the run with an unlocked character. For a locked one the first
+   * press only arms the purchase and a second press of the button buys it;
+   * a press that came from a card only ever arms, so no click on the grid
+   * spends silver.
+   */
+  private startOrUnlock(fromCard = false): void {
     const def = this.shell.characters.find((c) => c.id === this.selected)
     if (!def) return
     if (this.shell.isUnlocked(def.id)) {
@@ -266,6 +281,16 @@ export class TitleScreen {
       return
     }
     const card = this.cards.find((c) => c.def.id === def.id)
+    const affordable = this.shell.meta.silver >= def.unlockCost
+    if (affordable && (fromCard || this.unlockArmed <= 0)) {
+      this.unlockArmed = UNLOCK_CONFIRM
+      this.sfx('uiMove')
+      this.refreshCards()
+      pulse(this.start, [{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }], 260)
+      if (fromCard && !this.shell.input.isTouch) this.start.focus({ preventScroll: true })
+      return
+    }
+    this.unlockArmed = 0
     if (this.shell.unlockCharacter(def.id)) {
       this.sfx('levelUp')
       this.refreshSilver()

@@ -83,6 +83,7 @@ describe('chests', () => {
     expect(log.applied).toEqual([{ type: 'item', id: 'clover', rarity: 'rare' }])
     expect(log.events).toContain('chestOpened')
     expect(log.modals[0]).toEqual({ kind: 'chest', offer: { type: 'item', id: 'clover', rarity: 'rare' } })
+    expect(run.chestsPaid).toBe(1)
     expect(things.chestCost).toBe(34)
     // An opened chest no longer takes the prompt.
     expect(things.prompt).toBeNull()
@@ -95,7 +96,31 @@ describe('chests', () => {
     things.interact()
     expect(run.gold).toBe(0)
     expect(log.events).toContain('chestOpened')
+    expect(run.chestsPaid).toBe(0)
     expect(things.chestCost).toBe(25)
+  })
+
+  it('prices from the run, so the price keeps climbing on the next stage', () => {
+    const game = setup()
+    game.run.gold = 1000
+    for (let i = 0; i < 3; i++) {
+      game.standAt(game.find('chest', i).pos)
+      game.things.interact()
+    }
+    expect(game.run.chestsPaid).toBe(3)
+    expect(game.things.chestCost).toBe(53)
+    // Game builds a fresh manager for every stage; gold and the paid count carry over.
+    game.things.dispose()
+    const next = new InteractableManager(game.ctx)
+    expect(next.chestCost).toBe(53)
+    const gold = game.run.gold
+    const chest = next.markers.find((m) => m.kind === 'chest')!
+    game.player.pos.set(chest.pos.x + 1, chest.pos.y, chest.pos.z)
+    next.update(1 / 60)
+    next.interact()
+    expect(game.run.gold).toBe(gold - 53)
+    expect(game.run.chestsPaid).toBe(4)
+    expect(next.chestCost).toBe(64)
   })
 
   it('rolls the key once per chest, so mashing Interact never rerolls it', () => {
@@ -192,7 +217,7 @@ describe('shrines', () => {
     expect(modal.offers.every((o) => o.rarity === 'legendary')).toBe(true)
   })
 
-  it('greed pays 40 raw gold and adds curse', () => {
+  it('greed pays 40 raw gold and adds run-long difficulty', () => {
     const { things, find, standAt, run, stats, log } = setup()
     stats.goldGain = 3
     const shrine = find('shrineGreed')
@@ -200,7 +225,10 @@ describe('shrines', () => {
     expect(things.prompt?.text).toBe('Greed shrine: +40 gold, +8% difficulty')
     things.interact()
     expect(run.gold).toBe(40)
-    expect(run.curse).toBeCloseTo(0.08)
+    // run.greed survives stage changes; run.curse (reset per stage) is left alone.
+    expect(run.greed).toBeCloseTo(0.08)
+    expect(run.curse).toBe(0)
+    expect(log.recomputes).toBe(1)
     expect(shrine.used).toBe(true)
     expect(log.events).toContain('shrineUsed')
     things.interact()
@@ -253,13 +281,15 @@ describe('shrines', () => {
     expect(things.markers.filter((m) => m.kind === 'chest').length).toBe(chestsBefore)
   })
 
-  it('curse shrines add difficulty and an extra boss chest', () => {
-    const { things, find, standAt, run, ctx } = setup()
+  it('curse shrines add stage difficulty and an extra boss chest', () => {
+    const { things, find, standAt, run, ctx, log } = setup()
     standAt(find('shrineCurse', 0).pos)
     things.interact()
     standAt(find('shrineCurse', 1).pos)
     things.interact()
     expect(run.curse).toBeCloseTo(0.3)
+    expect(run.greed).toBe(0)
+    expect(log.recomputes).toBe(2)
     const before = things.markers.filter((m) => m.kind === 'chest').length
     const boss = fakeEnemy(7, new THREE.Vector3(30, 0, 30))
     boss.boss = true
@@ -376,7 +406,38 @@ describe('altar and portal', () => {
     expect(log.advances).toBe(1)
   })
 
-  it('reset() rebuilds a fresh layout', () => {
+  it('builds the portal hidden with the stage, so the shader prewarm compiles it', () => {
+    const { things, ctx } = setup()
+    const view = ctx.scene.getObjectByName('portal')!
+    expect(view).toBeDefined()
+    expect(view.visible).toBe(false)
+    things.openPortal(new THREE.Vector3(10, 0, 110))
+    expect(view.visible).toBe(true)
+    things.reset()
+    expect(view.visible).toBe(false)
+    expect(ctx.scene.getObjectByName('portal')).toBe(view)
+  })
+
+  // Covers the dead-player guards in interact() and updatePortal(); enterPortal's own
+  // guard is a private backstop that no public path reaches while those hold.
+  it('a dead player can neither walk into the portal, press E on it, nor open a chest', () => {
+    const { things, find, standAt, step, player, log, run } = setup()
+    const at = new THREE.Vector3(10, 0, 110)
+    things.openPortal(at)
+    step(1)
+    player.alive = false
+    player.pos.set(10.5, 0, 110)
+    step(1)
+    things.interact()
+    expect(log.advances).toBe(0)
+    run.gold = 100
+    standAt(find('chest').pos)
+    things.interact()
+    expect(log.events).not.toContain('chestOpened')
+    expect(run.gold).toBe(100)
+  })
+
+  it('reset() rebuilds a fresh layout but keeps the run-long chest price', () => {
     const { things, find, standAt, run } = setup()
     run.gold = 100
     standAt(find('chest').pos)
@@ -385,6 +446,6 @@ describe('altar and portal', () => {
     things.reset()
     expect(things.markers.some((m) => m.used)).toBe(false)
     expect(things.markers.some((m) => m.kind === 'portal')).toBe(false)
-    expect(things.chestCost).toBe(25)
+    expect(things.chestCost).toBe(34)
   })
 })

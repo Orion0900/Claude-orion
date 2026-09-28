@@ -28,18 +28,18 @@ export function sunDirection(stageIndex: number, disc = false, out = new THREE.V
 /**
  * Hemisphere fill plus one shadow-casting sun whose shadow camera follows
  * the player. The shadow camera moves in whole shadow-map texels along the
- * light's own axes, so shadows don't shimmer as the player runs.
+ * light's own axes, so shadows don't shimmer as the player runs. There are
+ * deliberately no point lights: every lit pixel pays for each one, all
+ * stage long, so candle light is faked on the ground (`glow.ts`).
  */
 export class Lighting {
   readonly sunDir: THREE.Vector3
   private readonly hemi: THREE.HemisphereLight
   private readonly sun: THREE.DirectionalLight
-  private readonly torches: THREE.PointLight[] = []
   private readonly right = new THREE.Vector3()
   private readonly lightUp = new THREE.Vector3()
   private readonly target = new THREE.Vector3()
   private quality: Settings['quality'] | null = null
-  private time = 0
 
   constructor(
     private readonly root: THREE.Group,
@@ -80,18 +80,12 @@ export class Lighting {
     this.applyQuality()
   }
 
-  /** Warm flickering point lights at a few spots (the candles ringing the crypt start). At most four. */
-  addTorches(points: readonly THREE.Vector3[], color: string): void {
-    for (const p of points.slice(0, 4 - this.torches.length)) {
-      const light = new THREE.PointLight(color, 14, 16, 2)
-      light.position.set(p.x, p.y + 0.9, p.z)
-      this.torches.push(light)
-      this.root.add(light)
-    }
+  /** The frustum the sun's shadow map is drawn with; the same object every frame. */
+  get shadowFrustum(): THREE.Frustum {
+    return this.sun.shadow.getFrustum()
   }
 
-  update(dt: number, focus: THREE.Vector3): void {
-    this.time += dt
+  update(focus: THREE.Vector3): void {
     if (this.settings.quality !== this.quality) this.applyQuality()
 
     const texel = (2 * SHADOW_HALF) / this.sun.shadow.mapSize.x
@@ -101,19 +95,12 @@ export class Lighting {
     this.target.copy(this.right).multiplyScalar(u).addScaledVector(this.lightUp, v).addScaledVector(this.sunDir, w)
     this.sun.target.position.copy(this.target)
     this.sun.position.copy(this.target).addScaledVector(this.sunDir, LIGHT_DISTANCE)
-
-    const t = this.time
-    for (let k = 0; k < this.torches.length; k++) {
-      this.torches[k].intensity = 14 * (0.82 + 0.12 * Math.sin(t * 9 + k * 1.7) + 0.06 * Math.sin(t * 23.3 + k * 4.1))
-    }
   }
 
   dispose(): void {
-    this.root.remove(this.hemi, this.sun, this.sun.target, ...this.torches)
+    this.root.remove(this.hemi, this.sun, this.sun.target)
     this.sun.dispose()
     this.hemi.dispose()
-    for (const light of this.torches) light.dispose()
-    this.torches.length = 0
   }
 
   /** Shadows off on low, 1024² on medium, 2048² on high; re-applied if the setting changes mid-run. */

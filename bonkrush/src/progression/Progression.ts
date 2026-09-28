@@ -9,17 +9,17 @@ import type {
   Enemy,
   GameContext,
   GameEvents,
-  ItemHooks,
   Offer,
   ProgressionApi,
   Rarity,
   StatBlock,
   StatMod,
+  TomeDef,
   TomeInstance,
 } from '../game/types'
 import { WEAPONS } from '../weapons/weaponDefs'
 import { ITEM_BY_ID, ITEMS } from './itemDefs'
-import { BIG_BONK_CHANCE, BIG_BONK_MULT, itemRuntime, type ItemRuntime } from './itemEffects'
+import { BIG_BONK_CHANCE, BIG_BONK_MULT, itemRuntime, type ItemRuntime, type KillAwareHooks } from './itemEffects'
 import {
   conditionalMultiplier,
   lifestealHeal,
@@ -48,7 +48,7 @@ const SKIP_GOLD = 0.2
 /** Chance per Wrench that a shrine boon rolls one rarity higher (stacks like independent rolls). */
 const WRENCH_BUMP = 0.25
 
-type HeldItem = { hooks: ItemHooks; stacks: number }
+type HeldItem = { hooks: KillAwareHooks; stacks: number }
 
 const LEVEL_UP_TYPES: ReadonlySet<Offer['type']> = new Set<Offer['type']>([
   'newWeapon',
@@ -94,20 +94,23 @@ export class Progression implements ProgressionApi {
   }
   /** Chest stand-ins that must not use up a pending level-up when taken. */
   private readonly nonLevelOffers = new WeakSet<Offer>()
+  /** The shrine difficulty last folded into `stats`, to notice when a shrine changes it. */
   private appliedCurse: number
+  private appliedGreed: number
 
   constructor(private readonly ctx: GameContext) {
     this.offerRng = ctx.rng.fork(0x0ffe5)
     this.runtime = itemRuntime(ctx)
     this.appliedCurse = ctx.run.curse
+    this.appliedGreed = ctx.run.greed
     this.stats = computeStats(this.collectMods())
 
     const on = <K extends keyof GameEvents>(type: K, fn: (p: GameEvents[K]) => void) =>
       this.unsubs.push(ctx.events.on(type, fn))
 
     on('enemyHit', this.onEnemyHit)
-    on('enemyKilled', ({ enemy }) => {
-      for (let i = 0; i < this.held.length; i++) this.held[i].hooks.onKill?.(ctx, enemy, this.held[i].stacks)
+    on('enemyKilled', ({ enemy, source }) => {
+      for (let i = 0; i < this.held.length; i++) this.held[i].hooks.onKill?.(ctx, enemy, this.held[i].stacks, source)
     })
     on('playerDamaged', ({ amount }) => {
       for (let i = 0; i < this.held.length; i++) this.held[i].hooks.onPlayerDamaged?.(ctx, amount, this.held[i].stacks)
@@ -129,6 +132,7 @@ export class Progression implements ProgressionApi {
 
   recompute(): void {
     this.appliedCurse = this.ctx.run.curse
+    this.appliedGreed = this.ctx.run.greed
     this.stats = computeStats(this.collectMods())
     this.ctx.events.emit('statsChanged', {})
     // The player doesn't exist yet while the run is being built.
@@ -173,6 +177,7 @@ export class Progression implements ProgressionApi {
         maxWeapons: weapons?.maxSlots ?? DEFAULT_WEAPON_SLOTS,
         tomes: this.tomes,
         maxTomes: this.maxTomes,
+        maxed: this.maxedTomes(TOMES),
         banished: this.banished,
         luck: this.stats.luck,
         anvil: this.stacks('anvil') > 0,
@@ -192,6 +197,7 @@ export class Progression implements ProgressionApi {
     return rollShrine(
       {
         tomePool: TOMES,
+        maxed: this.maxedTomes(TOMES),
         banished: this.banished,
         luck: this.stats.luck,
         forceRarity: golden ? 'legendary' : undefined,
@@ -258,13 +264,15 @@ export class Progression implements ProgressionApi {
     return true
   }
 
-  /** Like the original, banishing a level-up card also uses up that level-up. */
+  /**
+   * Removes the offer's weapon, tome or item from every future roll. The
+   * level-up stays pending: the UI rolls fresh cards for the same level.
+   */
   banish(offer: Offer): boolean {
     const key = banishKey(offer)
     if (!key || this.banishes <= 0) return false
     this.banishes--
     this.banished.add(key)
-    if (LEVEL_UP_TYPES.has(offer.type)) this.consumeLevelUp()
     return true
   }
 
@@ -316,9 +324,29 @@ export class Progression implements ProgressionApi {
       if (def?.mods) mods.push(...stackMods(def.mods, n))
     }
     mods.push(...this.extraMods, ...this.runtime.buffMods)
-    // Curse shrines raise run.curse directly; it lands on the difficulty stat here.
-    if (this.ctx.run.curse) mods.push({ stat: 'difficulty', op: 'add', value: this.ctx.run.curse })
+    // Curse (this stage) and greed (this run) shrines raise the run numbers
+    // directly; this is the one place they land on the difficulty stat.
+    const shrine = (this.ctx.run.curse || 0) + (this.ctx.run.greed || 0)
+    if (shrine) mods.push({ stat: 'difficulty', op: 'add', value: shrine })
     return mods
+  }
+
+  /**
+   * Tomes whose next level would change nothing because every stat they
+   * raise is at its cap (Blood past max lifesteal, Evasion at 75%...), so
+   * no card offers a dead upgrade. Chaos rolls a random stat and never is.
+   */
+  private maxedTomes(pool: readonly TomeDef[]): Set<string> {
+    const out = new Set<string>()
+    const candidates = pool.filter((d) => d.id !== CHAOS_TOME && d.perLevel.length > 0)
+    if (candidates.length === 0) return out
+    const mods = this.collectMods()
+    const now = computeStats(mods)
+    for (const def of candidates) {
+      const next = computeStats([...mods, ...def.perLevel])
+      if (def.perLevel.every((m) => next[m.stat] === now[m.stat])) out.add(def.id)
+    }
+    return out
   }
 
   private rebuildHeld(): void {
@@ -386,7 +414,8 @@ export class Progression implements ProgressionApi {
   // ───────────────────────────── frame ─────────────────────────────
 
   update(dt: number): void {
-    if (this.ctx.run.curse !== this.appliedCurse) this.recompute()
+    const run = this.ctx.run
+    if (run.curse !== this.appliedCurse || run.greed !== this.appliedGreed) this.recompute()
     this.runtime.update(dt)
     for (let i = 0; i < this.held.length; i++) this.held[i].hooks.update?.(this.ctx, dt, this.held[i].stacks)
   }

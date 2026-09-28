@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import type { Rng } from '../core/rng'
 import { MINIBOSSES, SWARM_ENEMY } from '../data/stages'
 import type { DamageOptions, Enemy, EnemyApi, EnemyDef, GameContext, Vec3 } from '../game/types'
+import { PLAY_LIMIT } from '../world/colliders'
 import {
   CHARGE_DASH,
   CHARGE_RECOVER,
@@ -44,7 +45,7 @@ import {
 } from './director'
 import { BOMB_DAMAGE, HEALTH_VALUE, emptyDrops, pieceCount, rollDrops } from './drops'
 import { ENEMIES, tierOf } from './enemyDefs'
-import { EnemyEntity } from './entity'
+import { DEATH_FLING, DEATH_NONE, DEATH_TOPPLE, EnemyEntity } from './entity'
 import { EnemyProjectiles, LOB_GRAVITY, SHAPE_DART, SHAPE_ORB } from './EnemyProjectiles'
 import { EnemyRenderer } from './EnemyRenderer'
 import { SpatialHash } from './spatialHash'
@@ -65,6 +66,25 @@ const MAX_KNOCKBACK = 25
 /** Ghosts in the final swarm send the player flying. */
 const GHOST_SHOVE = 14
 const LOBBERS: ReadonlySet<string> = new Set(['shroom'])
+/**
+ * Bodies wider than this (elite tanks, and every boss and miniboss) are
+ * "big": they are checked one by one instead of padding every hash query by
+ * their radius, which would triple the broadphase for the whole crowd.
+ * Everything else, plain tanks included, pads the query by at most this.
+ */
+const BIG_RADIUS = 1.3
+/** How tall the player is to enemy contact and shots, standing and sliding. */
+const PLAYER_HEIGHT = 1.7
+const SLIDE_HEIGHT = 0.9
+/** Melee fliers swoop to about head height, so a slide ducks under them. */
+const FLIER_BITE_HEIGHT = 1.0
+/** Straight shots aim at the chest of a standing player (a slide ducks under) or the body of a sliding one. */
+const AIM_HEIGHT = 1.3
+const AIM_HEIGHT_SLIDING = 0.45
+/** Death animations: a flung normal's seconds in the air and its gravity; a boss's topple. */
+const FLING_TIME = 0.45
+const FLING_GRAVITY = 24
+const TOPPLE_TIME = 1.1
 
 const BURN: DamageOptions = { source: 'burn', noProcs: true }
 const THORNS: DamageOptions = { source: 'thorns', noProcs: true }
@@ -93,6 +113,8 @@ interface Shockwave {
 
 const _v = new THREE.Vector3()
 const _drop = new THREE.Vector3()
+/** Reused sound options: damage() runs for every hit, so it shouldn't allocate. */
+const _sound: { pitch: number; volume: number; pos?: Vec3 } = { pitch: 1, volume: 1 }
 /** Where a hit on the player came from; separate so nested damage (item hooks) can't move it. */
 const _from = new THREE.Vector3()
 
@@ -112,7 +134,13 @@ export class EnemyManager implements EnemyApi, BossHost {
   private readonly waves: Shockwave[] = []
   private readonly neighbours: number[] = []
   private readonly found: number[] = []
+  /** Indices (into `entities`) of big bodies, rebuilt with the hash. */
+  private readonly big: number[] = []
+  /** Killed enemies still playing their death fling or topple. */
+  private readonly dying: EnemyEntity[] = []
   private readonly steer: Steer = { x: 0, z: 0 }
+  /** Running separation sum for the enemy being moved. */
+  private readonly push = { x: 0, z: 0, seen: 0 }
   private readonly drops = emptyDrops()
   private living = 0
   private bossRef: EnemyEntity | null = null
@@ -165,7 +193,8 @@ export class EnemyManager implements EnemyApi, BossHost {
     e.tier = isBoss ? 'boss' : tier
     e.boss = isBoss
     e.elite = !!opts.elite && e.tier === 'normal'
-    e.scale = e.elite ? ELITE_SCALE : 1
+    e.setBody(def, e.elite ? ELITE_SCALE : 1)
+    e.bigBody = isBigBody(e)
 
     const run = this.ctx.run
     const t = run.stageTime
@@ -197,7 +226,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     this.entities.push(e)
     this.living++
     this.perDef.set(def.id, live + 1)
-    if (e.radius > this.maxRadius) this.maxRadius = e.radius
+    if (!e.bigBody && e.radius > this.maxRadius) this.maxRadius = e.radius
     if (isBoss) {
       this.bossRef = e
       this.ctx.events.emit('bossSpawned', { enemy: e })
@@ -212,16 +241,20 @@ export class EnemyManager implements EnemyApi, BossHost {
     const vertical = Math.max(radius, 2)
     for (let k = 0; k < ids.length; k++) {
       const e = this.entities[ids[k]]
-      if (!e || !e.alive) continue
-      const dx = e.pos.x - center.x
-      const dz = e.pos.z - center.z
-      const rr = radius + e.radius
-      if (dx * dx + dz * dz > rr * rr) continue
-      const top = e.pos.y + e.height
-      const gap = center.y < e.pos.y ? e.pos.y - center.y : center.y > top ? center.y - top : 0
-      if (gap <= vertical) out.push(e)
+      // Big bodies can sit outside the padded query; they get their own pass below.
+      if (!e || e.bigBody) continue
+      if (inReach(e, center, radius, vertical)) out.push(e)
+    }
+    for (let k = 0; k < this.big.length; k++) {
+      const e = this.entities[this.big[k]]
+      if (e && inReach(e, center, radius, vertical)) out.push(e)
     }
     return out
+  }
+
+  /** Removes a live enemy without a kill: no drops, no events (the final swarm clears old enemies this way). */
+  remove(enemy: Enemy): void {
+    if (enemy instanceof EnemyEntity) this.despawn(enemy)
   }
 
   nearest(pos: Vec3, maxDist: number, exclude?: ReadonlySet<number>): Enemy | null {
@@ -241,7 +274,10 @@ export class EnemyManager implements EnemyApi, BossHost {
     if (ctx.settings.showDamageNumbers) {
       ctx.fx.number(_v.set(e.pos.x, e.pos.y + e.height + 0.25, e.pos.z), String(Math.max(1, Math.round(amount))), crit ? 'crit' : 'damage')
     }
-    ctx.audio.play(crit ? 'crit' : 'bonk', { pitch: 0.9 + Math.random() * 0.25, volume: opts.noProcs ? 0.4 : 0.8 })
+    _sound.pitch = 0.9 + Math.random() * 0.25
+    _sound.volume = opts.noProcs ? 0.4 : 0.8
+    _sound.pos = undefined
+    ctx.audio.play(crit ? 'crit' : 'bonk', _sound)
     const kb = opts.knockback
     if (kb && e.freeze <= 0 && Number.isFinite(kb.x) && Number.isFinite(kb.z)) {
       const k = 1 - Math.min(1, e.def.weight + (e.elite ? 0.15 : 0))
@@ -254,7 +290,7 @@ export class EnemyManager implements EnemyApi, BossHost {
       }
     }
     ctx.events.emit('enemyHit', { enemy: e, amount, crit, source: opts.source, procs: !opts.noProcs })
-    if (e.alive && e.hp <= 0) this.kill(e, opts.source)
+    if (e.alive && e.hp <= 0) this.kill(e, opts.source, kb)
   }
 
   applySlow(enemy: Enemy, seconds: number): void {
@@ -321,8 +357,9 @@ export class EnemyManager implements EnemyApi, BossHost {
     this.runPending(now)
     this.updateShockwaves(dt)
     this.shots.update(dt, ctx, now)
+    this.updateDeaths(dt)
     this.buildHash()
-    this.renderer.render(this.entities, now)
+    this.renderer.render(this.entities, this.dying, now)
     this.telegraphs.update(dt)
   }
 
@@ -333,6 +370,8 @@ export class EnemyManager implements EnemyApi, BossHost {
     this.entities.length = 0
     this.pool.length = 0
     this.resting.length = 0
+    this.dying.length = 0
+    this.big.length = 0
     this.pending = []
     this.waves.length = 0
     this.perDef.clear()
@@ -503,19 +542,24 @@ export class EnemyManager implements EnemyApi, BossHost {
     const lead = Math.min(1, dist / proj.speed) * 0.5
     const tx = dx + player.vel.x * lead
     const tz = dz + player.vel.z * lead
-    const ty = player.pos.y + 0.9 - oy
     if (LOBBERS.has(e.def.id)) {
+      // Lobs drop onto the player from above, so they aim at the middle of the body.
+      const ty = player.pos.y + 0.9 - oy
       const flat = Math.max(1, Math.hypot(tx, tz))
       const time = flat / proj.speed
       const vy = (ty + 0.5 * LOB_GRAVITY * time * time) / time
       this.shots.fire(ox, oy, oz, tx / time, vy, tz / time, damage, time + 0.8, proj.color, SHAPE_ORB, 0.28, LOB_GRAVITY, e.def.id)
     } else {
+      const ty = player.pos.y + (player.sliding ? AIM_HEIGHT_SLIDING : AIM_HEIGHT) - oy
       const l = Math.hypot(tx, ty, tz) || 1
       const s = proj.speed / l
       const shape = e.flier ? SHAPE_ORB : SHAPE_DART
       this.shots.fire(ox, oy, oz, tx * s, ty * s, tz * s, damage, proj.range / proj.speed, proj.color, shape, 0.28, 0, e.def.id)
     }
-    this.ctx.audio.play('shoot', { pos: e.pos, pitch: 1.2 + Math.random() * 0.2, volume: 0.35 })
+    _sound.pitch = 1.2 + Math.random() * 0.2
+    _sound.volume = 0.35
+    _sound.pos = e.pos
+    this.ctx.audio.play('shoot', _sound)
   }
 
   private explode(e: EnemyEntity): void {
@@ -563,18 +607,20 @@ export class EnemyManager implements EnemyApi, BossHost {
     this.separate(e, index)
 
     // Keep out of the player's body, so crowds ring them instead of stacking inside.
-    const pr = this.ctx.player.radius
+    const player = this.ctx.player
+    const pr = player.radius
     const ox = e.pos.x - px
     const oz = e.pos.z - pz
     const rr = e.radius + pr
     const d2 = ox * ox + oz * oz
-    if (d2 < rr * rr && d2 > 1e-8 && py < e.pos.y + e.height && py + 1.7 > e.pos.y) {
+    if (d2 < rr * rr && d2 > 1e-8 && py < e.pos.y + e.height && py + playerHeight(player) > e.pos.y) {
       const d = Math.sqrt(d2)
       e.pos.x = px + (ox / d) * rr
       e.pos.z = pz + (oz / d) * rr
     }
 
-    const limit = world.halfSize - e.radius
+    // The walls: nothing flies or shoulders its way out of the walkable square.
+    const limit = Math.min(PLAY_LIMIT, world.halfSize) - e.radius
     let vy = 0
     if (e.flier) {
       e.pos.x = clamp(e.pos.x, -limit, limit)
@@ -582,7 +628,7 @@ export class EnemyManager implements EnemyApi, BossHost {
       const ground = world.heightAt(e.pos.x, e.pos.z)
       // Fliers hover, then swoop down to head height when close enough to bite.
       let target = ground + e.hover
-      if (!e.def.projectile && dist < 3.5) target = Math.max(ground + 0.3, py + 0.6)
+      if (!e.def.projectile && dist < 3.5) target = Math.max(ground + 0.3, py + FLIER_BITE_HEIGHT)
       const before = e.pos.y
       e.pos.y += (target - e.pos.y) * Math.min(1, dt * 3)
       if (e.pos.y < ground + 0.3) e.pos.y = ground + 0.3
@@ -602,40 +648,25 @@ export class EnemyManager implements EnemyApi, BossHost {
 
   /** Pushes an enemy out of its neighbours, heavier ones yielding less. */
   private separate(e: EnemyEntity, index: number): void {
-    const ri = e.radius * SEPARATION
-    const ids = this.hash.query(e.pos.x, e.pos.z, ri + this.maxRadius * SEPARATION, this.neighbours)
+    const push = this.push
+    push.x = push.z = 0
+    push.seen = 0
     const mi = massOf(e)
-    let sx = 0
-    let sz = 0
-    let seen = 0
-    for (let k = 0; k < ids.length && seen < MAX_NEIGHBOURS; k++) {
+    // Big bodies first, so a crowd never walks into a boss because its neighbour budget ran out.
+    for (let k = 0; k < this.big.length; k++) {
+      const j = this.big[k]
+      if (j !== index) this.pushApart(e, mi, this.entities[j])
+    }
+    const ids = this.hash.query(e.pos.x, e.pos.z, e.radius * SEPARATION + this.maxRadius * SEPARATION, this.neighbours)
+    for (let k = 0; k < ids.length && push.seen < MAX_NEIGHBOURS; k++) {
       const j = ids[k]
       if (j === index) continue
       const o = this.entities[j]
-      if (!o || !o.alive || o.flier !== e.flier) continue
-      const dx = e.pos.x - o.pos.x
-      const dz = e.pos.z - o.pos.z
-      const rr = ri + o.radius * SEPARATION
-      const d2 = dx * dx + dz * dz
-      if (d2 >= rr * rr) continue
-      seen++
-      const mo = massOf(o)
-      const share = mo / (mi + mo)
-      if (d2 < 1e-8) {
-        // Exactly stacked: split along a direction unique to this enemy.
-        const a = e.phase * 6.283
-        sx += Math.cos(a) * rr * 0.5 * share
-        sz += Math.sin(a) * rr * 0.5 * share
-        continue
-      }
-      const d = Math.sqrt(d2)
-      const push = (rr - d) * share
-      sx += (dx / d) * push
-      sz += (dz / d) * push
+      if (o && !o.bigBody) this.pushApart(e, mi, o)
     }
-    if (seen === 0) return
-    sx *= 0.5
-    sz *= 0.5
+    if (push.seen === 0) return
+    let sx = push.x * 0.5
+    let sz = push.z * 0.5
     const m = Math.hypot(sx, sz)
     if (m > 0.35) {
       sx *= 0.35 / m
@@ -643,6 +674,31 @@ export class EnemyManager implements EnemyApi, BossHost {
     }
     e.pos.x += sx
     e.pos.z += sz
+  }
+
+  /** Adds `o`'s push on `e` (of mass `mi`) to the running separation sum, if they overlap. */
+  private pushApart(e: EnemyEntity, mi: number, o: EnemyEntity | undefined): void {
+    if (!o || !o.alive || o.flier !== e.flier) return
+    const dx = e.pos.x - o.pos.x
+    const dz = e.pos.z - o.pos.z
+    const rr = (e.radius + o.radius) * SEPARATION
+    const d2 = dx * dx + dz * dz
+    if (d2 >= rr * rr) return
+    const push = this.push
+    push.seen++
+    const mo = massOf(o)
+    const share = mo / (mi + mo)
+    if (d2 < 1e-8) {
+      // Exactly stacked: split along a direction unique to this enemy.
+      const a = e.phase * 6.283
+      push.x += Math.cos(a) * rr * 0.5 * share
+      push.z += Math.sin(a) * rr * 0.5 * share
+      return
+    }
+    const d = Math.sqrt(d2)
+    const amount = (rr - d) * share
+    push.x += (dx / d) * amount
+    push.z += (dz / d) * amount
   }
 
   // ─────────────────────────────── combat ───────────────────────────────
@@ -676,7 +732,7 @@ export class EnemyManager implements EnemyApi, BossHost {
     const reach = e.radius + player.radius + 0.15
     const d2 = dx * dx + dz * dz
     if (d2 > reach * reach) return
-    if (py > e.pos.y + e.height || py + 1.7 < e.pos.y) return
+    if (py > e.pos.y + e.height || py + playerHeight(player) < e.pos.y) return
     const dealt = player.hurt(e.def.damage * e.damageScale * e.contactMult, e.def.id, e.pos)
     if (!(dealt > 0)) return
     const thorns = this.ctx.progression.stats.thorns
@@ -695,9 +751,10 @@ export class EnemyManager implements EnemyApi, BossHost {
     v.y = Math.max(v.y, up)
   }
 
-  private kill(e: EnemyEntity, source: string): void {
+  private kill(e: EnemyEntity, source: string, blow?: Vec3): void {
     const ctx = this.ctx
     this.retire(e)
+    this.startDeath(e, blow)
     const now = ctx.time
     const big = e.tier !== 'normal'
     _v.set(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z)
@@ -710,15 +767,100 @@ export class EnemyManager implements EnemyApi, BossHost {
     }
     if (big || e.elite || now - this.lastKillSound > 0.08) {
       this.lastKillSound = now
-      ctx.audio.play('kill', { pos: e.pos, pitch: 0.9 + Math.random() * 0.25 })
+      _sound.pitch = 0.9 + Math.random() * 0.25
+      _sound.volume = 1
+      _sound.pos = e.pos
+      ctx.audio.play('kill', _sound)
     }
     this.dropLoot(e)
     ctx.events.emit('enemyKilled', { enemy: e, source })
     if (e.boss) ctx.events.emit('bossKilled', { enemy: e })
   }
 
+  /**
+   * Bonks a killed enemy off the screen: launched away from the blow, up and
+   * back, tumbling, for a moment. Bosses and minibosses keel over instead.
+   * Purely visual; the body is already dead.
+   */
+  private startDeath(e: EnemyEntity, blow: Vec3 | undefined): void {
+    e.deathT = 0
+    e.deathX = e.pos.x
+    e.deathY = e.pos.y
+    e.deathZ = e.pos.z
+    e.deathVX = e.deathVY = e.deathVZ = 0
+    e.deathPitch = e.deathRoll = 0
+    if (e.tier !== 'normal') {
+      e.death = DEATH_TOPPLE
+      e.deathTime = TOPPLE_TIME
+      this.dying.push(e)
+      return
+    }
+    // Away from the blow: the knockback it just took, else straight away from the player.
+    const p = this.ctx.player.pos
+    let dx = blow ? blow.x : 0
+    let dz = blow ? blow.z : 0
+    let l = Math.hypot(dx, dz)
+    const strength = Number.isFinite(l) ? l : 0
+    if (!(l > 0.5)) {
+      dx = e.pos.x - p.x
+      dz = e.pos.z - p.z
+      l = Math.hypot(dx, dz)
+    }
+    if (!(l > 1e-4)) {
+      const a = e.phase * 6.283
+      dx = Math.cos(a)
+      dz = Math.sin(a)
+      l = 1
+    }
+    // 6–12 m/s all told; harder blows fling further, elites are heavier.
+    const speed = (6 + Math.min(3, strength * 0.2) + Math.random() * 1.5) * (e.elite ? 0.7 : 1)
+    e.deathVX = (dx / l) * speed
+    e.deathVZ = (dz / l) * speed
+    e.deathVY = 5 + Math.random() * 2.5
+    // Face the blow and flip over backwards, with a little twist.
+    e.yaw = yawTowards(-dx, -dz)
+    e.deathPitch = -(9 + Math.random() * 6)
+    e.deathRoll = (Math.random() - 0.5) * 8
+    e.death = DEATH_FLING
+    e.deathTime = FLING_TIME
+    this.dying.push(e)
+  }
+
+  /** Moves the flung bodies; ends each death animation when its time is up. */
+  private updateDeaths(dt: number): void {
+    const world = this.ctx.world
+    let w = 0
+    for (let i = 0; i < this.dying.length; i++) {
+      const e = this.dying[i]
+      // alive again means the pool handed the object out (it can't happen within the animation, but be safe).
+      if (e.alive || e.death === DEATH_NONE) continue
+      e.deathT += dt
+      e.hitFlash += dt
+      if (e.deathT >= e.deathTime) {
+        e.death = DEATH_NONE
+        continue
+      }
+      if (e.death === DEATH_FLING) {
+        e.deathVY -= FLING_GRAVITY * dt
+        e.deathX += e.deathVX * dt
+        e.deathY += e.deathVY * dt
+        e.deathZ += e.deathVZ * dt
+        const ground = world.heightAt(e.deathX, e.deathZ)
+        if (e.deathY < ground) {
+          // Skid off a hillside rather than sink into it.
+          e.deathY = ground
+          if (e.deathVY < 0) e.deathVY *= -0.35
+          e.deathVX *= 0.6
+          e.deathVZ *= 0.6
+        }
+      }
+      this.dying[w++] = e
+    }
+    this.dying.length = w
+  }
+
   private dropLoot(e: EnemyEntity): void {
-    const d = rollDrops(this.rng, e.def, e.tier, e.elite, this.drops)
+    const d = rollDrops(this.rng, e.def, e.tier, e.elite, this.drops, this.difficulty(), this.ctx.stage.index)
     const pickups = this.ctx.pickups
     const spread = e.radius + 0.5
     this.spray('xp', d.xp, e.boss ? 60 : 25, e.boss ? 16 : 10, e, spread)
@@ -826,22 +968,29 @@ export class EnemyManager implements EnemyApi, BossHost {
     }
   }
 
+  /**
+   * Every live body goes in the hash, but only small ones set the query pad;
+   * big ones (at most a handful) are listed apart and checked one by one.
+   */
   private buildHash(): void {
     const hash = this.hash
     hash.clear()
+    this.big.length = 0
     let maxR = 0.5
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i]
       if (!e.alive) continue
       hash.insert(i, e.pos.x, e.pos.z)
-      if (e.radius > maxR) maxR = e.radius
+      if (e.bigBody) this.big.push(i)
+      else if (e.radius > maxR) maxR = e.radius
     }
     hash.build()
     this.maxRadius = maxR
   }
 
+  /** The difficulty stat; greed and curse shrines are already in it. */
   private difficulty(): number {
-    return effectiveDifficulty(this.ctx.progression.stats.difficulty, this.ctx.run.curse)
+    return effectiveDifficulty(this.ctx.progression.stats.difficulty)
   }
 
   private readonly acceptNearest = (i: number): boolean => {
@@ -853,6 +1002,27 @@ export class EnemyManager implements EnemyApi, BossHost {
 function capacityFor(def: EnemyDef): number {
   const tier = tierOf(def)
   return tier === 'boss' ? 3 : tier === 'miniboss' ? 4 : MAX_ENEMIES
+}
+
+function isBigBody(e: EnemyEntity): boolean {
+  return e.tier !== 'normal' || e.radius > BIG_RADIUS
+}
+
+/** Whether `e` is alive and within `radius` (plus its own) of `center`, with at most `vertical` m of height gap. */
+function inReach(e: EnemyEntity, center: Vec3, radius: number, vertical: number): boolean {
+  if (!e.alive) return false
+  const dx = e.pos.x - center.x
+  const dz = e.pos.z - center.z
+  const rr = radius + e.radius
+  if (dx * dx + dz * dz > rr * rr) return false
+  const top = e.pos.y + e.height
+  const gap = center.y < e.pos.y ? e.pos.y - center.y : center.y > top ? center.y - top : 0
+  return gap <= vertical
+}
+
+/** The player's body height for contact: a slide ducks under swoops and shots. */
+function playerHeight(player: { readonly sliding: boolean }): number {
+  return player.sliding ? SLIDE_HEIGHT : PLAYER_HEIGHT
 }
 
 /** Bosses barely budge; otherwise bigger bodies push smaller ones aside. */

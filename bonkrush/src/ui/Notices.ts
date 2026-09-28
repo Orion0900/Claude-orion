@@ -3,7 +3,6 @@ import { el } from './dom'
 const BANNER_TIME = 2.4
 const BANNER_QUEUE = 3
 const TOAST_TIME = 3.2
-const TOAST_MAX = 5
 /** Length of the leave animations in styles.css. */
 const LEAVE_MS = 260
 
@@ -31,7 +30,11 @@ export class Notices {
   private bannerLife = 0
   private toasts: Toast[] = []
 
-  constructor(parent: HTMLElement) {
+  constructor(
+    parent: HTMLElement,
+    /** Toasts shown at once; the oldest drops out first. */
+    private readonly toastMax = 5,
+  ) {
     this.bannerHost = el('div', 'banners', undefined, parent)
     this.toastHost = el('div', 'toasts', undefined, parent)
   }
@@ -50,7 +53,7 @@ export class Notices {
     node.style.setProperty('--tc', color)
     this.toastHost.appendChild(node)
     this.toasts.push({ node, life: TOAST_TIME })
-    while (this.toasts.length > TOAST_MAX) this.dropToast(0)
+    while (this.toasts.length > this.toastMax) this.dropToast(0)
   }
 
   update(dt: number): void {

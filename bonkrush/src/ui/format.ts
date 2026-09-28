@@ -6,6 +6,7 @@ import type {
   ItemDef,
   Offer,
   Rarity,
+  RunState,
   StatId,
   StatMod,
   TomeDef,
@@ -14,7 +15,7 @@ import type {
   WeaponStats,
 } from '../game/types'
 import { RARITY_MULT } from '../progression/rarity'
-import { describeMod, scaleMod } from '../progression/stats'
+import { STAT_INFO, describeMod, scaleMod } from '../progression/stats'
 
 // ─────────────────────────────── numbers ───────────────────────────────
 
@@ -104,6 +105,31 @@ export function promptLabel(
     text: `${key} — ${prompt.text}${hasCost ? ` · ${formatCount(cost)} 🪙` : ''}`,
     affordable: !hasCost || Math.floor(gold) >= cost,
   }
+}
+
+/** The stage-start banner's line: what a new player is here to do. */
+export const STAGE_GOAL = 'Find the ☠ altar to summon the boss'
+
+export interface Objective {
+  text: string
+  kind: 'altar' | 'boss' | 'portal'
+}
+
+/**
+ * The standing hint under the stage name: summon the boss at the altar, beat
+ * it, then leave through the portal it opens.
+ */
+export function objectiveLabel(run: Pick<RunState, 'bossSpawned' | 'portalOpen'>): Objective {
+  if (run.portalOpen) return { text: 'Portal open!', kind: 'portal' }
+  if (run.bossSpawned) return { text: 'Beat the boss to open the portal', kind: 'boss' }
+  return { text: '☠ Altar: summon the boss', kind: 'altar' }
+}
+
+/** The controls line on the title and pause screens (DESIGN.md, Controls). */
+export function controlsHint(touch: boolean): string {
+  return touch
+    ? 'Left thumb: move · Drag right: look · ⤒ jump · ⤓ slide · ✋ interact'
+    : 'WASD move · Mouse look · Space jump · Shift / C / right mouse slide · E interact · Tab stats · Esc pause'
 }
 
 // ─────────────────────────────── weapons ───────────────────────────────
@@ -315,7 +341,7 @@ export function describeOffer(offer: Offer, look: DefLookups): OfferView {
       return {
         kind: 'stat',
         icon: first ? STAT_ICON[first.stat] : '✨',
-        name: offer.label,
+        name: boonName(offer.mods),
         rarity: offer.rarity,
         tag: 'Boon',
         isNew: false,
@@ -360,6 +386,16 @@ export function describeOffer(offer: Offer, look: DefLookups): OfferView {
         description: '',
       }
   }
+}
+
+/**
+ * A shrine boon is named after the stat it raises, like a tome card; its
+ * lines carry the numbers (the offer's own label repeats those lines).
+ */
+function boonName(mods: readonly StatMod[]): string {
+  const labels = [...new Set(mods.map((m) => STAT_INFO[m.stat]?.label ?? m.stat))]
+  if (labels.length === 0) return 'Boon'
+  return labels.length <= 2 ? labels.join(' & ') : 'Mixed Boon'
 }
 
 /** The chest sting climbs with rarity so a legendary sounds like one. */

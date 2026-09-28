@@ -36,6 +36,7 @@ export interface FakeLog {
   challenges: Array<{ count: number; center: THREE.Vector3 }>
   bossesSummoned: number
   advances: number
+  recomputes: number
   events: Array<keyof GameEvents>
 }
 
@@ -108,6 +109,7 @@ export function fakeContext(spots: FakeSpots = {}, seed = 1): FakeContext {
     challenges: [],
     bossesSummoned: 0,
     advances: 0,
+    recomputes: 0,
     events: [],
   }
   for (const type of TRACKED) events.on(type, () => log.events.push(type))
@@ -132,8 +134,8 @@ export function fakeContext(spots: FakeSpots = {}, seed = 1): FakeContext {
     bossDefeated: false,
     portalOpen: false,
     curse: 0,
-      greed: 0,
-      chestsPaid: 0,
+    greed: 0,
+    chestsPaid: 0,
   }
   const stats: StatBlock = { ...BASE_STATS }
   const items = new Map<string, number>()
@@ -201,7 +203,9 @@ export function fakeContext(spots: FakeSpots = {}, seed = 1): FakeContext {
       applyOffer: (o: Offer) => {
         log.applied.push(o)
       },
-      recompute: noop,
+      recompute: () => {
+        log.recomputes++
+      },
     },
     pickups: {
       spawn: (kind: PickupKind, pos: THREE.Vector3, value: number) => {

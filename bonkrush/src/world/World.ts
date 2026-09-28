@@ -1,6 +1,7 @@
 import * as THREE from 'three'
-import type { GameContext, PlayerApi, Vec3, WorldApi } from '../game/types'
+import type { CameraApi, GameContext, PlayerApi, Vec3, WorldApi } from '../game/types'
 import { ColliderGrid } from './colliders'
+import { GroundGlow, type GlowPool } from './glow'
 import { Lighting, sunDirection } from './lighting'
 import { Motes } from './motes'
 import { PropLayer } from './props'
@@ -11,8 +12,10 @@ import { generateTerrain, WORLD_HALF_SIZE, type HeightField } from './terrain'
 import { buildTerrainGeometries } from './terrainMesh'
 
 /**
- * One stage's map: rolling terrain with a flat start and a walled rim,
- * scattered props, the spots interactables use, sky, fog and lights.
+ * One stage's map: rolling terrain with a flat start, a few long slide
+ * ramps and a walled rim, scattered props, the spots interactables use,
+ * sky, fog and lights. Solid props between the camera and the player
+ * dither out of the way.
  *
  * The layout comes from a fork of the run's rng salted by the stage, so a
  * run seed always rebuilds the same maps while every run gets new ones.
@@ -32,7 +35,10 @@ export class World implements WorldApi {
   private readonly lighting: Lighting
   private readonly sky: Sky
   private readonly motes: Motes
+  private readonly glow: GroundGlow
   private readonly focus = new THREE.Vector3()
+  /** Where the camera has to see: the player's chest. */
+  private readonly sightline = new THREE.Vector3()
   private disposed = false
 
   constructor(private readonly ctx: GameContext) {
@@ -54,11 +60,19 @@ export class World implements WorldApi {
       this.root.add(mesh)
     }
 
-    this.props = new PropLayer(this.root, scattered.groups, boundaryRocks(this.field, layout), this.field, stage.palette)
     this.lighting = new Lighting(this.root, stage, ctx.settings)
+    this.props = new PropLayer(
+      this.root,
+      scattered.groups,
+      boundaryRocks(this.field, layout),
+      this.field,
+      stage.palette,
+      this.colliders,
+      this.lighting.shadowFrustum,
+    )
     this.sky = new Sky(this.root, stage, sunDirection(stage.index, true), seed)
-    const candles = scattered.groups.find((g) => g.kind === 'candle')
-    if (candles) this.lighting.addTorches(torchSpots(candles), candles.spec.glow ?? '#ffc05a')
+    // Built even when empty, so every stage compiles the same programs up front.
+    this.glow = new GroundGlow(this.root, glowPools(scattered.groups), this.field)
 
     this.focus.copy(this.spots.playerStart)
     this.motes = new Motes(this.root, stage.index, ctx.settings, this.focus)
@@ -86,12 +100,18 @@ export class World implements WorldApi {
     // In a run the player exists from its construction on; on the title screen it never does.
     const player = this.ctx.player as PlayerApi | undefined
     const at = player?.pos
-    if (at && Number.isFinite(at.x) && Number.isFinite(at.y) && Number.isFinite(at.z)) this.focus.copy(at)
+    const valid = !!at && Number.isFinite(at.x) && Number.isFinite(at.y) && Number.isFinite(at.z)
+    if (valid) this.focus.copy(at)
     else if (!player) this.focus.copy(this.spots.playerStart)
 
-    this.lighting.update(dt, this.focus)
+    this.lighting.update(this.focus)
     this.sky.update(dt, this.focus)
     this.props.update(dt)
+    // Last frame's camera is close enough; the fade eases over 0.15 s anyway.
+    const eye = (this.ctx.camera as CameraApi | undefined)?.camera.position
+    const seen = valid ? this.sightline.set(at.x, at.y + 1, at.z) : null
+    this.props.updateOcclusion(dt, eye ?? null, seen)
+    this.glow.update(dt)
     this.motes.update(dt, this.focus)
   }
 
@@ -99,6 +119,7 @@ export class World implements WorldApi {
     if (this.disposed) return
     this.disposed = true
     this.props.dispose()
+    this.glow.dispose()
     this.sky.dispose()
     this.lighting.dispose()
     this.motes.dispose()
@@ -111,19 +132,21 @@ export class World implements WorldApi {
   }
 }
 
-/** Up to four candles from the ring around the start, spread evenly by angle, to hang lights over. */
-function torchSpots(candles: PropGroup): THREE.Vector3[] {
-  const ring = candles.spec.startRing
-  const near = candles.instances
-    .filter((c) => !ring || Math.hypot(c.x, c.z) <= ring.max + 0.5)
-    .sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))
-    .slice(0, 8)
-    .sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x))
-  const step = Math.max(1, near.length / 4)
-  const out: THREE.Vector3[] = []
-  for (let k = 0; k < 4 && Math.floor(k * step) < near.length; k++) {
-    const c = near[Math.floor(k * step)]
-    out.push(new THREE.Vector3(c.x, c.y, c.z))
+/**
+ * A pool of warm light under every candle and jack-o'-lantern: wide and
+ * bright around the start's candle ring, small elsewhere.
+ */
+function glowPools(groups: readonly PropGroup[]): GlowPool[] {
+  const pools: GlowPool[] = []
+  for (const g of groups) {
+    if (g.kind !== 'candle' && g.kind !== 'pumpkin') continue
+    const color = g.spec.glow ?? '#ffc05a'
+    const ring = g.spec.startRing
+    for (const p of g.instances) {
+      const lit = ring && Math.hypot(p.x, p.z) <= ring.max + 0.5
+      if (g.kind === 'candle') pools.push({ x: p.x, z: p.z, radius: lit ? 4.5 : 2.4 * p.scale, strength: lit ? 0.6 : 0.4, color })
+      else pools.push({ x: p.x, z: p.z, radius: 1.7 * p.scale, strength: 0.3, color })
+    }
   }
-  return out
+  return pools
 }

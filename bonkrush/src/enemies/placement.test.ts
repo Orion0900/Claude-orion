@@ -1,5 +1,5 @@
 import { Rng } from '../core/rng'
-import { circlePoint, clampToSquare, ringPoint } from './placement'
+import { circlePoint, clampToSquare, ringPoint, ringSpots, type Point2 } from './placement'
 
 describe('ringPoint', () => {
   it('lands on the ring in open ground', () => {
@@ -46,6 +46,35 @@ describe('circlePoint', () => {
   it('survives n = 0', () => {
     const p = circlePoint(0, 0, 3, 0, 0, 0, { x: 0, z: 0 })
     expect(Number.isFinite(p.x)).toBe(true)
+  })
+})
+
+describe('ringSpots', () => {
+  it('spaces n points evenly on the ring in open ground', () => {
+    const out: Point2[] = []
+    expect(ringSpots(8, 16, 5, -5, 0, 94, out)).toBe(8)
+    for (let i = 0; i < 8; i++) {
+      expect(Math.hypot(out[i].x - 5, out[i].z + 5)).toBeCloseTo(16)
+      const next = out[(i + 1) % 8]
+      expect(Math.hypot(next.x - out[i].x, next.z - out[i].z)).toBeCloseTo(2 * 16 * Math.sin(Math.PI / 8))
+    }
+  })
+
+  it('closes against a wall as an arc instead of piling onto it', () => {
+    const out: Point2[] = []
+    expect(ringSpots(30, 16, 88, 0, 0.3, 94, out)).toBe(30)
+    for (let i = 0; i < 30; i++) {
+      expect(Math.abs(out[i].x)).toBeLessThanOrEqual(94)
+      expect(Math.hypot(out[i].x - 88, out[i].z)).toBeCloseTo(16)
+    }
+    // No two members share a spot.
+    const keys = new Set(out.slice(0, 30).map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)}`))
+    expect(keys.size).toBe(30)
+  })
+
+  it('places nothing when no part of the ring is inside', () => {
+    expect(ringSpots(10, 50, 0, 0, 0, 20, [])).toBe(0)
+    expect(ringSpots(0, 16, 0, 0, 0, 94, [])).toBe(0)
   })
 })
 

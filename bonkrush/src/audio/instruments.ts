@@ -39,9 +39,12 @@ export function playNote(s: Synth, e: NoteEvent, t: number, step: number, bus: M
       s.tone(bus.dry, t, { wave: 'triangle', freq, dur, hold: dur * 0.55, gain: 0.2 * v })
       return
     }
-    case 'arp':
-      s.tone(bus.echo, t, { wave: 'pulse12', freq: midiToFreq(e.note), dur: step * 0.9, gain: 0.04 * v, filter: { type: 'lowpass', freq: 2600 } })
+    case 'arp': {
+      // Stage arps are one-step plucks; the title hook's longer notes sing a moment, then ring out.
+      const dur = e.len * step * 0.9
+      s.tone(bus.echo, t, { wave: 'pulse12', freq: midiToFreq(e.note), dur, hold: e.len > 1 ? step * 1.5 : 0, gain: 0.08 * v, filter: { type: 'lowpass', freq: 2600 } })
       return
+    }
     case 'lead':
     case 'harmony': {
       const dur = e.len * step * 0.95

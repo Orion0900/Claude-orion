@@ -128,6 +128,15 @@ describe('level-up offers', () => {
     expect(ids).not.toContain('quantity')
   })
 
+  it('leaves out tomes whose stats are all capped, owned or not', () => {
+    const blood = TOMES.find((t) => t.id === 'bloody')!
+    const c = levelUpCandidates(input({ tomes: [{ def: blood, level: 30 }], maxed: new Set(['bloody', 'evasion']) }))
+    const ids = c.map((x) => x.id)
+    expect(ids).not.toContain('bloody')
+    expect(ids).not.toContain('evasion')
+    expect(ids).toContain('armor')
+  })
+
   it('falls back to gold and a heal when nothing is left', () => {
     const offers = rollLevelUpOffers(
       input({
@@ -200,6 +209,16 @@ describe('shrine offers', () => {
       const stats = offers.flatMap((o) => (o.type === 'stat' ? o.mods.map((m) => m.stat) : []))
       expect(new Set(stats).size).toBe(3)
       for (const s of stats) expect(['difficulty', 'silverGain', 'projectiles']).not.toContain(s)
+    }
+  })
+
+  it('never offers a boon for a capped stat', () => {
+    const rng = new Rng(8)
+    for (let i = 0; i < 100; i++) {
+      const offers = rollShrineOffers({ tomePool: TOMES, banished: new Set(), maxed: new Set(['evasion', 'armor']), luck: 0 }, rng)
+      const stats = offers.flatMap((o) => (o.type === 'stat' ? o.mods.map((m) => m.stat) : []))
+      expect(stats).not.toContain('evasion')
+      expect(stats).not.toContain('armor')
     }
   })
 

@@ -3,11 +3,15 @@ import { STAGES } from '../data/stages'
 import type { Enemy, StatBlock } from '../game/types'
 import { CHARGE_DASH, CHARGE_WINDUP } from './behaviors'
 import { ELITE_HP_MULT, ELITE_SCALE, hpScale } from './director'
-import type { EnemyEntity } from './entity'
+import { DEATH_FLING, DEATH_NONE, DEATH_TOPPLE, type EnemyEntity } from './entity'
 import { makeHarness } from './testContext'
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z)
 const count = (h: ReturnType<typeof makeHarness>, type: string) => h.events.filter((e) => e.type === type).length
+/** How many instances the renderer drew for a def last frame. */
+const drawn = (h: ReturnType<typeof makeHarness>, id: string) =>
+  (h.ctx.scene.getObjectByName(`enemies:${id}`) as THREE.InstancedMesh).count
+const slide = (h: ReturnType<typeof makeHarness>, on: boolean) => ((h.ctx.player as { sliding: boolean }).sliding = on)
 
 describe('EnemyManager', () => {
   it('gives every spawn a new uid, even when it reuses a pooled object', () => {
@@ -55,10 +59,30 @@ describe('EnemyManager', () => {
   it('scales HP with stage time, stage and difficulty', () => {
     const h = makeHarness({ stage: STAGES[1] })
     h.ctx.run.stageTime = 300
-    ;(h.ctx.progression.stats as StatBlock).difficulty = 0.2
-    h.ctx.run.curse = 0.1
+    ;(h.ctx.progression.stats as StatBlock).difficulty = 0.3
     const e = h.enemies.spawn('mummy', at(30, 0)) as Enemy
     expect(e.maxHp).toBeCloseTo(30 * hpScale(300, STAGES[1].enemyScale, 0.3))
+  })
+
+  it('counts curse and greed once: they are already in the difficulty stat', () => {
+    const h = makeHarness()
+    // Progression folds run.curse and run.greed into stats.difficulty.
+    ;(h.ctx.progression.stats as StatBlock).difficulty = 0.08
+    h.ctx.run.curse = 0.08
+    h.ctx.run.greed = 0.08
+    const e = h.enemies.spawn('goblin', at(30, 0)) as Enemy
+    expect(e.maxHp).toBeCloseTo(16 * 1.08)
+  })
+
+  it('pays difficulty and the stage back in XP and gold', () => {
+    const h = makeHarness({ stage: STAGES[2] })
+    ;(h.ctx.progression.stats as StatBlock).difficulty = 0.4
+    const golem = h.enemies.spawn('bone_colossus', at(20, 0)) as Enemy
+    h.enemies.damage(golem, 1e9, { source: 'test' })
+    const calls = (h.ctx.pickups.spawn as ReturnType<typeof vi.fn>).mock.calls
+    const total = (kind: string) => calls.filter((c) => c[0] === kind).reduce((sum, c) => sum + c[2], 0)
+    expect(total('xp')).toBeCloseTo(220 * 2 * 1.2)
+    expect(total('gold')).toBeCloseTo(40 * 1.2)
   })
 
   it('announces hits, kills and drops the loot', () => {
@@ -162,6 +186,53 @@ describe('EnemyManager', () => {
     h.step(0.001)
     expect(h.enemies.nearest(at(0, 0), 20)).toBe(a)
     expect(h.enemies.nearest(at(0, 0), 20, new Set([a.uid]))).toBe(b)
+  })
+
+  it('finds big bodies as exactly as small ones', () => {
+    const h = makeHarness()
+    const rng = h.ctx.rng
+    for (let i = 0; i < 120; i++) h.enemies.spawn('goblin', at(rng.range(-40, 40), rng.range(-40, 40)))
+    for (let i = 0; i < 6; i++) h.enemies.spawn('treant', at(rng.range(-40, 40), rng.range(-40, 40)), { elite: true })
+    h.enemies.spawn('stone_golem', at(12, -7))
+    h.enemies.spawn('barkzilla', at(-15, 20), { boss: true })
+    h.step(0.016)
+    const out: Enemy[] = []
+    for (let q = 0; q < 60; q++) {
+      const c = at(rng.range(-45, 45), rng.range(-45, 45))
+      const r = rng.range(0.5, 8)
+      const brute = h.enemies.list.filter((e) => e.alive && Math.hypot(e.pos.x - c.x, e.pos.z - c.z) <= r + e.def.radius * e.scale)
+      expect(new Set(h.enemies.queryRadius(c, r, out))).toEqual(new Set(brute))
+    }
+    // A boss standing right next to the centre is found by a tiny query.
+    const boss = h.enemies.boss as Enemy
+    expect(h.enemies.queryRadius(new THREE.Vector3(boss.pos.x + 2.9, 0, boss.pos.z), 0.5, out)).toContain(boss)
+  })
+
+  it("doesn't pad every enemy's neighbour search for one big body", () => {
+    const h = makeHarness()
+    h.enemies.spawn('goblin', at(30, 0))
+    h.enemies.spawn('barkzilla', at(-30, 0), { boss: true })
+    h.enemies.spawn('treant', at(0, 30), { elite: true })
+    h.step(0.016)
+    expect((h.enemies as unknown as { maxRadius: number }).maxRadius).toBeLessThanOrEqual(1.3)
+  })
+
+  it('keeps the crowd out of a boss', () => {
+    const h = makeHarness()
+    const boss = h.enemies.spawn('barkzilla', at(0, -30), { boss: true }) as EnemyEntity
+    boss.freeze = 0
+    const goblins: EnemyEntity[] = []
+    for (let i = 0; i < 30; i++) goblins.push(h.enemies.spawn('goblin', at((i % 6) - 2.5, -30 + Math.floor(i / 6) - 2)) as EnemyEntity)
+    for (const g of goblins) h.enemies.applyFreeze(g, 5)
+    h.enemies.applyFreeze(boss, 5)
+    // Frozen enemies don't move, so push them by hand the way move() would: run separation only.
+    const sep = h.enemies as unknown as { separate(e: EnemyEntity, i: number): void; buildHash(): void; entities: EnemyEntity[] }
+    for (let n = 0; n < 60; n++) {
+      sep.buildHash()
+      sep.entities.forEach((e, i) => e.alive && e.tier === 'normal' && sep.separate(e, i))
+    }
+    const close = goblins.filter((g) => Math.hypot(g.pos.x - boss.pos.x, g.pos.z - boss.pos.z) < (boss.radius + g.radius) * 0.85 * 0.9)
+    expect(close).toHaveLength(0)
   })
 
   it('keeps a crowd from collapsing into one blob', () => {
@@ -278,6 +349,99 @@ describe('EnemyManager', () => {
     }
     expect(windupAt).toBeGreaterThan(0)
     expect(hitAt - windupAt).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it('bonks killed enemies off the screen, away from the blow', () => {
+    const h = makeHarness()
+    const e = h.enemies.spawn('goblin', at(5, 0)) as EnemyEntity
+    h.step(0.02)
+    const x0 = e.pos.x
+    h.enemies.damage(e, 1e6, { source: 'sword', knockback: new THREE.Vector3(0, 0, 10) })
+    expect(e.alive).toBe(false)
+    expect(e.death).toBe(DEATH_FLING)
+    h.step(0.05, 3)
+    // Flying: up, along the blow, still drawn, but not alive, targetable or solid.
+    expect(e.deathZ).toBeGreaterThan(0.6)
+    expect(Math.abs(e.deathX - x0)).toBeLessThan(0.01)
+    expect(e.deathY).toBeGreaterThan(0.3)
+    expect(e.pos.x).toBe(x0)
+    expect(drawn(h, 'goblin')).toBe(1)
+    expect(h.enemies.queryRadius(new THREE.Vector3(e.deathX, e.deathY, e.deathZ), 3, [])).toHaveLength(0)
+    expect(h.enemies.nearest(at(0, 0), 50)).toBeNull()
+    // Gone after about half a second.
+    h.step(0.05, 8)
+    expect(e.death).toBe(DEATH_NONE)
+    expect(drawn(h, 'goblin')).toBe(0)
+  })
+
+  it('flings away from the player when the blow has no push', () => {
+    const h = makeHarness()
+    const e = h.enemies.spawn('goblin', at(-6, 0)) as EnemyEntity
+    h.enemies.damage(e, 1e6, { source: 'burn' })
+    expect(e.deathVX).toBeLessThan(-5)
+    expect(Math.hypot(e.deathVX, e.deathVZ)).toBeLessThanOrEqual(12)
+  })
+
+  it('topples bosses slowly instead of flinging them', () => {
+    const h = makeHarness()
+    const boss = h.enemies.spawn('barkzilla', at(0, -14), { boss: true }) as EnemyEntity
+    h.enemies.damage(boss, 1e9, { source: 'test' })
+    expect(boss.death).toBe(DEATH_TOPPLE)
+    h.step(0.05, 10)
+    expect(drawn(h, 'barkzilla')).toBe(1)
+    expect(boss.deathX).toBe(boss.pos.x)
+    h.step(0.05, 14)
+    expect(drawn(h, 'barkzilla')).toBe(0)
+  })
+
+  it("doesn't fling enemies that leave without a kill", () => {
+    const h = makeHarness()
+    const a = h.enemies.spawn('goblin', at(20, 0)) as EnemyEntity
+    const b = h.enemies.spawn('goblin', at(-20, 0)) as EnemyEntity
+    h.enemies.remove(a)
+    h.enemies.clear()
+    expect(a.alive || b.alive).toBe(false)
+    expect(a.death).toBe(DEATH_NONE)
+    expect(b.death).toBe(DEATH_NONE)
+    expect(count(h, 'enemyKilled')).toBe(0)
+    expect(h.enemies.aliveCount).toBe(0)
+    h.step(0.02)
+    expect(drawn(h, 'goblin')).toBe(0)
+  })
+
+  it('shots aimed at a standing player fly over a slide', () => {
+    const shotAt = (sliding: boolean) => {
+      const h = makeHarness({ stage: STAGES[1] })
+      const scorpion = h.enemies.spawn('scorpion', at(0, 12)) as EnemyEntity
+      // Wait for the shot to leave, standing, then maybe slide under it.
+      for (let i = 0; i < 200 && h.enemies.shots.count === 0; i++) h.step(0.02)
+      h.enemies.applyFreeze(scorpion, 10)
+      slide(h, sliding)
+      for (let i = 0; i < 100 && h.enemies.shots.count > 0; i++) h.step(0.02)
+      return h.hurt.mock.calls.some((c) => c[1] === 'scorpion')
+    }
+    expect(shotAt(false)).toBe(true)
+    expect(shotAt(true)).toBe(false)
+  })
+
+  it('aims low at a player who is already sliding', () => {
+    const h = makeHarness({ stage: STAGES[1] })
+    slide(h, true)
+    h.enemies.spawn('scorpion', at(0, 12))
+    for (let i = 0; i < 300 && !h.hurt.mock.calls.some((c) => c[1] === 'scorpion'); i++) h.step(0.02)
+    expect(h.hurt.mock.calls.some((c) => c[1] === 'scorpion')).toBe(true)
+  })
+
+  it('lets a slide duck under swooping bats', () => {
+    const bitten = (sliding: boolean) => {
+      const h = makeHarness()
+      slide(h, sliding)
+      h.enemies.spawn('bat', at(1.5, 0))
+      h.step(0.02, 150)
+      return h.hurt.mock.calls.some((c) => c[1] === 'bat')
+    }
+    expect(bitten(false)).toBe(true)
+    expect(bitten(true)).toBe(false)
   })
 
   it('removes every mesh it added on dispose', () => {

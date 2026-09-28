@@ -21,6 +21,11 @@ export class ColliderGrid {
   private readonly invCell: number
   private readonly cellStart: Int32Array
   private readonly cellItems: Int32Array
+  /** Largest radius, so a query knows how far into a cell a circle can reach. */
+  private readonly maxR: number
+  /** Per-circle query stamps, so a circle spanning several cells is reported once. */
+  private readonly seen: Int32Array
+  private stamp = 0
 
   constructor(
     circles: readonly Circle[],
@@ -48,6 +53,8 @@ export class ColliderGrid {
     this.cellItems = new Int32Array(counts[nCells])
     const fill = counts.slice(0, nCells)
     circles.forEach((c, n) => this.forCells(c.x, c.z, c.r, (k) => (this.cellItems[fill[k]++] = n)))
+    this.maxR = circles.reduce((m, c) => Math.max(m, c.r), 0)
+    this.seen = new Int32Array(this.count)
   }
 
   /** Pushes the circle at (pos.x, pos.z) out of every solid it overlaps, then inside the play square. */
@@ -112,6 +119,40 @@ export class ColliderGrid {
     return false
   }
 
+  /**
+   * Fills `out` with the index of every solid whose circle, grown by `pad`,
+   * touches the segment (ax, az)–(bx, bz), each once. Only looks in the cells
+   * along the segment, so a short one costs a handful of cells.
+   */
+  querySegment(ax: number, az: number, bx: number, bz: number, pad: number, out: number[]): number[] {
+    out.length = 0
+    if (this.count === 0) return out
+    this.stamp++
+    const reach = this.maxR + Math.max(0, pad)
+    const size = 1 / this.invCell
+    // A cell can only hold a hit if the segment passes within this of its centre.
+    const cellReach = size * Math.SQRT1_2 + reach
+    const c0 = this.cellOf(Math.min(ax, bx) - reach)
+    const c1 = this.cellOf(Math.max(ax, bx) + reach)
+    const r0 = this.cellOf(Math.min(az, bz) - reach)
+    const r1 = this.cellOf(Math.max(az, bz) + reach)
+    for (let row = r0; row <= r1; row++) {
+      const cz = -this.halfSize + (row + 0.5) * size
+      for (let col = c0; col <= c1; col++) {
+        const cx = -this.halfSize + (col + 0.5) * size
+        if (segmentPointDistance(ax, az, bx, bz, cx, cz) > cellReach) continue
+        const k = row * this.cells + col
+        for (let n = this.cellStart[k], end = this.cellStart[k + 1]; n < end; n++) {
+          const id = this.cellItems[n]
+          if (this.seen[id] === this.stamp) continue
+          this.seen[id] = this.stamp
+          if (segmentPointDistance(ax, az, bx, bz, this.xs[id], this.zs[id]) < this.rs[id] + pad) out.push(id)
+        }
+      }
+    }
+    return out
+  }
+
   private cellOf(v: number): number {
     const c = Math.floor((v + this.halfSize) * this.invCell)
     return c < 0 ? 0 : c >= this.cells ? this.cells - 1 : c
@@ -124,4 +165,15 @@ export class ColliderGrid {
     const r1 = this.cellOf(z + r)
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) fn(row * this.cells + col)
   }
+}
+
+/** Distance from (px, pz) to the segment (ax, az)–(bx, bz). */
+export function segmentPointDistance(ax: number, az: number, bx: number, bz: number, px: number, pz: number): number {
+  const ex = bx - ax
+  const ez = bz - az
+  const len2 = ex * ex + ez * ez
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * ex + (pz - az) * ez) / len2)) : 0
+  const dx = ax + ex * t - px
+  const dz = az + ez * t - pz
+  return Math.sqrt(dx * dx + dz * dz)
 }

@@ -9,6 +9,7 @@
  */
 import type { Rng } from '../core/rng'
 import type { GameContext } from '../game/types'
+import { PLAY_LIMIT } from '../world/colliders'
 import { keepDistance, yawTowards, type Steer } from './behaviors'
 import type { EnemyEntity } from './entity'
 import { SHAPE_DART, SHAPE_ORB, type EnemyProjectiles } from './EnemyProjectiles'
@@ -49,6 +50,11 @@ interface Pattern {
 }
 
 // ─────────────────────────────── attacks ───────────────────────────────
+
+/** The walkable half-width: summons and teleports stay inside the walls. */
+function playLimit(h: BossHost): number {
+  return Math.min(PLAY_LIMIT, h.ctx.world.halfSize)
+}
 
 function projectileDamage(e: EnemyEntity): number {
   return (e.def.projectile?.damage ?? e.def.damage * 0.6) * e.damageScale
@@ -186,7 +192,7 @@ function charge(speed: number, maxDist: number, windup: number, recover: number,
 function summon(defId: string, count: number, radius: number, around: 'self' | 'player', windup: number): Attack {
   return (h, e) => {
     const center = around === 'self' ? e.pos : h.ctx.player.pos
-    const limit = h.ctx.world.halfSize - 3
+    const limit = playLimit(h) - 3
     const n = e.hp < e.maxHp * 0.5 ? Math.ceil(count * 1.5) : count
     const base = h.rng.next() * Math.PI * 2
     const spots: number[] = []
@@ -211,7 +217,7 @@ function summon(defId: string, count: number, radius: number, around: 'self' | '
 function teleport(radius: number, windup: number): Attack {
   return (h, e) => {
     const p = h.ctx.player.pos
-    const limit = h.ctx.world.halfSize - e.radius - 2
+    const limit = playLimit(h) - e.radius - 2
     const a = h.rng.next() * Math.PI * 2
     const x = clamp(p.x + Math.sin(a) * 2.5, -limit, limit)
     const z = clamp(p.z + Math.cos(a) * 2.5, -limit, limit)

@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng'
 import { ENEMIES } from './enemyDefs'
-import { emptyDrops, pieceCount, rollDrops } from './drops'
+import { STAGE_XP, difficultyRewardMultiplier, emptyDrops, pieceCount, rollDrops, stageXpMultiplier } from './drops'
 
 describe('rollDrops', () => {
   it('gives normals 1–2 gold about a quarter of the time', () => {
@@ -72,6 +72,33 @@ describe('rollDrops', () => {
     expect(bombs / n).toBeLessThan(0.0045)
     expect(health / n).toBeGreaterThan(0.007)
     expect(health / n).toBeLessThan(0.013)
+  })
+})
+
+describe('reward scaling', () => {
+  it('pays difficulty back as XP and gold: × (1 + 0.5 × difficulty)', () => {
+    expect(difficultyRewardMultiplier(0)).toBe(1)
+    expect(difficultyRewardMultiplier(0.4)).toBeCloseTo(1.2)
+    expect(difficultyRewardMultiplier(-0.3)).toBe(1)
+  })
+
+  it('multiplies XP by stage: × 1, 1.3 and 2', () => {
+    expect(STAGE_XP).toEqual([1, 1.3, 2])
+    expect(stageXpMultiplier(0)).toBe(1)
+    expect(stageXpMultiplier(1)).toBe(1.3)
+    expect(stageXpMultiplier(2)).toBe(2)
+    expect(stageXpMultiplier(7)).toBe(2)
+  })
+
+  it('scales every drop by both, without changing the rolls', () => {
+    const plain = rollDrops(new Rng(9), ENEMIES.skeleton, 'normal', true, emptyDrops())
+    const scaled = rollDrops(new Rng(9), ENEMIES.skeleton, 'normal', true, emptyDrops(), 0.5, 2)
+    expect(scaled.xp).toBeCloseTo(plain.xp * 2 * 1.25)
+    expect(scaled.gold).toBeCloseTo(plain.gold * 1.25)
+    expect(scaled.chest).toBe(plain.chest)
+    const boss = rollDrops(new Rng(4), ENEMIES.grave_warden, 'boss', false, emptyDrops(), 0.2, 2)
+    expect(boss.xp).toBeCloseTo(1500 * 2 * 1.1)
+    expect(boss.gold).toBeCloseTo(100 * 1.1)
   })
 })
 

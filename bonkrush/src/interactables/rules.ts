@@ -18,8 +18,10 @@ export const CHARGE_DRAIN = 2 / CHARGE_TIME
 export const GOLDEN_SHRINE_CHANCE = 0.1
 export const SILVER_POT_CHANCE = 1 / 12
 export const GREED_GOLD = 40
-export const GREED_CURSE = 0.08
-export const CURSE_CURSE = 0.15
+/** Greed's difficulty lasts the whole run (run.greed). */
+export const GREED_DIFFICULTY = 0.08
+/** Curse's difficulty lasts only the stage (run.curse). */
+export const CURSE_DIFFICULTY = 0.15
 
 export type ShrineKind = Extract<
   InteractableKind,
@@ -35,7 +37,7 @@ export const SHRINE_COUNTS: Readonly<Record<ShrineKind, number>> = {
   shrineCurse: 2,
 }
 
-/** Gold price of the next paid chest after `paid` paid chests: 25, 34, 43, 53… */
+/** Gold price of the next paid chest after `paid` paid chests this run: 25, 34, 43, 53… */
 export function chestCost(paid: number): number {
   const n = Math.max(0, Math.floor(paid))
   return Math.round(25 * 1.18 ** n + 4 * n)

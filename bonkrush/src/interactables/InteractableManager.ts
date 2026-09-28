@@ -35,9 +35,9 @@ import {
   chargeSpeed,
   chargeText,
   chestCost as priceOfChest,
-  CURSE_CURSE,
+  CURSE_DIFFICULTY,
   GOLDEN_SHRINE_CHANCE,
-  GREED_CURSE,
+  GREED_DIFFICULTY,
   GREED_GOLD,
   keyFreeChance,
   pickNearest,
@@ -164,15 +164,17 @@ interface Pot {
   alive: boolean
 }
 
-/** Meshes of the exit portal, built when it first opens. */
+/**
+ * Meshes of the exit portal. Built hidden with the stage, so the shader
+ * prewarm after each stage build compiles them instead of the portal
+ * stuttering the frame the boss dies.
+ */
 interface PortalView {
   group: THREE.Group
   ring: THREE.Mesh
   disc: THREE.Mesh
   sparks: THREE.Points
   sparkData: Float32Array
-  geometries: THREE.BufferGeometry[]
-  materials: THREE.Material[]
 }
 
 export class InteractableManager implements InteractableApi {
@@ -204,10 +206,9 @@ export class InteractableManager implements InteractableApi {
   private readonly pots: Pot[] = []
   private altar!: Altar
   private portal: PortalThing | null = null
-  private portalView: PortalView | null = null
+  private readonly portalView: PortalView
   private portalEntered = false
 
-  private paid = 0
   /** Extra free chests owed to the next boss or miniboss by curse shrines. */
   private curseChests = 0
   private focus: Usable | null = null
@@ -309,6 +310,9 @@ export class InteractableManager implements InteractableApi {
     this.altarGroup.name = 'altar'
     this.root.add(this.altarGroup)
 
+    this.portalView = this.buildPortalView()
+    this.root.add(this.portalView.group)
+
     this.layout()
 
     this.unsubs.push(
@@ -331,8 +335,9 @@ export class InteractableManager implements InteractableApi {
     return this.promptValue
   }
 
+  /** Priced from the run's paid-chest count, so it keeps climbing across stages as gold carries over. */
   get chestCost(): number {
-    return priceOfChest(this.paid)
+    return priceOfChest(this.ctx.run.chestsPaid)
   }
 
   get markers(): ReadonlyArray<Usable> {
@@ -354,10 +359,12 @@ export class InteractableManager implements InteractableApi {
         break
       case 'shrineGreed':
         ctx.addGold(GREED_GOLD, true)
-        this.addCurse(GREED_CURSE)
+        // Greed's difficulty lasts the whole run; Game never resets run.greed.
+        ctx.run.greed += GREED_DIFFICULTY
+        ctx.progression.recompute()
         ctx.audio.play('gold')
         ctx.audio.play('shrine', { pitch: 1.1 })
-        ctx.ui.toast(`+${GREED_GOLD} gold · +${Math.round(GREED_CURSE * 100)}% difficulty`, SHRINE_COLOR.shrineGreed)
+        ctx.ui.toast(`+${GREED_GOLD} gold · +${Math.round(GREED_DIFFICULTY * 100)}% difficulty for the run`, SHRINE_COLOR.shrineGreed)
         this.useShrine(t)
         break
       case 'shrineMagnet':
@@ -382,10 +389,12 @@ export class InteractableManager implements InteractableApi {
         break
       }
       case 'shrineCurse':
-        this.addCurse(CURSE_CURSE)
+        // Stage-only: Game clears run.curse when the next stage is built.
+        ctx.run.curse += CURSE_DIFFICULTY
+        ctx.progression.recompute()
         this.curseChests++
         ctx.audio.play('shrine', { pitch: 0.6 })
-        ctx.ui.toast(`Cursed: +${Math.round(CURSE_CURSE * 100)}% difficulty, extra boss chest`, SHRINE_COLOR.shrineCurse)
+        ctx.ui.toast(`Cursed: +${Math.round(CURSE_DIFFICULTY * 100)}% difficulty this stage, extra boss chest`, SHRINE_COLOR.shrineCurse)
         this.useShrine(t)
         break
       case 'altar':
@@ -402,11 +411,11 @@ export class InteractableManager implements InteractableApi {
     if (this.portal) return
     const ctx = this.ctx
     const p = this.onGround(pos, 1.5)
-    const view = this.buildPortalView()
+    const view = this.portalView
     view.group.position.copy(p)
     view.group.rotation.y = this.yawToPlayer(p)
     view.group.scale.setScalar(0.01)
-    this.root.add(view.group)
+    view.group.visible = true
     this.portal = { kind: 'portal', pos: p, used: false, dist: Infinity, reach: PORTAL_REACH, usable: false, age: 0, armed: false }
     this.things.push(this.portal)
     ctx.events.emit('portalOpened', { pos: p.clone() })
@@ -445,7 +454,6 @@ export class InteractableManager implements InteractableApi {
     this.shrines.length = 0
     this.chargeShrines.length = 0
     this.pots.length = 0
-    this.paid = 0
     this.curseChests = 0
     this.focus = null
     this.promptValue = null
@@ -699,7 +707,7 @@ export class InteractableManager implements InteractableApi {
         return
       }
       ctx.addGold(-cost, true)
-      this.paid++
+      ctx.run.chestsPaid++
     }
     this.openChest(chest, free)
   }
@@ -898,11 +906,6 @@ export class InteractableManager implements InteractableApi {
     ctx.fx.burst(shrine.pos.clone().setY(shrine.pos.y + 2.2), color, 24, 6, 0.28)
   }
 
-  private addCurse(amount: number): void {
-    this.ctx.run.curse += amount
-    this.ctx.progression.recompute()
-  }
-
   private updateChallenges(): void {
     for (const shrine of this.shrines) {
       const foes = shrine.foes
@@ -1009,7 +1012,6 @@ export class InteractableManager implements InteractableApi {
   }
 
   private buildPortalView(): PortalView {
-    if (this.portalView) return this.portalView
     const ringGeo = portalRingGeometry()
     const discGeo = portalDiscGeometry()
     const columnGeo = beamGeometry()
@@ -1034,8 +1036,12 @@ export class InteractableManager implements InteractableApi {
       depthWrite: false,
     })
 
+    this.geometries.push(ringGeo, discGeo, columnGeo, sparkGeo)
+    this.materials.push(ringMat, discMat, columnMat, sparkMat)
+
     const group = new THREE.Group()
     group.name = 'portal'
+    group.visible = false
     const ring = new THREE.Mesh(ringGeo, ringMat)
     ring.position.y = 2.5
     const disc = new THREE.Mesh(discGeo, discMat)
@@ -1056,22 +1062,13 @@ export class InteractableManager implements InteractableApi {
       sparkData[i * 3 + 1] = 0.3 + Math.random() * 2
       sparkData[i * 3 + 2] = 0.6 + Math.random() * 0.8
     }
-    this.portalView = {
-      group,
-      ring,
-      disc,
-      sparks,
-      sparkData,
-      geometries: [ringGeo, discGeo, columnGeo, sparkGeo],
-      materials: [ringMat, discMat, columnMat, sparkMat],
-    }
-    return this.portalView
+    return { group, ring, disc, sparks, sparkData }
   }
 
   private updatePortal(dt: number, player: PlayerApi): void {
     const portal = this.portal
+    if (!portal) return
     const view = this.portalView
-    if (!portal || !view) return
     portal.age += dt
     const grow = Math.min(1, portal.age / 0.8)
     view.group.scale.setScalar(Math.max(0.01, 1 - (1 - grow) ** 3))
@@ -1103,20 +1100,19 @@ export class InteractableManager implements InteractableApi {
   }
 
   private enterPortal(): void {
-    if (!this.portal || this.portalEntered) return
+    // Backstop only: both callers already skip a dead player, and Game closes the
+    // same-tick death race. Keeps any future caller from clearing a stage post-mortem.
+    if (!this.portal || this.portalEntered || !this.ctx.player.alive) return
     this.portalEntered = true
     this.portal.used = true
     this.ctx.advanceStage()
   }
 
+  /** Hides the portal; its meshes stay built (and compiled) for the next opening. */
   private removePortal(): void {
-    const view = this.portalView
-    if (view) {
-      this.root.remove(view.group)
-      for (const g of view.geometries) g.dispose()
-      for (const m of view.materials) m.dispose()
-      this.portalView = null
-    }
+    this.portalView.group.visible = false
+    const i = this.portal ? this.things.indexOf(this.portal) : -1
+    if (i >= 0) this.things.splice(i, 1)
     this.portal = null
     this.portalEntered = false
   }
@@ -1146,7 +1142,7 @@ export class InteractableManager implements InteractableApi {
         this.setPrompt(chargeText(focus.charge))
         break
       case 'shrineGreed':
-        this.setPrompt(`Greed shrine: +${GREED_GOLD} gold, +${Math.round(GREED_CURSE * 100)}% difficulty`)
+        this.setPrompt(`Greed shrine: +${GREED_GOLD} gold, +${Math.round(GREED_DIFFICULTY * 100)}% difficulty`)
         break
       case 'shrineMagnet':
         this.setPrompt('Magnet shrine')
@@ -1155,7 +1151,7 @@ export class InteractableManager implements InteractableApi {
         this.setPrompt('Challenge shrine')
         break
       case 'shrineCurse':
-        this.setPrompt(`Curse shrine: +${Math.round(CURSE_CURSE * 100)}% difficulty, extra boss chest`)
+        this.setPrompt(`Curse shrine: +${Math.round(CURSE_DIFFICULTY * 100)}% difficulty, extra boss chest`)
         break
       case 'altar':
         this.setPrompt('Summon the boss')

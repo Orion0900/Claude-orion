@@ -2,6 +2,7 @@ import {
   FINAL_TEMPO,
   LAYER,
   STEPS_PER_BAR,
+  TITLE_SONG,
   degreeToMidi,
   eventsAt,
   hit,
@@ -68,11 +69,14 @@ describe('songForStage', () => {
   })
 
   it('survives odd stage indices', () => {
-    for (const i of [-1, 3, 7, Number.NaN]) {
+    for (const i of [-2, -0.5, 3, 7, Number.NaN, -Infinity]) {
       const song = songForStage(i)
       expect(song.bars).toBeGreaterThan(0)
       expect(song.calm.lead).toHaveLength(song.bars)
+      expect(song.title).toBe(false)
     }
+    // Only the title index is special; other negatives still play the first stage.
+    expect(songForStage(-2)).toEqual(songForStage(0))
   })
 
   it('keeps every lead note in key, in range and inside its bar', () => {
@@ -199,5 +203,112 @@ describe('tempo and intensity', () => {
     expect(smoothIntensity(0.3, Number.NaN, 1)).toBe(0.3)
     expect(smoothIntensity(0.3, 5, 0)).toBe(0.3)
     expect(smoothIntensity(0.99, 5, 1)).toBe(1)
+  })
+})
+
+describe('title theme', () => {
+  const title = songForStage(TITLE_SONG)
+  const stages = [0, 1, 2].map(songForStage)
+
+  it('is its own song rather than the first stage clamped', () => {
+    expect(TITLE_SONG).toBe(-1)
+    expect(title.title).toBe(true)
+    expect(songForStage(-1)).toEqual(title)
+    for (const stage of stages) {
+      expect(stage.title).toBe(false)
+      expect(title.root % 12).not.toBe(stage.root % 12)
+      // Calmer: slower than every stage.
+      expect(title.bpm).toBeLessThan(stage.bpm)
+      expect(title.calm.lead).not.toEqual(stage.calm.lead)
+    }
+  })
+
+  it('plays only arp, bass and light drums', () => {
+    const counts = channelsOver(title, 0)
+    expect([...counts.keys()].sort()).toEqual(['arp', 'bass', 'hat', 'kick', 'snare'])
+    const out: NoteEvent[] = []
+    for (let step = 0; step < title.bars * STEPS_PER_BAR; step++) {
+      const n = eventsAt(title, step, 0, out)
+      for (let i = 0; i < n; i++) {
+        const e = out[i]
+        if (e.ch === 'kick' || e.ch === 'snare' || e.ch === 'hat') expect(e.vel).toBeLessThanOrEqual(0.5)
+        if (e.ch === 'bass') expect(e.vel).toBeLessThan(0.8)
+      }
+    }
+    // Sparser than a stage song even before its lead joins.
+    expect(total(counts)).toBeLessThan(total(channelsOver(stages[0], LAYER.beat)))
+  })
+
+  it('ignores intensity, tempo included', () => {
+    const snapshot = (level: number) => {
+      const out: NoteEvent[] = []
+      const all: NoteEvent[] = []
+      for (let step = 0; step < title.bars * STEPS_PER_BAR; step++) {
+        const n = eventsAt(title, step, level, out)
+        for (let i = 0; i < n; i++) all.push({ ...out[i] })
+      }
+      return all
+    }
+    const calm = snapshot(0)
+    for (const level of [LAYER.lead, LAYER.drive, 1, Number.NaN]) expect(snapshot(level)).toEqual(calm)
+    expect(stepDuration(title, 1)).toBe(stepDuration(title, 0))
+    expect(stepDuration(title, 0)).toBeCloseTo(60 / title.bpm / 4)
+  })
+
+  it('carries its hook on the arp, above and louder than the bounces', () => {
+    const out: NoteEvent[] = []
+    for (let bar = 0; bar < title.bars; bar++) {
+      const hook = title.calm.lead[bar]
+      expect(hook.length).toBeGreaterThan(1)
+      const lowest = Math.min(...hook.map((h) => degreeToMidi(title.root, title.scale, h.degree)))
+      for (let s = 0; s < STEPS_PER_BAR; s++) {
+        const n = eventsAt(title, bar * STEPS_PER_BAR + s, 0, out)
+        const arps = out.slice(0, n).filter((e) => e.ch === 'arp')
+        const note = hook.find((h) => h.step === s)
+        if (note) {
+          expect(arps).toHaveLength(1)
+          expect(arps[0].note).toBe(degreeToMidi(title.root, title.scale, note.degree))
+          expect(arps[0].len).toBe(note.len)
+        } else {
+          for (const a of arps) {
+            expect(a.len).toBe(1)
+            expect(a.note).toBeLessThan(lowest)
+            expect(a.vel).toBeLessThan(0.75)
+          }
+        }
+      }
+    }
+  })
+
+  it('keeps the hook in key, inside its bars and catchy', () => {
+    const lead = title.calm.lead
+    expect(lead).toHaveLength(title.bars)
+    for (const bar of lead) {
+      for (const note of bar) {
+        const midi = degreeToMidi(title.root, title.scale, note.degree)
+        expect(title.scale).toContain((((midi - title.root) % 12) + 12) % 12)
+        expect(note.step + note.len).toBeLessThanOrEqual(STEPS_PER_BAR)
+      }
+    }
+    // Every bar shares one rhythm, and the answer opens with the question's first bar.
+    const rhythm = (bar: readonly { step: number }[]) => bar.map((n) => n.step)
+    for (const bar of lead) expect(rhythm(bar)).toEqual(rhythm(lead[0]))
+    expect(lead[title.bars / 2]).toEqual(lead[0])
+    // The loop leans home: the last note sits a step from the first.
+    const last = lead[lead.length - 1]
+    expect(Math.abs(last[last.length - 1].degree - lead[0][0].degree)).toBe(1)
+  })
+
+  it('walks the bass down the progression and loops cleanly', () => {
+    const out: NoteEvent[] = []
+    const bassAt = (bar: number) => {
+      const n = eventsAt(title, bar * STEPS_PER_BAR, 0, out)
+      for (let i = 0; i < n; i++) if (out[i].ch === 'bass') return out[i].note
+      return -1
+    }
+    const line = [0, 1, 2, 3].map(bassAt)
+    expect(line[1]).toBeLessThan(line[0])
+    expect(line[2]).toBeLessThan(line[1])
+    expect(bassAt(title.bars)).toBe(line[0])
   })
 })

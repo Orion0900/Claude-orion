@@ -22,6 +22,12 @@ export class LevelUpModal extends Modal {
   private busy = 0
   private next: (() => void) | null = null
   private roundAt = 0
+  /**
+   * Set once the modal has closed. Its node lingers for the leave animation,
+   * and a stale click there (a Space tap on the still-focused card) must not
+   * apply an offer again.
+   */
+  private done = false
   private readonly sub: HTMLDivElement
   private readonly row: HTMLDivElement
   private readonly hint: HTMLDivElement
@@ -92,6 +98,10 @@ export class LevelUpModal extends Modal {
     }
   }
 
+  override destroy(): void {
+    this.done = true
+  }
+
   protected override auto(): void {
     if (this.busy > 0) return
     if (this.banishing) this.toggleBanish()
@@ -148,13 +158,14 @@ export class LevelUpModal extends Modal {
     this.root.classList.toggle('banishing', this.banishing)
     this.hint.classList.toggle('warn', this.banishing)
     this.hint.textContent = this.banishing
-      ? 'Banish a card: it never shows up again this run (uses this level-up)'
+      ? 'Banish a card: it never shows up again this run, and you get fresh cards'
       : this.env.shell.input.isTouch
         ? 'Tap a card to take it'
         : `Press 1–${Math.max(1, this.cards.length)} or click a card · skipping pays 20% of the level in gold`
   }
 
   private choose(i: number): void {
+    if (this.done) return
     const roundReady = this.age - this.roundAt >= ROUND_GUARD || this.env.autoPick()
     if (!this.ready || !roundReady || this.busy > 0) return
     const offer = this.offers[i]
@@ -180,13 +191,13 @@ export class LevelUpModal extends Modal {
     this.env.sfx('explode', { volume: 0.4, pitch: 1.4 })
     card.classList.add('banished')
     this.cards.forEach((c, k) => k !== i && c.classList.add('dismissed'))
-    // A banish uses up the level-up, like the original: on to the next round.
+    // A banish doesn't use up the level-up: fresh cards for the same level.
     this.banishing = false
     this.after(BANISH_DELAY, () => this.roll())
   }
 
   private doReroll(): void {
-    if (!this.ready || this.busy > 0) return
+    if (this.done || !this.ready || this.busy > 0) return
     const p = this.env.ctx.progression
     if (!p.useReroll()) {
       pulse(this.reroll.btn, SHAKE, 260)
@@ -199,7 +210,7 @@ export class LevelUpModal extends Modal {
   }
 
   private doSkip(): void {
-    if (!this.ready || this.busy > 0) return
+    if (this.done || !this.ready || this.busy > 0) return
     const p = this.env.ctx.progression
     const empty = this.cards.length === 0
     if (!empty && p.skips <= 0) {
@@ -214,7 +225,7 @@ export class LevelUpModal extends Modal {
   }
 
   private toggleBanish(): void {
-    if (!this.ready || this.busy > 0) return
+    if (this.done || !this.ready || this.busy > 0) return
     const p = this.env.ctx.progression
     if (!this.banishing && (p.banishes <= 0 || this.cards.length === 0)) {
       pulse(this.banish.btn, SHAKE, 260)

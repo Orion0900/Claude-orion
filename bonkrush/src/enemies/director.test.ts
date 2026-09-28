@@ -1,10 +1,13 @@
 import {
   aliveCap,
+  behaviorSpawnWeight,
   bossHpScale,
   clumpSize,
   damageScale,
   effectiveDifficulty,
   eliteChance,
+  encircleCount,
+  encircleTimes,
   ghostTier,
   hpScale,
   intensityFor,
@@ -20,22 +23,33 @@ import {
 } from './director'
 
 describe('spawnRate', () => {
-  it('starts at one per second', () => {
-    expect(spawnRate(0, 0)).toBeCloseTo(1)
+  it('opens stage 1 at 1.6 per second', () => {
+    expect(spawnRate(0, 0)).toBeCloseTo(1.6)
+    expect(spawnRate(0, 0, 0)).toBeCloseTo(1.6)
   })
 
-  it('follows min(12, 1 + 0.55 × min^1.25)', () => {
-    expect(spawnRate(300, 0)).toBeCloseTo(1 + 0.55 * Math.pow(5, 1.25))
-    expect(spawnRate(600, 0)).toBeCloseTo(1 + 0.55 * Math.pow(10, 1.25))
+  it('follows min(14, 1.6 + 1.5 × stage + 0.6 × min^1.25)', () => {
+    expect(spawnRate(300, 0)).toBeCloseTo(1.6 + 0.6 * Math.pow(5, 1.25))
+    expect(spawnRate(600, 0)).toBeCloseTo(1.6 + 0.6 * Math.pow(10, 1.25))
+    expect(spawnRate(300, 0, 2)).toBeCloseTo(1.6 + 3 + 0.6 * Math.pow(5, 1.25))
   })
 
-  it('caps at 12 before difficulty', () => {
-    expect(spawnRate(3600, 0)).toBe(12)
-    expect(spawnRate(3600, 0.5)).toBeCloseTo(12 * 1.3)
+  it('opens later stages busier', () => {
+    expect(spawnRate(0, 0, 1)).toBeCloseTo(3.1)
+    expect(spawnRate(0, 0, 2)).toBeCloseTo(4.6)
+  })
+
+  it('caps at 14 before difficulty', () => {
+    expect(spawnRate(3600, 0)).toBe(14)
+    expect(spawnRate(3600, 0.5, 2)).toBeCloseTo(14 * 1.3)
   })
 
   it('scales with difficulty', () => {
-    expect(spawnRate(0, 1)).toBeCloseTo(1.6)
+    expect(spawnRate(0, 1)).toBeCloseTo(1.6 * 1.6)
+  })
+
+  it('halves while a boss is alive', () => {
+    expect(spawnRate(240, 0.3, 1, true)).toBeCloseTo(spawnRate(240, 0.3, 1) / 2)
   })
 
   it('jumps to 14/s in the swarm', () => {
@@ -79,6 +93,13 @@ describe('roster', () => {
     expect(early).toBeGreaterThan(0)
   })
 
+  it('keeps tanks and chargers a spice', () => {
+    expect(behaviorSpawnWeight('tank')).toBe(0.12)
+    expect(behaviorSpawnWeight('charger')).toBe(0.45)
+    expect(behaviorSpawnWeight('chaser')).toBe(1)
+    expect(behaviorSpawnWeight('boss')).toBe(0)
+  })
+
   it('reuses the output array', () => {
     const out: number[] = [9, 9, 9, 9, 9, 9, 9, 9]
     expect(rosterWeights(0, 6, out)).toBe(out)
@@ -107,9 +128,10 @@ describe('scaling', () => {
     expect(bossHpScale(60, 1)).toBeCloseTo(2.7)
   })
 
-  it('adds the curse to difficulty without going absurd', () => {
-    expect(effectiveDifficulty(0.2, 0.15)).toBeCloseTo(0.35)
-    expect(effectiveDifficulty(-5, 0)).toBe(-0.5)
+  it('takes the difficulty stat as is (curse and greed are already in it), floored', () => {
+    expect(effectiveDifficulty(0.35)).toBeCloseTo(0.35)
+    expect(effectiveDifficulty(-5)).toBe(-0.5)
+    expect(effectiveDifficulty(NaN)).toBe(0)
   })
 })
 
@@ -153,6 +175,21 @@ describe('schedule', () => {
 
   it('sends them at 6:30 and 3:00 left on stage 3', () => {
     expect(minibossTimes(2, 480)).toEqual([90, 300])
+  })
+
+  it('surrounds the player at 5:30 and 3:30 left', () => {
+    expect(encircleTimes(0, 600)).toEqual([270, 390])
+    expect(encircleTimes(1, 540)).toEqual([210, 330])
+  })
+
+  it('surrounds them at 4:30 and 3:15 left on stage 3', () => {
+    expect(encircleTimes(2, 480)).toEqual([210, 285])
+  })
+
+  it('rings the player with 30 + 10 × stage', () => {
+    expect(encircleCount(0)).toBe(30)
+    expect(encircleCount(1)).toBe(40)
+    expect(encircleCount(2)).toBe(50)
   })
 
   it('counts 60 s wave slots', () => {

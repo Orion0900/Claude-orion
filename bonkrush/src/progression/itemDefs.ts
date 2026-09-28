@@ -125,7 +125,7 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Ice Cube',
     icon: '🧊',
     rarity: 'epic',
-    description: '10% chance on hit to freeze an enemy for 1.5 s (bosses are slowed instead).',
+    description: '10% chance on hit to freeze an enemy for 1.5 s (bosses and minibosses are slowed instead).',
     hooks: ITEM_HOOKS.ice_cube,
   },
   {
@@ -169,7 +169,7 @@ export const ITEMS: readonly ItemDef[] = [
     name: "Reaper's Dagger",
     icon: '🗡️',
     rarity: 'legendary',
-    description: '1% chance on hit to execute a non-boss enemy outright.',
+    description: '1% chance on hit to execute an enemy outright (not bosses or minibosses).',
     hooks: ITEM_HOOKS.reaper_dagger,
   },
   {

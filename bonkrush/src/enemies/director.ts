@@ -16,7 +16,12 @@ export const RECYCLE_DISTANCE = 45
 /** Normals further than this are recycled even below the cap, so a sliding player never loses the horde. */
 export const STRAGGLER_DISTANCE = 75
 export const WAVE_INTERVAL = 60
+/** Spawns per second before difficulty, at most. */
+export const SPAWN_RATE_CAP = 14
 export const SWARM_RATE = 14
+/** Encirclements: a ring this far around the player, announced this many seconds ahead. */
+export const ENCIRCLE_RADIUS = 16
+export const ENCIRCLE_WARNING = 1
 
 /** Final-swarm ghost tiers: normal, purple (+3:00) and red (+6:00). */
 export type GhostTier = 0 | 1 | 2
@@ -36,20 +41,29 @@ export const ELITE_DAMAGE_MULT = 1.5
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
-/** Difficulty stat plus the stage's curse; never so negative that scales hit zero. */
-export function effectiveDifficulty(statDifficulty: number, curse: number): number {
-  const d = (statDifficulty || 0) + (curse || 0)
-  return Math.max(-0.5, d)
+/**
+ * The difficulty stat as the director uses it. Progression already folds
+ * greed and curse shrines into the stat, so nothing is added here; it is
+ * only floored so scales never reach zero.
+ */
+export function effectiveDifficulty(statDifficulty: number): number {
+  return Math.max(-0.5, statDifficulty || 0)
 }
 
 export function aliveCap(quality: Settings['quality']): number {
   return quality === 'low' ? 180 : 300
 }
 
-/** Spawns per second: min(12, 1 + 0.55 × min^1.25) × (1 + difficulty × 0.6). */
-export function spawnRate(stageTime: number, difficulty: number): number {
+/**
+ * Spawns per second: min(14, 1.6 + 1.5 × stage + 0.6 × min^1.25) × (1 + difficulty × 0.6),
+ * halved while a boss is alive. The stage term keeps later stages from
+ * opening on an empty map.
+ */
+export function spawnRate(stageTime: number, difficulty: number, stageIndex = 0, bossAlive = false): number {
   const m = Math.max(0, stageTime) / 60
-  return Math.min(12, 1 + 0.55 * Math.pow(m, 1.25)) * (1 + difficulty * 0.6)
+  const s = Math.max(0, stageIndex)
+  const rate = Math.min(SPAWN_RATE_CAP, 1.6 + 1.5 * s + 0.6 * Math.pow(m, 1.25)) * (1 + difficulty * 0.6)
+  return bossAlive ? rate * 0.5 : rate
 }
 
 /** Final-swarm ghosts per second. */
@@ -80,11 +94,11 @@ export function behaviorSpawnWeight(behavior: EnemyBehavior): number {
     case 'ranged':
       return 0.7
     case 'charger':
-      return 0.6
+      return 0.45
     case 'exploder':
       return 0.6
     case 'tank':
-      return 0.35
+      return 0.12
     case 'boss':
       return 0
     default:
@@ -172,6 +186,20 @@ export function swarmDamageMultiplier(swarmSeconds: number): number {
 export function minibossTimes(stageIndex: number, duration: number): [number, number] {
   const left = stageIndex >= 2 ? [390, 180] : [420, 120]
   return [Math.max(0, duration - left[0]), Math.max(0, duration - left[1])]
+}
+
+/**
+ * Stage times when the player gets surrounded: at 5:30 and 3:30 left, or
+ * 4:30 and 3:15 left on stage 3.
+ */
+export function encircleTimes(stageIndex: number, duration: number): [number, number] {
+  const left = stageIndex >= 2 ? [270, 195] : [330, 210]
+  return [Math.max(0, duration - left[0]), Math.max(0, duration - left[1])]
+}
+
+/** An encirclement is 30 + 10 × stage of the stage's first roster type. */
+export function encircleCount(stageIndex: number): number {
+  return 30 + 10 * Math.max(0, stageIndex)
 }
 
 /** Which 60 s wave slot a stage time falls in; a wave fires when this goes up (never at 0). */

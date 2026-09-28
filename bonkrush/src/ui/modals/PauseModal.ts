@@ -1,5 +1,5 @@
 import { activateFocused, arrowDir, bouncyText, button, el, moveFocus } from '../dom'
-import { formatCount, formatTime } from '../format'
+import { controlsHint, formatCount, formatTime } from '../format'
 import { StatList, buildInventory } from '../panels'
 import { Modal, type ModalEnv } from './Modal'
 
@@ -31,6 +31,11 @@ export class PauseModal extends Modal {
     const resume = button('Resume', 'btn-primary btn-big', () => this.resume(), menu)
     button('Settings', 'btn-purple', () => this.ready && env.openSettings(), menu)
     this.quit = button('Quit to title', 'btn-red', () => this.onQuit(), menu)
+    if (!env.shell.input.isTouch) {
+      // Touch players see their controls on screen; keyboard ones get a reminder.
+      const keys = el('div', 'pause-keys', undefined, side)
+      for (const part of controlsHint(false).split(' · ')) el('span', 'pause-key', part, keys)
+    }
 
     const main = el('div', 'pause-main', undefined, this.panel)
     const statsBox = el('div', 'pause-stats', undefined, main)
@@ -64,7 +69,7 @@ export class PauseModal extends Modal {
     this.quitArmed -= dt
     if (this.quitArmed <= 0) {
       this.quit.textContent = 'Quit to title'
-      this.quit.classList.remove('armed')
+      this.quit.classList.remove('armed', 'two-line')
     }
   }
 
@@ -86,8 +91,9 @@ export class PauseModal extends Modal {
     if (!this.ready) return
     if (this.quitArmed <= 0) {
       this.quitArmed = QUIT_CONFIRM
-      this.quit.textContent = 'Really quit? Run is lost'
-      this.quit.classList.add('armed')
+      // Quitting ends the run like a death would: silver and records are kept.
+      this.quit.replaceChildren('Quit to title?', el('span', 'btn-note', 'Your silver is kept'))
+      this.quit.classList.add('armed', 'two-line')
       this.env.sfx('uiMove')
       return
     }

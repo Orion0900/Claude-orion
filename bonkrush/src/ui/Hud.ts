@@ -1,7 +1,7 @@
 import type { GameContext } from '../game/types'
 import { STAGES } from '../data/stages'
 import { POP, SHAKE, el, fitCanvas, pulse } from './dom'
-import { formatCount, fraction, promptLabel, timerKey, timerLabel } from './format'
+import { formatCount, fraction, objectiveLabel, promptLabel, timerKey, timerLabel } from './format'
 import { MapView } from './MapView'
 import { StatList, buildInventory } from './panels'
 
@@ -17,7 +17,15 @@ interface SlotView {
 const FIT_INTERVAL = 0.5
 /** Seconds between stat list refreshes while the Tab overlay is up. */
 const TAB_STATS_INTERVAL = 0.25
+/**
+ * Seconds between HUD text refreshes. Every text write costs a layout pass,
+ * and in a fight kills, gold, HP and boss HP change nearly every frame; bars
+ * are transforms and still move every frame.
+ */
+const TEXT_INTERVAL = 0.1
 const LOW_HP = 0.3
+/** Pixels per wheel "line" (Firefox reports mouse wheels in lines). */
+const WHEEL_LINE = 16
 
 /**
  * The in-run HUD. `update` runs every frame, so every value is cached and
@@ -42,6 +50,7 @@ export class Hud {
   private readonly timer: HTMLDivElement
   private readonly timerSub: HTMLDivElement
   private readonly stageName: HTMLDivElement
+  private readonly objective: HTMLDivElement
   private readonly bossBar: HTMLDivElement
   private readonly bossName: HTMLSpanElement
   private readonly bossHp: HTMLSpanElement
@@ -62,6 +71,7 @@ export class Hud {
   private readonly xpBar: HTMLDivElement
 
   private readonly tab: HTMLDivElement
+  private readonly tabPanel: HTMLDivElement
   private readonly bigMap: HTMLCanvasElement
   private bigSize = 0
   private readonly stats = new StatList()
@@ -76,6 +86,8 @@ export class Hud {
   private cLevel = NaN
   private cTimer = NaN
   private cStage = ''
+  private cObjective = ''
+  private cHpText = ''
   private cKills = NaN
   private cGold = NaN
   private cSilver = NaN
@@ -89,6 +101,7 @@ export class Hud {
   private cXp = NaN
   private lastGoldPulse = 0
   private clock = 0
+  private textIn = 0
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'hud hidden', undefined, parent)
@@ -112,6 +125,7 @@ export class Hud {
     this.timer = el('div', 'timer ol', '10:00', this.timerBox)
     this.timerSub = el('div', 'timer-sub ol', '', this.timerBox)
     this.stageName = el('div', 'stage-name ol', '', tc)
+    this.objective = el('div', 'objective ol', '', tc)
     this.bossBar = el('div', 'bossbar', undefined, tc)
     const head = el('div', 'bossbar-head', undefined, this.bossBar)
     this.bossName = el('span', 'bossbar-name ol', '', head)
@@ -137,6 +151,7 @@ export class Hud {
 
     this.tab = el('div', 'tab-overlay hidden', undefined, this.root)
     const panel = el('div', 'panel tab-panel', undefined, this.tab)
+    this.tabPanel = panel
     const mapCol = el('div', 'tab-map', undefined, panel)
     el('div', 'panel-title ol', 'Map', mapCol)
     this.bigMap = el('canvas', 'bigmap', undefined, mapCol)
@@ -145,6 +160,13 @@ export class Hud {
     el('div', 'panel-title ol', 'Stats', statCol)
     statCol.appendChild(this.stats.el)
     this.tabInv = el('div', 'tab-inv', undefined, panel)
+    // The overlay takes no pointer events and the mouse is locked to the game,
+    // so the wheel reaches the window; while Tab is held it scrolls the overlay.
+    window.addEventListener('wheel', this.onWheel, { passive: true })
+  }
+
+  dispose(): void {
+    window.removeEventListener('wheel', this.onWheel)
   }
 
   /** Points the HUD at a run (new run or new stage): resets caches and slots, re-bakes the map. */
@@ -154,7 +176,8 @@ export class Hud {
     this.map.invalidate()
     this.cHp = this.cMax = this.cShield = this.cLevel = this.cTimer = NaN
     this.cKills = this.cGold = this.cSilver = this.cXp = this.cBossFrac = this.cBossHp = NaN
-    this.cStage = ''
+    this.cStage = this.cObjective = this.cHpText = ''
+    this.textIn = 0
     this.cBoss = false
     this.cBossName = ''
     this.bossBar.classList.remove('show')
@@ -183,6 +206,20 @@ export class Hud {
     pulse(this.hpBar, SHAKE, 260)
   }
 
+  /** A wave is coming: the timer flares, harder for an encirclement (its banner is the spawner's). */
+  pulseWave(encircle: boolean): void {
+    const glow = encircle ? '#ff3b4f' : '#ffb02e'
+    pulse(
+      this.timerBox,
+      [
+        { transform: 'scale(1)', filter: 'none' },
+        { transform: `scale(${encircle ? 1.35 : 1.2})`, filter: `drop-shadow(0 0 10px ${glow}) brightness(1.6)` },
+        { transform: 'scale(1)', filter: 'none' },
+      ],
+      encircle ? 900 : 650,
+    )
+  }
+
   /** The timer slams in as FINAL SWARM (called when the countdown crosses zero). */
   private swarm(): void {
     pulse(this.timerBox, [{ transform: 'scale(2.2)', opacity: 0 }, { transform: 'scale(0.9)', opacity: 1 }, { transform: 'scale(1)' }], 600)
@@ -191,9 +228,13 @@ export class Hud {
   update(ctx: GameContext, dt: number, tabHeld: boolean): void {
     this.clock += dt
     this.map.tick(dt)
-    this.updateVitals(ctx)
+    this.updateBars(ctx)
     this.updateSlots(ctx)
-    this.updateTop(ctx)
+    this.textIn -= dt
+    if (this.textIn <= 0) {
+      this.textIn = TEXT_INTERVAL
+      this.updateText(ctx)
+    }
     this.updatePrompt(ctx)
     this.updateXp(ctx)
 
@@ -220,6 +261,12 @@ export class Hud {
     return this.tabOpen
   }
 
+  private onWheel = (e: WheelEvent): void => {
+    if (!this.tabOpen) return
+    const unit = e.deltaMode === 1 ? WHEEL_LINE : e.deltaMode === 2 ? this.tabPanel.clientHeight : 1
+    this.tabPanel.scrollTop += e.deltaY * unit
+  }
+
   private setTab(open: boolean, ctx: GameContext | null): void {
     this.tabOpen = open && !!ctx
     this.tab.classList.toggle('hidden', !this.tabOpen)
@@ -228,12 +275,14 @@ export class Hud {
       return
     }
     this.tabInv.replaceChildren(buildInventory(ctx))
+    this.tabPanel.scrollTop = 0
     this.stats.update(ctx.progression.stats)
     this.tabStatsIn = TAB_STATS_INTERVAL
     this.bigSize = fitCanvas(this.bigMap)
   }
 
-  private updateVitals(ctx: GameContext): void {
+  /** Every frame: bar fills are transforms, which cost no layout. */
+  private updateBars(ctx: GameContext): void {
     const max = Math.max(1, Math.round(ctx.progression.stats.maxHp))
     const hp = Math.max(0, Math.ceil(ctx.player.hp))
     const shield = Math.max(0, Math.ceil(ctx.player.shield))
@@ -243,8 +292,33 @@ export class Hud {
       this.cShield = shield
       this.hpFill.style.transform = `scaleX(${fraction(hp, max)})`
       this.shieldFill.style.transform = `scaleX(${fraction(shield, max)})`
-      this.hpText.textContent = shield > 0 ? `${hp} / ${max}  +${shield}🛡️` : `${hp} / ${max}`
       this.root.classList.toggle('low-hp', hp > 0 && hp / max < LOW_HP)
+    }
+
+    const boss = ctx.enemies.boss
+    const alive = !!boss && boss.alive && boss.hp > 0
+    if (alive !== this.cBoss) {
+      this.cBoss = alive
+      this.bossBar.classList.toggle('show', alive)
+      // A new boss shows its name and HP at once, not on the next text tick.
+      if (alive) this.textIn = 0
+    }
+    if (boss && alive) {
+      const frac = Math.round(fraction(boss.hp, boss.maxHp) * 1000) / 1000
+      if (frac !== this.cBossFrac) {
+        this.cBossFrac = frac
+        this.bossFill.style.transform = `scaleX(${frac})`
+      }
+    }
+  }
+
+  /** Every TEXT_INTERVAL: all the numbers and labels, each written only when it changed. */
+  private updateText(ctx: GameContext): void {
+    const hpText =
+      this.cShield > 0 ? `${this.cHp} / ${this.cMax}  +${this.cShield}🛡️` : `${this.cHp} / ${this.cMax}`
+    if (hpText !== this.cHpText) {
+      this.cHpText = hpText
+      this.hpText.textContent = hpText
     }
     const level = ctx.progression.level
     if (level !== this.cLevel) {
@@ -252,22 +326,7 @@ export class Hud {
       this.lvlNum.textContent = String(level)
       this.xpText.textContent = `LV ${level}`
     }
-  }
 
-  private updateSlots(ctx: GameContext): void {
-    const owned = ctx.weapons.owned
-    for (let i = 0; i < this.weaponSlots.length; i++) {
-      const w = owned[i]
-      setSlot(this.weaponSlots[i], w ? w.def.id : '', w ? w.level : 0, w?.def.icon, w?.def.color)
-    }
-    const tomes = ctx.progression.tomes
-    for (let i = 0; i < this.tomeSlots.length; i++) {
-      const t = tomes[i]
-      setSlot(this.tomeSlots[i], t ? t.def.id : '', t ? t.level : 0, t?.def.icon, '#c86bff')
-    }
-  }
-
-  private updateTop(ctx: GameContext): void {
     const run = ctx.run
     const key = timerKey(run.stageTime, run.stageDuration)
     if (key !== this.cTimer) {
@@ -284,6 +343,15 @@ export class Hud {
       this.cStage = ctx.stage.name
       this.stageName.textContent = `${ctx.stage.name} · ${ctx.stage.index + 1}/${STAGES.length}`
     }
+    const goal = objectiveLabel(run)
+    if (goal.text !== this.cObjective) {
+      const changed = this.cObjective !== ''
+      this.cObjective = goal.text
+      this.objective.textContent = goal.text
+      this.objective.className = `objective ol ${goal.kind}`
+      if (changed) pulse(this.objective, POP, 420)
+    }
+
     const kills = run.kills
     if (kills !== this.cKills) {
       this.cKills = kills
@@ -301,26 +369,29 @@ export class Hud {
     }
 
     const boss = ctx.enemies.boss
-    const alive = !!boss && boss.alive && boss.hp > 0
-    if (alive !== this.cBoss) {
-      this.cBoss = alive
-      this.bossBar.classList.toggle('show', alive)
-    }
-    if (boss && alive) {
+    if (boss && this.cBoss) {
       if (boss.def.name !== this.cBossName) {
         this.cBossName = boss.def.name
         this.bossName.textContent = boss.def.name
-      }
-      const frac = Math.round(fraction(boss.hp, boss.maxHp) * 1000) / 1000
-      if (frac !== this.cBossFrac) {
-        this.cBossFrac = frac
-        this.bossFill.style.transform = `scaleX(${frac})`
       }
       const hp = Math.ceil(boss.hp)
       if (hp !== this.cBossHp) {
         this.cBossHp = hp
         this.bossHp.textContent = `${formatCount(hp)} / ${formatCount(boss.maxHp)}`
       }
+    }
+  }
+
+  private updateSlots(ctx: GameContext): void {
+    const owned = ctx.weapons.owned
+    for (let i = 0; i < this.weaponSlots.length; i++) {
+      const w = owned[i]
+      setSlot(this.weaponSlots[i], w ? w.def.id : '', w ? w.level : 0, w?.def.icon, w?.def.color)
+    }
+    const tomes = ctx.progression.tomes
+    for (let i = 0; i < this.tomeSlots.length; i++) {
+      const t = tomes[i]
+      setSlot(this.tomeSlots[i], t ? t.def.id : '', t ? t.level : 0, t?.def.icon, '#c86bff')
     }
   }
 

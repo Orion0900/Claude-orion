@@ -1,5 +1,6 @@
 import type { StageDef, Vec3 } from '../game/types'
 import { Noise2D, smoothstep } from './noise'
+import { planRamps, rampFootprint, rampHeight, type SlideRamp } from './ramps'
 
 /** Half the side of every map, metres. */
 export const WORLD_HALF_SIZE = 110
@@ -29,6 +30,8 @@ export class HeightField {
   readonly size: number
   /** Row-major: heights[j * size + i] is at x = -halfSize + i·cell, z = -halfSize + j·cell. */
   readonly heights: Float32Array
+  /** The slide ramps baked into these heights (spots and props keep off their lanes). */
+  ramps: readonly SlideRamp[] = []
   private readonly invCell: number
 
   constructor(
@@ -110,7 +113,8 @@ export class HeightField {
 /**
  * The continuous height function behind a stage: broad swells to slide down,
  * fractal hills on top, gentle terraces, a flat start and a steep rim.
- * Defined everywhere, so it can also shape things beyond the grid.
+ * Defined everywhere, so it can also shape things beyond the grid. The slide
+ * ramps are not part of it; `generateTerrain` bakes them into the grid.
  */
 export function makeHeightFunction(params: TerrainParams): (x: number, z: number) => number {
   const hills = new Noise2D(params.seed)
@@ -157,8 +161,11 @@ export function makeHeightFunction(params: TerrainParams): (x: number, z: number
   }
 }
 
-/** Samples a stage's height function onto a grid. Deterministic for a given seed. */
-export function generateTerrain(params: TerrainParams, halfSize = WORLD_HALF_SIZE, cell = 1): HeightField {
+/**
+ * Samples a stage's height function onto a grid, then carves in its slide
+ * ramps (fitted to the hills they sit on). Deterministic for a given seed.
+ */
+export function generateTerrain(params: TerrainParams, halfSize = WORLD_HALF_SIZE, cell = 1, ramps = true): HeightField {
   const field = new HeightField(halfSize, cell)
   const height = makeHeightFunction(params)
   const n = field.size
@@ -166,5 +173,28 @@ export function generateTerrain(params: TerrainParams, halfSize = WORLD_HALF_SIZ
     const z = field.coord(j)
     for (let i = 0; i < n; i++) field.heights[j * n + i] = height(field.coord(i), z)
   }
+  if (ramps) {
+    field.ramps = planRamps((x, z) => field.heightAt(x, z), params.seed)
+    for (const r of field.ramps) bakeRamp(field, r)
+  }
   return field
+}
+
+/** Blends one ramp into the grid over its footprint. */
+function bakeRamp(field: HeightField, r: SlideRamp): void {
+  const f = rampFootprint(r)
+  const reach = f.half + field.cell
+  const toIndex = (v: number) => (v + field.halfSize) / field.cell
+  const last = field.size - 1
+  const i0 = Math.max(0, Math.floor(toIndex(Math.min(f.ax, f.bx) - reach)))
+  const i1 = Math.min(last, Math.ceil(toIndex(Math.max(f.ax, f.bx) + reach)))
+  const j0 = Math.max(0, Math.floor(toIndex(Math.min(f.az, f.bz) - reach)))
+  const j1 = Math.min(last, Math.ceil(toIndex(Math.max(f.az, f.bz) + reach)))
+  for (let j = j0; j <= j1; j++) {
+    const z = field.coord(j)
+    for (let i = i0; i <= i1; i++) {
+      const k = j * field.size + i
+      field.heights[k] = rampHeight(r, field.coord(i), z, field.heights[k])
+    }
+  }
 }

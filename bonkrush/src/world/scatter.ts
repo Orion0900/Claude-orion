@@ -3,6 +3,7 @@ import type { StageDef } from '../game/types'
 import { PLAY_LIMIT, type Circle } from './colliders'
 import { Noise2D, smoothstep } from './noise'
 import { propSpec, type PropSpec } from './propSpecs'
+import { nearRamp } from './ramps'
 import { SPOT_CLEARANCE, type WorldSpots } from './spots'
 import type { HeightField } from './terrain'
 
@@ -19,6 +20,8 @@ export interface PropInstance {
   sz: number
   scale: number
   variant: number
+  /** Index into `ScatterResult.colliders` for a solid prop (the camera fades what it looks through). */
+  collider?: number
 }
 
 export interface PropGroup {
@@ -38,11 +41,13 @@ export interface ScatterResult {
 const SOLID_GAP = 1.2
 /** Props stay a little inside the walkable square; beyond it is the rim and its walls. */
 const PROP_LIMIT = PLAY_LIMIT - 2
+/** Room every prop leaves beside a slide ramp's lane, so a slide down it never snags. */
+export const RAMP_PROP_CLEAR = 1.5
 
 /**
  * Scatters every prop a stage lists. Solid, big kinds go first so small
  * decorations fill in around them. Nothing lands in the start clearing, on
- * a spot, on a steep slope, or overlapping a solid.
+ * a spot, on a slide ramp, on a steep slope, or overlapping a solid.
  */
 export function scatterProps(
   field: HeightField,
@@ -104,6 +109,7 @@ export function scatterProps(
       const r = spec.radius * scale
       if (!ignoreStart && x * x + z * z < spec.startClear ** 2) return false
       if (field.flatness(x, z) < minFlat) return false
+      if (nearRamp(field.ramps, x, z, r + RAMP_PROP_CLEAR)) return false
       if (spotHash.hits(x, z, r, 0.3)) return false
       if (solid ? solids.hits(x, z, r, SOLID_GAP) : solids.hits(x, z, r * 0.6, 0)) return false
       if (spec.spacing > 0 && same.hits(x, z, 0, spec.spacing * scale, true)) return false
@@ -117,7 +123,7 @@ export function scatterProps(
         field.heightAt(x, z - foot),
       )
       const stretch = kindRng.range(0.92, 1.08)
-      instances.push({
+      const inst: PropInstance = {
         x,
         y: ground - spec.sink * scale,
         z,
@@ -129,10 +135,12 @@ export function scatterProps(
         sz: scale,
         scale,
         variant: pickVariant(spec, kindRng),
-      })
+      }
+      instances.push(inst)
       same.add({ x, z, r: 0 })
       if (solid) {
         const c = { x, z, r }
+        inst.collider = colliders.length
         solids.add(c)
         colliders.push(c)
       }

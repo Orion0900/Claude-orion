@@ -7,6 +7,12 @@ import * as THREE from 'three'
 import type { Enemy, EnemyDef } from '../game/types'
 import type { EnemyTier } from './enemyDefs'
 
+export const DEATH_NONE = 0
+/** Launched away from the killing blow, tumbling, for a moment before it vanishes. */
+export const DEATH_FLING = 1
+/** Bosses and minibosses keel over, slower and heavier. */
+export const DEATH_TOPPLE = 2
+
 export class EnemyEntity implements Enemy {
   uid = 0
   def: EnemyDef
@@ -73,8 +79,46 @@ export class EnemyEntity implements Enemy {
   recyclable = true
   diedAt = 0
 
+  /**
+   * Scaled body size and flier flag. Plain fields rather than getters: the
+   * separation loop reads them for every neighbour, every frame. Always set
+   * through setBody(), which keeps them in step with `scale`.
+   */
+  radius = 0
+  height = 0
+  flier = false
+  /** Big bodies (bosses, minibosses, elites) skip the spatial hash's radius pad; see EnemyManager.buildHash. */
+  bigBody = false
+
+  /**
+   * Death animation, purely visual: a killed normal is flung away tumbling,
+   * a boss or miniboss topples over. The body is dead (not targetable, no
+   * contact) and these fields only drive the renderer.
+   */
+  death = DEATH_NONE
+  deathT = 0
+  deathTime = 0
+  deathX = 0
+  deathY = 0
+  deathZ = 0
+  deathVX = 0
+  deathVY = 0
+  deathVZ = 0
+  /** Tumble rates, rad/s, about the body's side and forward axes. */
+  deathPitch = 0
+  deathRoll = 0
+
   constructor(def: EnemyDef) {
     this.def = def
+    this.setBody(def, 1)
+  }
+
+  /** Sets the scaled radius and height (and the flier flag) for `def` at `scale`. */
+  setBody(def: EnemyDef, scale: number): void {
+    this.scale = scale
+    this.radius = def.radius * scale
+    this.height = def.height * scale
+    this.flier = def.behavior === 'flier'
   }
 
   /** Back to a blank enemy of `def` (pooled objects are reused). */
@@ -85,7 +129,6 @@ export class EnemyEntity implements Enemy {
     this.vel.set(0, 0, 0)
     this.yaw = 0
     this.hp = this.maxHp = 1
-    this.scale = 1
     this.elite = this.boss = this.alive = false
     this.slow = this.burn = this.burnDps = this.freeze = 0
     this.hitFlash = 99
@@ -111,20 +154,13 @@ export class EnemyEntity implements Enemy {
     this.sweepT = this.sweepAngle = this.sweepSpeed = 0
     this.recyclable = true
     this.diedAt = 0
-  }
-
-  get radius(): number {
-    return this.def.radius * this.scale
-  }
-
-  get height(): number {
-    return this.def.height * this.scale
-  }
-
-  get flier(): boolean {
-    return this.def.behavior === 'flier'
+    this.setBody(def, 1)
+    this.bigBody = false
+    this.death = DEATH_NONE
+    this.deathT = this.deathTime = 0
   }
 }
+
 
 /**
  * Moves an enemy to a fresh spot as if it had just arrived (the spawner

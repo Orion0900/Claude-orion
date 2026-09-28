@@ -2,7 +2,7 @@ import type { SfxId } from '../game/types'
 import { AudioEngine } from './AudioEngine'
 import { playNote } from './instruments'
 import { SFX_RULES } from './limiter'
-import { STEPS_PER_BAR, eventsAt, songForStage, stepDuration, type NoteEvent } from './sequencer'
+import { STEPS_PER_BAR, TITLE_SONG, eventsAt, songForStage, stepDuration, type NoteEvent } from './sequencer'
 import { SFX } from './sfx'
 import { Synth } from './synth'
 
@@ -196,8 +196,8 @@ describe('sound effect recipes', () => {
 })
 
 describe('music instruments', () => {
-  it('play every channel of every stage without invalid automation', () => {
-    for (let stage = 0; stage < 3; stage++) {
+  it('play every channel of every stage and the title theme without invalid automation', () => {
+    for (const stage of [TITLE_SONG, 0, 1, 2]) {
       const song = songForStage(stage)
       const ctx = new FakeContext()
       const synth = new Synth(ctx as unknown as AudioContext)
@@ -327,6 +327,66 @@ describe('AudioEngine', () => {
       audio.update(1 / 60)
       // Only one look-ahead window's worth of notes, not thirty seconds of them.
       expect(ctx.sources.length - before).toBeLessThan(40)
+    })
+  })
+
+  it('starts the title theme on unlock when it was asked for before', () => {
+    withFakeWindow(() => {
+      FakeContext.lastMade = null
+      const audio = new AudioEngine()
+      // Game shows the title, and asks for its theme, before any gesture.
+      audio.startMusic(TITLE_SONG)
+      audio.update(1 / 60)
+      expect(FakeContext.lastMade).toBeNull()
+      audio.unlock()
+      const ctx = FakeContext.lastMade!
+      for (let i = 0; i < 60; i++) {
+        ctx.currentTime += 1 / 60
+        audio.update(1 / 60)
+      }
+      expect(ctx.sources.length).toBeGreaterThan(10)
+    })
+  })
+
+  it('plays the title theme the same at any intensity', () => {
+    const notesOver = (level: number) =>
+      withFakeWindow(() => {
+        const audio = new AudioEngine()
+        audio.unlock()
+        const ctx = FakeContext.lastMade!
+        audio.startMusic(TITLE_SONG)
+        audio.setIntensity(level)
+        for (let i = 0; i < 600; i++) {
+          ctx.currentTime += 1 / 60
+          audio.update(1 / 60)
+        }
+        return ctx.sources.length
+      })
+    expect(notesOver(1)).toBe(notesOver(0))
+  })
+
+  it('keeps the song playing when asked for it again, and switches when asked for another', () => {
+    withFakeWindow(() => {
+      const audio = new AudioEngine()
+      audio.unlock()
+      const ctx = FakeContext.lastMade!
+      const bandOf = () => (audio as unknown as { band: unknown }).band
+      audio.startMusic(TITLE_SONG)
+      audio.update(1 / 60)
+      const band = bandOf()
+      expect(band).not.toBeNull()
+      audio.startMusic(TITLE_SONG)
+      audio.update(1 / 60)
+      expect(bandOf()).toBe(band)
+      audio.startMusic(0)
+      audio.update(1 / 60)
+      expect(bandOf()).not.toBe(band)
+      // After a stop the same song starts again from the top.
+      audio.stopMusic()
+      audio.startMusic(0)
+      ctx.currentTime += 1
+      audio.update(1 / 60)
+      expect(bandOf()).not.toBeNull()
     })
   })
 })

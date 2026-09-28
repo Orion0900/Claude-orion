@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 import type { Rng } from '../core/rng'
 import type { WorldApi } from '../game/types'
+import { nearRamp } from './ramps'
 import type { HeightField } from './terrain'
 
 export type WorldSpots = WorldApi['spots']
@@ -33,6 +34,13 @@ export const SPOT_RULES = {
 export const SPOT_CLEARANCE = { altar: 7, shrine: 4.5, chest: 2.2, pot: 1.2 }
 
 /**
+ * How far each kind of spot stays from a slide ramp's lane, so nothing sits
+ * in a slide's way and levelling a pad never dents a ramp: the altar levels
+ * 10 m around itself and a shrine 6.2 m.
+ */
+export const SPOT_RAMP_CLEAR = { altar: 11, shrine: 7.5, chest: 3.5, pot: 2.5 }
+
+/**
  * Picks every interactable spot for a map. Spots go down before props so the
  * props can keep out of their way. Levels the ground under the altar and the
  * shrines (mutating `field`), then reads each spot's y off the ground.
@@ -41,10 +49,19 @@ export function placeSpots(field: HeightField, rng: Rng, rules = SPOT_RULES): Wo
   const taken: Array<{ x: number; z: number; keep: number }> = []
   const flatFor = (degrees: number) => Math.cos((degrees * Math.PI) / 180)
 
-  const fits = (x: number, z: number, keep: number, spacing: number, same: readonly Vector3[], minFlat: number): boolean => {
+  const fits = (
+    x: number,
+    z: number,
+    keep: number,
+    spacing: number,
+    same: readonly Vector3[],
+    minFlat: number,
+    rampClear: number,
+  ): boolean => {
     const r2 = x * x + z * z
     if (r2 < rules.startClear ** 2 || r2 > rules.maxRadius ** 2) return false
     if (field.flatness(x, z) < minFlat) return false
+    if (nearRamp(field.ramps, x, z, rampClear)) return false
     for (const t of taken) {
       const need = t.keep + keep
       if ((x - t.x) ** 2 + (z - t.z) ** 2 < need * need) return false
@@ -59,7 +76,16 @@ export function placeSpots(field: HeightField, rng: Rng, rules = SPOT_RULES): Wo
   }
 
   /** Rejection sampling, uniform by area; a rough map slowly accepts steeper ground rather than coming up short. */
-  const scatter = (list: Vector3[], count: number, keep: number, spacing: number, minR: number, maxR: number, slope: number) => {
+  const scatter = (
+    list: Vector3[],
+    count: number,
+    keep: number,
+    spacing: number,
+    minR: number,
+    maxR: number,
+    slope: number,
+    rampClear: number,
+  ) => {
     let minFlat = flatFor(slope)
     for (let tries = 1; list.length < count && tries <= 60000; tries++) {
       if (tries % 5000 === 0) minFlat *= 0.97
@@ -67,22 +93,22 @@ export function placeSpots(field: HeightField, rng: Rng, rules = SPOT_RULES): Wo
       const r = Math.sqrt(rng.range(minR * minR, maxR * maxR))
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
-      if (fits(x, z, keep, spacing, list, minFlat)) add(x, z, keep, list)
+      if (fits(x, z, keep, spacing, list, minFlat, rampClear)) add(x, z, keep, list)
     }
   }
 
   const altars: Vector3[] = []
-  scatter(altars, 1, SPOT_CLEARANCE.altar, 0, rules.altarMin, rules.altarMax, rules.padSlope)
+  scatter(altars, 1, SPOT_CLEARANCE.altar, 0, rules.altarMin, rules.altarMax, rules.padSlope, SPOT_RAMP_CLEAR.altar)
   if (altars.length === 0) add(rules.altarMin, 0, SPOT_CLEARANCE.altar, altars)
   const altar = altars[0]
   field.flatten(altar.x, altar.z, 5, 5)
 
   const shrines: Vector3[] = []
-  scatter(shrines, rules.shrines, SPOT_CLEARANCE.shrine, rules.shrineSpacing, rules.startClear, rules.maxRadius, rules.padSlope)
+  scatter(shrines, rules.shrines, SPOT_CLEARANCE.shrine, rules.shrineSpacing, rules.startClear, rules.maxRadius, rules.padSlope, SPOT_RAMP_CLEAR.shrine)
   for (const s of shrines) field.flatten(s.x, s.z, 3.2, 3)
 
   const chests: Vector3[] = []
-  scatter(chests, rules.chests, SPOT_CLEARANCE.chest, rules.chestSpacing, rules.startClear, rules.maxRadius, rules.maxSlope)
+  scatter(chests, rules.chests, SPOT_CLEARANCE.chest, rules.chestSpacing, rules.startClear, rules.maxRadius, rules.maxSlope, SPOT_RAMP_CLEAR.chest)
 
   // Pots come in little clusters of one to three, like in the original.
   const pots: Vector3[] = []
@@ -96,7 +122,7 @@ export function placeSpots(field: HeightField, rng: Rng, rules = SPOT_RULES): Wo
     for (let g = 0; g < group; g++) {
       const x = g === 0 ? cx : cx + rng.range(-3, 3)
       const z = g === 0 ? cz : cz + rng.range(-3, 3)
-      if (fits(x, z, SPOT_CLEARANCE.pot, rules.potSpacing, pots, potFlat)) add(x, z, SPOT_CLEARANCE.pot, pots)
+      if (fits(x, z, SPOT_CLEARANCE.pot, rules.potSpacing, pots, potFlat, SPOT_RAMP_CLEAR.pot)) add(x, z, SPOT_CLEARANCE.pot, pots)
     }
   }
 

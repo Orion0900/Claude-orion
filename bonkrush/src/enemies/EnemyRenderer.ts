@@ -11,10 +11,14 @@ import * as THREE from 'three'
 import type { EnemyDef } from '../game/types'
 import { animStyleOf, buildEnemyGeometry, type AnimStyle } from './EnemyModels'
 import { emptyPose, poseFor, stepTime } from './anim'
-import type { EnemyEntity } from './entity'
+import { DEATH_FLING, DEATH_NONE, type EnemyEntity } from './entity'
 
 const HIT_FLASH_TIME = 0.12
 const SPAWN_GROW_TIME = 0.35
+/** A flung body pops out of existence over its last moment in the air. */
+const FLING_SHRINK = 0.12
+/** A toppling boss falls over in the first part of its death and sinks away in the rest. */
+const TOPPLE_FALL = 0.6
 const ELITE_RIM = [1.0, 0.72, 0.18] as const
 const MINIBOSS_RIM = [1.0, 0.35, 0.15] as const
 
@@ -52,6 +56,7 @@ const _euler = new THREE.Euler(0, 0, 0, 'YXZ')
 const _mat = new THREE.Matrix4()
 const _pose = emptyPose()
 const _identity = new THREE.Quaternion()
+const _up = new THREE.Vector3()
 
 export class EnemyRenderer {
   private readonly batches = new Map<string, Batch>()
@@ -111,8 +116,8 @@ export class EnemyRenderer {
     return this.batches.get(defId)?.capacity ?? 0
   }
 
-  /** Writes every living enemy's instance for this frame. */
-  render(list: readonly EnemyEntity[], time: number): void {
+  /** Writes every living enemy's instance for this frame, plus the killed ones still flying or falling. */
+  render(list: readonly EnemyEntity[], dying: readonly EnemyEntity[], time: number): void {
     for (let i = 0; i < this.batchList.length; i++) this.batchList[i].n = 0
     let shadows = 0
     let markers = 0
@@ -169,6 +174,17 @@ export class EnemyRenderer {
       }
     }
 
+    for (let i = 0; i < dying.length; i++) {
+      const e = dying[i]
+      if (e.alive || e.death === DEATH_NONE) continue
+      const b = this.batches.get(e.def.id)
+      if (!b || b.n >= b.capacity) continue
+      const k = b.n++
+      this.writeDeath(b, k, e)
+      writeTint(b.colors, k, e, stepped)
+      writeFx(b.fx, k, e, time)
+    }
+
     for (let i = 0; i < this.batchList.length; i++) {
       const b = this.batchList[i]
       b.mesh.count = b.n
@@ -185,6 +201,37 @@ export class EnemyRenderer {
     this.markers.count = markers
     this.markers.visible = markers > 0
     if (markers > 0) markRange(this.markers.instanceMatrix, markers * 16)
+  }
+
+  /**
+   * A flung body tumbles about its middle along its flight; a toppling boss
+   * pivots on its feet, falling backwards, then sinks into the ground.
+   * No shadow or ◆ marker: it's already gone as far as the game is concerned.
+   */
+  private writeDeath(b: Batch, k: number, e: EnemyEntity): void {
+    const t = e.deathT
+    const h = e.height
+    if (e.death === DEATH_FLING) {
+      const s = Math.min(1, Math.max(0, (e.deathTime - t) / FLING_SHRINK))
+      _euler.set(e.deathPitch * t, e.yaw + Math.PI, e.deathRoll * t)
+      _quat.setFromEuler(_euler)
+      // Spin about the body's centre, not its feet.
+      const half = h * s * 0.5
+      _up.set(0, half, 0).applyQuaternion(_quat)
+      _pos.set(e.deathX - _up.x, e.deathY + half - _up.y, e.deathZ - _up.z)
+      _scl.set(h * s, h * s, h * s)
+    } else {
+      const fall = e.deathTime * TOPPLE_FALL
+      const u = Math.min(1, t / fall)
+      const sink = t > fall ? (t - fall) / (e.deathTime - fall) : 0
+      // Tips slowly, then slams down: an accelerating fall to flat on its back.
+      _euler.set(-(Math.PI / 2) * u * u, e.yaw + Math.PI, 0)
+      _quat.setFromEuler(_euler)
+      _pos.set(e.deathX, e.deathY - sink * e.radius, e.deathZ)
+      const s = h * (1 - sink)
+      _scl.set(s, s, s)
+    }
+    b.mesh.setMatrixAt(k, _mat.compose(_pos, _quat, _scl))
   }
 
   dispose(): void {

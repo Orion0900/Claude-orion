@@ -41,6 +41,10 @@ describe('lifestealHeal', () => {
   it('always heals the whole part past 1', () => {
     expect(lifestealHeal(1.5, 0.9)).toBe(1)
     expect(lifestealHeal(1.5, 0.1)).toBe(2)
+    expect(lifestealHeal(1.3, 0.2)).toBe(2)
+    expect(lifestealHeal(1.3, 0.5)).toBe(1)
+    expect(lifestealHeal(2, 0.99)).toBe(2)
+    expect(lifestealHeal(5, 0)).toBe(5)
     expect(lifestealHeal(0, 0)).toBe(0)
   })
 })

@@ -29,15 +29,14 @@ export function makeHarness(opts: { stage?: StageDef; seed?: number; halfSize?: 
   const halfSize = opts.halfSize ?? 120
   const events = new EventBus<GameEvents>()
   const log: TestHarness['events'] = []
-  const types: Array<keyof GameEvents> = ['enemyHit', 'enemyKilled', 'bossSpawned', 'bossKilled', 'finalSwarm']
+  const types: Array<keyof GameEvents> = ['enemyHit', 'enemyKilled', 'bossSpawned', 'bossKilled', 'finalSwarm', 'wave']
   for (const type of types) events.on(type, (payload) => log.push({ type, payload }))
 
   const run: RunState = {
     seed: 1, characterId: 'vix', stageIndex: stage.index, stageTime: 0, totalTime: 0, stageDuration: stage.duration,
     kills: 0, gold: 0, silver: 0, damageDealt: 0, damageTaken: 0, chestsOpened: 0, shrinesUsed: 0,
     bossesKilled: 0, elitesKilled: 0, bossSpawned: false, bossDefeated: false, portalOpen: false, curse: 0,
-      greed: 0,
-      chestsPaid: 0,
+    greed: 0, chestsPaid: 0,
   }
   events.on('bossSpawned', () => (run.bossSpawned = true))
 

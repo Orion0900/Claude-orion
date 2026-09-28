@@ -58,9 +58,17 @@ export interface Song {
   /** The final-swarm variation: a new progression and melody, harmonised. */
   final: Section
   groove: Groove
+  /**
+   * The title theme: one fixed, gentle arrangement whatever the intensity.
+   * Its `calm.lead` is the hook, played on the arp.
+   */
+  title: boolean
 }
 
 export const STEPS_PER_BAR = 16
+
+/** `startMusic` index of the title theme. */
+export const TITLE_SONG = -1
 
 /** Intensity thresholds where layers join in. */
 export const LAYER = {
@@ -171,6 +179,47 @@ const CADENCES = ['x.x.x...x.......', 'x..x..x.x.......', 'x...x...x.......']
 const LEAD_LOW = -2
 const LEAD_HIGH = 9
 
+/**
+ * The title theme: C major at a relaxed 112 bpm (slower than any stage)
+ * over I–vi–IV–V. The hook rides the arp in a 3-3-2 lilt, three notes a
+ * bar, with soft chord-tone bounces between them. It rises and falls
+ * through triads for four bars, ending on a question (D), then answers by
+ * stepping down from a high E and leans on G7 back into the loop.
+ * Degrees are relative to the root, C5.
+ */
+const TITLE = {
+  bpm: 112,
+  root: 72,
+  /** C, Am, F, G: the bass walks down from C. */
+  chords: [0, -2, -4, -3],
+  /** Hook notes land on steps 0, 6 and 12 of each bar. */
+  hookSteps: [0, 6, 12],
+  hook: [
+    [2, 4, 7], // C:  E G C'
+    [7, 5, 2], // Am: C' A E
+    [3, 5, 7], // F:  F A C'
+    [6, 4, 1], // G:  B G D
+    [2, 4, 7], // C:  E G C'
+    [9, 8, 7], // Am: E' D' C'
+    [5, 4, 3], // F:  A G F
+    [4, 3, 1], // G7: G F D, leading home to E
+  ],
+  /**
+   * Bounces fill the other eighths an octave below, each digit a chord tone
+   * in scale degrees: root, fifth, third, fifth, octave.
+   */
+  bounce: '..0.4...2.4...7.',
+  bass: 'R.....R.....O...',
+  kick: 'x.......x.......',
+  snare: '....o.......o...',
+  /** A soft pickup into the loop on the last bar. */
+  fill: '....o.......o.oo',
+  hats: '..o...o...o...o.',
+} as const
+
+/** Title theme levels: the hook leads, everything else stays soft. */
+const TITLE_VEL = { hook: 1, bounce: 0.3, bass: 0.4, kick: 0.5, snare: 0.35, hat: 0.4 } as const
+
 export function midiToFreq(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12)
 }
@@ -196,8 +245,13 @@ export function hit(pattern: string, step: number): number {
   }
 }
 
-/** The song for a stage. Deterministic; stages past the third reuse a groove with a new melody. */
+/**
+ * The song for a stage, or the title theme for `TITLE_SONG`. Deterministic;
+ * stages past the third reuse a groove with a new melody.
+ */
 export function songForStage(stageIndex: number): Song {
+  // Checked before the clamp, which would otherwise turn -1 into the first stage.
+  if (stageIndex === TITLE_SONG) return titleSong()
   const index = Math.max(0, Math.floor(stageIndex) || 0)
   const preset = PRESETS[index % PRESETS.length]
   const rng = new Rng(0xb0c5 + index * 7919)
@@ -209,12 +263,35 @@ export function songForStage(stageIndex: number): Song {
     calm: { chords: preset.calm, lead: makeLead(rng.fork(1), preset.calm) },
     final: { chords: preset.final, lead: makeLead(rng.fork(2), preset.final) },
     groove: preset.groove,
+    title: false,
+  }
+}
+
+function titleSong(): Song {
+  const lead = TITLE.hook.map((bar) =>
+    bar.map((degree, i) => {
+      const step = TITLE.hookSteps[i]
+      const next = i + 1 < TITLE.hookSteps.length ? TITLE.hookSteps[i + 1] : STEPS_PER_BAR
+      return { step, degree, len: next - step }
+    }),
+  )
+  const section: Section = { chords: TITLE.chords, lead }
+  return {
+    bpm: TITLE.bpm,
+    root: TITLE.root,
+    scale: MAJOR,
+    bars: lead.length,
+    calm: section,
+    final: section,
+    // One groove whatever the intensity.
+    groove: { kick: [TITLE.kick, TITLE.kick, TITLE.kick], snare: [TITLE.snare, TITLE.snare], fill: TITLE.fill },
+    title: true,
   }
 }
 
 /** Seconds per sixteenth at an intensity. */
 export function stepDuration(song: Song, intensity: number): number {
-  const tempo = song.bpm * (intensity >= LAYER.final ? FINAL_TEMPO : 1)
+  const tempo = song.bpm * (!song.title && intensity >= LAYER.final ? FINAL_TEMPO : 1)
   return 60 / tempo / 4
 }
 
@@ -240,6 +317,7 @@ export function eventsAt(song: Song, step: number, intensity: number, out: NoteE
   const pos = ((Math.floor(step) % loop) + loop) % loop
   const bar = Math.floor(pos / STEPS_PER_BAR)
   const s = pos % STEPS_PER_BAR
+  if (song.title) return titleEventsAt(song, bar, s, out)
   const level = Math.min(1, Math.max(0, Number.isFinite(intensity) ? intensity : 0))
   const final = level >= LAYER.final
   const drive = level >= LAYER.drive
@@ -286,7 +364,8 @@ export function eventsAt(song: Song, step: number, intensity: number, out: NoteE
     const i = drive ? s % 4 : (s / 2) % 4
     const up = final && s % 8 >= 4 ? 7 : 0
     const note = degreeToMidi(song.root - 12, song.scale, chord + ARP_TONES[i] + up)
-    n = put(out, n, 'arp', note, 1, 0.35 + 0.25 * level)
+    // Stage arps stay well under the full arp level; only the title hook uses it.
+    n = put(out, n, 'arp', note, 1, 0.175 + 0.125 * level)
   }
 
   // Lead, with a harmony a third above in the final swarm.
@@ -298,6 +377,33 @@ export function eventsAt(song: Song, step: number, intensity: number, out: NoteE
       if (final) n = put(out, n, 'harmony', degreeToMidi(song.root, song.scale, note.degree + 2), note.len, 0.5)
     }
   }
+  return n
+}
+
+/** The title theme's step: light drums, a soft bass and the arp hook, with no layers to climb. */
+function titleEventsAt(song: Song, bar: number, s: number, out: NoteEvent[]): number {
+  const section = song.calm
+  const chord = section.chords[bar % section.chords.length]
+  let n = 0
+
+  const kick = hit(TITLE.kick, s)
+  if (kick > 0) n = put(out, n, 'kick', 0, 1, kick * TITLE_VEL.kick)
+  const snare = hit(bar === song.bars - 1 ? TITLE.fill : TITLE.snare, s)
+  if (snare > 0) n = put(out, n, 'snare', 0, 1, snare * TITLE_VEL.snare)
+  const hat = hit(TITLE.hats, s)
+  if (hat > 0) n = put(out, n, 'hat', 0, 1, hat * TITLE_VEL.hat)
+
+  const b = TITLE.bass.charCodeAt(s)
+  if (b !== 46) {
+    const note = degreeToMidi(song.root - 24, song.scale, chord) + (b === 79 ? 12 : 0)
+    n = put(out, n, 'bass', note, gapAfter(TITLE.bass, s, 4), TITLE_VEL.bass)
+  }
+
+  for (const note of section.lead[bar % section.lead.length]) {
+    if (note.step === s) n = put(out, n, 'arp', degreeToMidi(song.root, song.scale, note.degree), note.len, TITLE_VEL.hook)
+  }
+  const tone = TITLE.bounce.charCodeAt(s) - 48 // '0'
+  if (tone >= 0 && tone <= 9) n = put(out, n, 'arp', degreeToMidi(song.root - 12, song.scale, chord + tone), 1, TITLE_VEL.bounce)
   return n
 }
 

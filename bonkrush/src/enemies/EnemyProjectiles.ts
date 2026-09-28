@@ -14,6 +14,21 @@ export const SHAPE_DART = 1
 /** Spores and bombs fall; this is gentler than real gravity so lobs read as arcs. */
 export const LOB_GRAVITY = 9
 
+/**
+ * The player's body to a shot: a vertical segment from the ankles up,
+ * swept by the player's radius. Standing it tops out at 1.6 m (about 2 m
+ * with the radius); sliding, the whole body is about 0.9 m tall, so a shot
+ * aimed at a standing player's chest flies over a slide.
+ */
+const BODY_BOTTOM = 0.2
+const BODY_TOP = 1.6
+const SLIDE_BODY_HEIGHT = 0.9
+
+/** Top of the body segment above the player's feet. */
+function bodyTop(sliding: boolean, radius: number): number {
+  return sliding ? Math.max(BODY_BOTTOM, SLIDE_BODY_HEIGHT - radius) : BODY_TOP
+}
+
 class Shot {
   x = 0
   y = 0
@@ -113,6 +128,8 @@ export class EnemyProjectiles {
     const px = player.pos.x
     const py = player.pos.y
     const pz = player.pos.z
+    const bottom = py + BODY_BOTTOM
+    const top = py + bodyTop(player.sliding, pr)
 
     for (let i = this.live.length - 1; i >= 0; i--) {
       const s = this.live[i]
@@ -132,8 +149,8 @@ export class EnemyProjectiles {
         continue
       }
       if (!player.alive) continue
-      // Distance to the player's body, a vertical segment from ankles to head.
-      const cy = s.y < py + 0.2 ? py + 0.2 : s.y > py + 1.6 ? py + 1.6 : s.y
+      // Distance to the player's body, a vertical segment from ankles to head (lower while sliding).
+      const cy = s.y < bottom ? bottom : s.y > top ? top : s.y
       const dx = s.x - px
       const dy = s.y - cy
       const dz = s.z - pz

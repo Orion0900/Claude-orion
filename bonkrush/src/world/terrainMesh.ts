@@ -1,17 +1,24 @@
 import * as THREE from 'three'
 import type { StageDef } from '../game/types'
 import { Noise2D, hash2, smoothstep } from './noise'
+import { RAMP_SHAPE, type SlideRamp } from './ramps'
 import type { HeightField } from './terrain'
 
-export type TerrainPalette = Pick<StageDef['palette'], 'groundLow' | 'groundHigh' | 'cliff'>
+export type TerrainPalette = Pick<StageDef['palette'], 'groundLow' | 'groundHigh' | 'cliff' | 'accent'>
+
+/** Chevrons on a ramp's face repeat every this many metres and lean back this much per metre across. */
+const CHEVRON_PERIOD = 6
+const CHEVRON_LEAN = 0.8
 
 /**
  * Turns the height grid into `chunks`² flat-shaded, non-indexed geometries:
  * two triangles per cell, one colour per triangle. Colour runs from
  * groundLow in the hollows to groundHigh on the tops, drifts in broad
  * patches so meadows read at a glance, turns to cliff on steep faces, and
- * jitters a little per face for the faceted look. Chunks let the renderer
- * cull what's off screen or outside the shadow camera.
+ * jitters a little per face for the faceted look. Slide ramps get a
+ * packed, lighter lane with darker edges and accent chevrons pointing
+ * downhill, so they read from across the map. Chunks let the renderer cull
+ * what's off screen or outside the shadow camera.
  */
 export function buildTerrainGeometries(field: HeightField, palette: TerrainPalette, seed: number, chunks = 4): THREE.BufferGeometry[] {
   const n = field.size
@@ -24,7 +31,29 @@ export function buildTerrainGeometries(field: HeightField, palette: TerrainPalet
   const low = new THREE.Color(palette.groundLow)
   const high = new THREE.Color(palette.groundHigh)
   const cliff = new THREE.Color(palette.cliff)
+  const lane = low.clone().lerp(high, 0.6).lerp(new THREE.Color('#fff4dc'), 0.3)
+  const accent = new THREE.Color(palette.accent)
   const c = new THREE.Color()
+
+  /** Paints `c` if (x, z) is on a ramp's lane; false if it isn't. */
+  const laneColour = (ramps: readonly SlideRamp[], x: number, z: number): boolean => {
+    for (const r of ramps) {
+      // rampLocal, inlined: this runs for every face of the map.
+      const ox = x - r.x
+      const oz = z - r.z
+      const u = ox * r.dx + oz * r.dz
+      const across = Math.abs(oz * r.dx - ox * r.dz)
+      if (u < -RAMP_SHAPE.deck || u > r.length + RAMP_SHAPE.runout || across > RAMP_SHAPE.halfWidth + 0.3) continue
+      c.copy(lane)
+      if (across > RAMP_SHAPE.halfWidth - 0.9) c.multiplyScalar(0.8)
+      else if (u > 0 && u < r.length) {
+        const g = (u + across * CHEVRON_LEAN) / CHEVRON_PERIOD
+        if (g - Math.floor(g) < 0.24) c.lerp(accent, 0.55)
+      }
+      return true
+    }
+    return false
+  }
 
   const out: THREE.BufferGeometry[] = []
   for (let cj = 0; cj < chunks; cj++) {
@@ -66,11 +95,13 @@ export function buildTerrainGeometries(field: HeightField, palette: TerrainPalet
         const mx = (ax + bx + cx) / 3
         const mz = (az + bz + cz) / 3
         const h = (ay + by + cy) / 3
-        const patch = patches.fbm(mx * 0.045, mz * 0.045, 2)
-        const t = Math.min(1, Math.max(0, 0.5 + (h - mean) / (2.4 * spread) + patch * 0.35))
-        c.copy(low).lerp(high, t)
-        c.lerp(cliff, smoothstep(0.86, 0.62, ny))
-        const k = 1 + (hash2(salt, 0, seed) - 0.5) * 0.09
+        let k = 1 + (hash2(salt, 0, seed) - 0.5) * 0.09
+        if (!laneColour(field.ramps, mx, mz)) {
+          const patch = patches.fbm(mx * 0.045, mz * 0.045, 2)
+          const t = Math.min(1, Math.max(0, 0.5 + (h - mean) / (2.4 * spread) + patch * 0.35))
+          c.copy(low).lerp(high, t)
+          c.lerp(cliff, smoothstep(0.86, 0.62, ny))
+        } else k = 1 + (k - 1) * 0.4
         put(ax, ay, az, nx, ny, nz, c.r * k, c.g * k, c.b * k)
         put(bx, by, bz, nx, ny, nz, c.r * k, c.g * k, c.b * k)
         put(cx, cy, cz, nx, ny, nz, c.r * k, c.g * k, c.b * k)

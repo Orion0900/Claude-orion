@@ -5,6 +5,7 @@
  */
 import type { AudioApi, GameContext, ModalRequest, SfxId, ShellApi, UiApi } from '../game/types'
 import { el } from './dom'
+import { STAGE_GOAL } from './format'
 import { Hud } from './Hud'
 import { ChestModal } from './modals/ChestModal'
 import { EndModal } from './modals/EndModal'
@@ -61,7 +62,8 @@ export class Ui implements UiApi {
     // Touch layouts move the prompt clear of the thumbs.
     this.root.classList.toggle('touch', shell.input.isTouch)
     this.hud = new Hud(this.root)
-    this.notices = new Notices(this.root)
+    // Fewer toasts on phones, where the stack would bury the controls.
+    this.notices = new Notices(this.root, shell.input.isTouch ? 3 : 5)
     this.title = new TitleScreen(shell, this.root, (id, opts) => this.sfx(id, opts), () => this.openSettings())
     this.modalLayer = el('div', 'modal-layer', undefined, this.root)
     this.settingsLayer = el('div', 'settings-layer', undefined, this.root)
@@ -104,9 +106,11 @@ export class Ui implements UiApi {
       ev.on('playerDamaged', ({ amount }) => {
         if (amount > 0) this.hud.hurt()
       }),
+      // The banner-less wave pulse; an encirclement's SURROUNDED! banner is the spawner's.
+      ev.on('wave', ({ encircle }) => this.hud.pulseWave(encircle)),
     )
-    // Every stage opens with its name; attach runs once per stage.
-    this.notices.banner(ctx.stage.name.toUpperCase(), ctx.stage.subtitle, ctx.stage.palette.accent)
+    // Every stage opens with its name and the goal; attach runs once per stage.
+    this.notices.banner(ctx.stage.name.toUpperCase(), STAGE_GOAL, ctx.stage.palette.accent)
   }
 
   showTitle(): void {
@@ -202,6 +206,11 @@ export class Ui implements UiApi {
       console.error('[ui] modal cleanup failed', err)
     }
     const node = a.modal.root
+    // The node lingers for its leave animation: make it unreachable, and drop
+    // focus from it so a Space or Enter meant as a jump can't click a stale button.
+    node.inert = true
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement && node.contains(focused)) focused.blur()
     node.classList.add('leaving')
     window.setTimeout(() => node.remove(), MODAL_LEAVE_MS)
     a.resolve()
@@ -285,7 +294,7 @@ export class Ui implements UiApi {
     } else if (!ctx) {
       this.notices.update(step)
     }
-    if (this.title.visible) this.title.update()
+    if (this.title.visible) this.title.update(step)
 
     const tab = !!ctx && this.hud.tabVisible
     if (tab !== this.tabClass) {
@@ -308,6 +317,7 @@ export class Ui implements UiApi {
     this.flushModals()
     this.closeSettings()
     this.notices.clear()
+    this.hud.dispose()
     this.ctx = null
     this.disposed = true
     this.root.remove()

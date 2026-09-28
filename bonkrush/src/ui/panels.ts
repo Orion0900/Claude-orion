@@ -138,6 +138,10 @@ export function offerCard(view: OfferView, index: number, keyHint: string): HTML
     const ul = el('ul', 'card-lines', undefined, text)
     for (const line of view.lines) el('li', '', line, ul)
   }
-  if (view.description) el('div', 'card-desc', view.description, text)
+  if (view.description) {
+    el('div', 'card-desc', view.description, text)
+    // Short screens clamp the rules text; hovering still reads all of it.
+    card.title = view.description
+  }
   return card
 }

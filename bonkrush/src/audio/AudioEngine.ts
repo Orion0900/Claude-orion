@@ -54,6 +54,7 @@ export class AudioEngine implements AudioApi {
   private readonly voices = new Map<number, Voice>()
   private readonly leftovers: Leftover[] = []
   private song: Song | null = null
+  private songIndex = Number.NaN
   private band: Band | null = null
   private step = 0
   private nextStepTime = 0
@@ -122,8 +123,16 @@ export class AudioEngine implements AudioApi {
     if (Number.isFinite(level)) this.targetIntensity = Math.min(1, Math.max(0, level))
   }
 
+  /**
+   * Stage song by index, or the title theme for -1 (`TITLE_SONG`). Before
+   * unlock the song is only remembered; it starts once the context runs.
+   * Asking again for the song already playing leaves it be, so returning to
+   * the title never restarts its theme.
+   */
   startMusic(stageIndex: number): void {
+    if (this.song && stageIndex === this.songIndex) return
     this.retireBand(0.15)
+    this.songIndex = stageIndex
     this.song = songForStage(stageIndex)
     this.step = 0
     this.intensity = 0

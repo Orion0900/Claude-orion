@@ -1,5 +1,7 @@
 import { Vector3 } from 'three'
 import { STAGES } from '../data/stages'
+import { segmentPointDistance } from './colliders'
+import { RAMP_SHAPE, laneDistance, rampFootprint, rampSurface } from './ramps'
 import { generateTerrain, HeightField, TERRAIN_SHAPE, WORLD_HALF_SIZE } from './terrain'
 import { buildTerrainGeometries } from './terrainMesh'
 
@@ -81,6 +83,66 @@ describe('generateTerrain', () => {
         }
       }
       expect(max - min).toBeGreaterThan(5)
+    }
+  })
+})
+
+describe('slide ramps', () => {
+  const deg = Math.PI / 180
+  const maps = STAGES.flatMap((stage) =>
+    [0, 1, 2, 3, 4].map((k) => generateTerrain({ ...stage.terrain, seed: (stage.terrain.seed * 7919 + k * 104729) >>> 0 })),
+  )
+
+  it('bakes two to four into every map, the same ones for the same seed', () => {
+    for (const f of maps) {
+      expect(f.ramps.length).toBeGreaterThanOrEqual(2)
+      expect(f.ramps.length).toBeLessThanOrEqual(4)
+    }
+    expect(generateTerrain(STAGES[1].terrain).ramps).toEqual(generateTerrain(STAGES[1].terrain).ramps)
+    expect(generateTerrain(STAGES[1].terrain, WORLD_HALF_SIZE, 1, false).ramps).toEqual([])
+  })
+
+  it('gives each a smooth 30–40 m face that holds 15–25° and runs downhill all the way', () => {
+    for (const f of maps) {
+      for (const r of f.ramps) {
+        expect(r.length).toBeGreaterThanOrEqual(30)
+        expect(r.length).toBeLessThanOrEqual(40)
+        const h = (u: number) => f.heightAt(r.x + r.dx * u, r.z + r.dz * u)
+        for (let u = RAMP_SHAPE.lip + 1; u <= r.length - RAMP_SHAPE.foot - 1; u += 1) {
+          const slope = Math.atan(h(u - 0.5) - h(u + 0.5)) / deg
+          expect(slope).toBeGreaterThan(15)
+          expect(slope).toBeLessThan(25)
+        }
+        for (let u = 0.5; u <= r.length; u += 0.5) expect(h(u)).toBeLessThan(h(u - 0.5) + 0.02)
+        // No bumps or kinks from the deck to the end of the run-out.
+        for (let u = -RAMP_SHAPE.deck + 1; u < r.length + RAMP_SHAPE.runout; u += 1) {
+          expect(Math.abs(h(u - 1) - 2 * h(u) + h(u + 1))).toBeLessThan(0.12)
+        }
+        // The lane is exactly the ramp's own surface.
+        for (const [u, v] of [[-2, 0], [r.length / 2, -3], [r.length / 2, 3], [r.length + 4, 0]]) {
+          expect(f.heightAt(r.x + r.dx * u - r.dz * v, r.z + r.dz * u + r.dx * v)).toBeCloseTo(rampSurface(r, u, v), 1)
+        }
+      }
+    }
+  })
+
+  it('keeps every ramp out of the start clearing and off the rim, and apart from the others', () => {
+    for (const f of maps) {
+      for (const r of f.ramps) {
+        const fp = rampFootprint(r)
+        expect(segmentPointDistance(fp.ax, fp.az, fp.bx, fp.bz, 0, 0) - fp.half).toBeGreaterThanOrEqual(TERRAIN_SHAPE.startRadius + TERRAIN_SHAPE.startBlend)
+        expect(laneDistance(r, 0, 0)).toBeGreaterThanOrEqual(TERRAIN_SHAPE.startRadius + TERRAIN_SHAPE.startBlend + RAMP_SHAPE.sideBlend - 1e-6)
+        for (const [x, z] of [[fp.ax, fp.az], [fp.bx, fp.bz]]) {
+          expect(Math.max(Math.abs(x), Math.abs(z))).toBeLessThan(TERRAIN_SHAPE.rimStart)
+        }
+        for (const other of f.ramps) {
+          if (other === r) continue
+          // Lanes never cross or touch.
+          for (let u = -RAMP_SHAPE.deck; u <= r.length + RAMP_SHAPE.runout; u += 2) {
+            expect(laneDistance(other, r.x + r.dx * u, r.z + r.dz * u)).toBeGreaterThan(RAMP_SHAPE.halfWidth)
+          }
+        }
+      }
     }
   })
 })

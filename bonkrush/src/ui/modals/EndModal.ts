@@ -26,21 +26,24 @@ export class EndModal extends Modal {
     )
 
     const grid = el('div', 'end-stats', undefined, this.panel)
-    const bossNote = run.bossesKilled > 0 ? ` · ${run.bossesKilled} boss${run.bossesKilled > 1 ? 'es' : ''}` : ''
-    const cells: Array<[string, string, string]> = [
+    const bosses = run.bossesKilled
+    // Bosses ride under the elites as a small note: in the value they overflowed the cell.
+    const bossNote = bosses > 0 ? `+${formatCount(bosses)} boss${bosses > 1 ? 'es' : ''}` : ''
+    const cells: Array<[string, string, string, string?]> = [
       ['⏱️', 'Time', formatTime(run.totalTime)],
       ['⭐', 'Level', String(ctx.progression.level)],
-      ['💀', 'Kills', `${formatCount(run.kills)}`],
-      ['◆', 'Elites', `${formatCount(run.elitesKilled)}${bossNote}`],
+      ['💀', 'Kills', formatCount(run.kills)],
+      ['◆', 'Elites', formatCount(run.elitesKilled), bossNote],
       ['🪙', 'Gold', formatCount(run.gold)],
       ['🥈', 'Silver earned', `+${formatCount(run.silver)}`],
     ]
-    cells.forEach(([icon, label, value], i) => {
+    cells.forEach(([icon, label, value, note], i) => {
       const cell = el('div', 'end-cell', undefined, grid)
       cell.style.setProperty('--i', String(i))
       el('span', 'end-icon', icon, cell)
       el('span', 'end-value ol', value, cell)
       el('span', 'end-label', label, cell)
+      if (note) el('span', 'end-note', note, cell)
     })
 
     const cols = el('div', 'end-cols', undefined, this.panel)

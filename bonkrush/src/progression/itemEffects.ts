@@ -2,10 +2,12 @@
  * What the effect items actually do. Item defs are static, so the per-run
  * state their hooks need (cooldowns, buffs, souls, clouds, the stopwatch
  * charge, the proc rng) lives in an `ItemRuntime` looked up by context.
- * All item damage is `noProcs`, so items never trigger each other in a loop.
+ * All item damage is `noProcs`, and Soul Reaper ignores its own kills, so
+ * items never trigger each other in a loop.
  */
 import * as THREE from 'three'
 import type { Rng } from '../core/rng'
+import { tierOf } from '../enemies/enemyDefs'
 import type { Enemy, GameContext, ItemHooks, SfxId, StatMod } from '../game/types'
 import { ItemVfx } from './itemVfx'
 import { procChance, soulCount, vacuumInterval } from './itemMath'
@@ -26,6 +28,22 @@ const _s = new THREE.Vector3()
 const _v = new THREE.Vector3()
 const _aim = new THREE.Vector3()
 const _identity = new THREE.Quaternion()
+
+/** Kills by souls must not release more souls, or one kill chains through the whole horde. */
+const SOUL_SOURCE = 'item:soul_reaper'
+
+/**
+ * `ItemHooks` whose `onKill` also gets the kill's damage source, so an item
+ * can ignore kills it made itself. Plain `ItemHooks` fit it as they are.
+ */
+export interface KillAwareHooks extends ItemHooks {
+  onKill?(ctx: GameContext, enemy: Enemy, stacks: number, source?: string): void
+}
+
+/** Bosses and minibosses: never executed, and slowed where others would be frozen. */
+export function isBossClass(enemy: Enemy): boolean {
+  return enemy.boss || tierOf(enemy.def) !== 'normal'
+}
 
 /**
  * Scratch space for radius queries, one frame per nesting level: a kill in
@@ -94,6 +112,9 @@ export class ItemRuntime {
 
   constructor(readonly ctx: GameContext) {
     this.rng = ctx.rng.fork(0x17e3)
+    // Built now, hidden, so the stage-start shader prewarm compiles them
+    // instead of the first soul or spike hitching the frame.
+    this.vfx = new ItemVfx(ctx.scene)
   }
 
   /** Rolls an item's per-stack proc chance with the player's luck. */
@@ -269,7 +290,7 @@ export class ItemRuntime {
       this.ctx.enemies.queryRadius(p.pos, STOPWATCH_RADIUS, s.list)
       for (let i = 0; i < s.list.length; i++) {
         const e = s.list[i]
-        if (e.boss) this.ctx.enemies.applySlow(e, STOPWATCH_SECONDS)
+        if (isBossClass(e)) this.ctx.enemies.applySlow(e, STOPWATCH_SECONDS)
         else this.ctx.enemies.applyFreeze(e, STOPWATCH_SECONDS)
       }
     } finally {
@@ -322,10 +343,9 @@ export class ItemRuntime {
     if (latest === this) latest = null
   }
 
-  /** The VFX pools, built the first time an item needs them; null once disposed. */
+  /** The VFX pools; null once disposed. */
   private visuals(): ItemVfx | null {
-    if (this.disposed) return null
-    return (this.vfx ??= new ItemVfx(this.ctx.scene))
+    return this.disposed ? null : this.vfx
   }
 
   private updateSouls(vfx: ItemVfx, dt: number): void {
@@ -361,7 +381,7 @@ export class ItemRuntime {
         if (dist <= t.def.radius * t.scale + 0.4) {
           s.active = false
           s.target = null
-          this.ctx.enemies.damage(t, s.damage, { source: 'item:soul_reaper', noProcs: true })
+          this.ctx.enemies.damage(t, s.damage, { source: SOUL_SOURCE, noProcs: true })
           this.ctx.fx.burst(_aim, '#aefcff', 6, 4, 0.2)
           continue
         }
@@ -442,8 +462,8 @@ const runtimes = new WeakMap<GameContext, ItemRuntime>()
 let latest: ItemRuntime | null = null
 
 /**
- * The item runtime for a run, created on first use. The game shell never
- * disposes Progression, so starting a new run cleans up the last run's pools.
+ * The item runtime for a run, created with its Progression. Should a run
+ * end without Progression.dispose(), the next run cleans up its pools.
  */
 export function itemRuntime(ctx: GameContext): ItemRuntime {
   // Hooks look this up on every hit; the current run is almost always the one asked for.
@@ -504,7 +524,7 @@ export const ITEM_HOOKS = {
     onHit(ctx, enemy, _damage, _crit, stacks) {
       if (!enemy.alive || !itemRuntime(ctx).roll(0.1, stacks)) return
       const seconds = 1.5 * ctx.progression.stats.duration
-      if (enemy.boss) ctx.enemies.applySlow(enemy, seconds)
+      if (isBossClass(enemy)) ctx.enemies.applySlow(enemy, seconds)
       else ctx.enemies.applyFreeze(enemy, seconds)
     },
   },
@@ -518,7 +538,8 @@ export const ITEM_HOOKS = {
     },
   },
   soul_reaper: {
-    onKill(ctx, enemy, stacks) {
+    onKill(ctx, enemy, stacks, source?: string) {
+      if (source === SOUL_SOURCE) return
       itemRuntime(ctx).spawnSouls(enemy.pos, soulCount(stacks), SOUL_DAMAGE * ctx.progression.stats.damage)
     },
   },
@@ -535,7 +556,7 @@ export const ITEM_HOOKS = {
   },
   reaper_dagger: {
     onHit(ctx, enemy, _damage, _crit, stacks) {
-      if (!enemy.alive || enemy.boss || enemy.def.behavior === 'boss') return
+      if (!enemy.alive || isBossClass(enemy)) return
       if (!itemRuntime(ctx).roll(0.01, stacks)) return
       ctx.fx.number(enemy.pos, 'EXECUTE', 'info')
       ctx.fx.burst(enemy.pos, '#7a2cff', 12, 5, 0.3)
@@ -557,7 +578,7 @@ export const ITEM_HOOKS = {
       rt.stillSeconds = still ? rt.stillSeconds + dt : 0
     },
   },
-} satisfies Record<string, ItemHooks>
+} satisfies Record<string, KillAwareHooks>
 
 /** Big Bonk's odds per hit, per stack. */
 export const BIG_BONK_CHANCE = 0.02

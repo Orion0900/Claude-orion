@@ -2,12 +2,14 @@ import type { DefLookups } from './format'
 import {
   barShares,
   bestStageLabel,
+  controlsHint,
   describeOffer,
   describeWeaponChange,
   formatCount,
   formatNumber,
   formatTime,
   fraction,
+  objectiveLabel,
   promptLabel,
   sumMods,
   timerKey,
@@ -237,9 +239,21 @@ describe('describeOffer', () => {
       { type: 'stat', rarity: 'epic', label: 'Might', mods: [{ stat: 'damage', op: 'add', value: 0.064 }] },
       LOOK,
     )
-    expect(v.name).toBe('Might')
+    // Named after the stat, not the label (which repeats the lines).
+    expect(v.name).toBe('Damage')
     expect(v.icon).toBe('💪')
     expect(v.lines).toEqual(['+6.4% Damage'])
+  })
+
+  it('names multi-stat boons without repeating their lines', () => {
+    const mods = [
+      { stat: 'maxHp', op: 'add', value: 20 },
+      { stat: 'regen', op: 'add', value: 0.5 },
+    ] as const
+    const v = describeOffer({ type: 'stat', rarity: 'rare', label: 'x', mods: [...mods] }, LOOK)
+    expect(v.name).toBe('Max HP & HP Regen')
+    expect(v.lines).toHaveLength(2)
+    expect(describeOffer({ type: 'stat', rarity: 'rare', label: 'x', mods: [] }, LOOK).name).toBe('Boon')
   })
 
   it('shows item stacks, and NEW for a first copy', () => {
@@ -259,6 +273,21 @@ describe('describeOffer', () => {
     expect(v.name).toBe('nope')
     expect(v.tag).toBe('Upgrade')
     expect(v.lines).toEqual([])
+  })
+})
+
+describe('objective and controls', () => {
+  it('walks the stage goal from altar to boss to portal', () => {
+    expect(objectiveLabel({ bossSpawned: false, portalOpen: false })).toEqual({ text: '☠ Altar: summon the boss', kind: 'altar' })
+    expect(objectiveLabel({ bossSpawned: true, portalOpen: false }).kind).toBe('boss')
+    expect(objectiveLabel({ bossSpawned: true, portalOpen: true })).toEqual({ text: 'Portal open!', kind: 'portal' })
+  })
+
+  it('lists every slide key and no longer mentions Ctrl', () => {
+    const desk = controlsHint(false)
+    expect(desk).toContain('Shift / C / right mouse slide')
+    expect(desk).not.toMatch(/ctrl/i)
+    expect(controlsHint(true)).toContain('slide')
   })
 })
 

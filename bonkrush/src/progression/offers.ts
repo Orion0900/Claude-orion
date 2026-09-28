@@ -41,6 +41,8 @@ export interface LevelUpInput {
   maxTomes: number
   /** Keys from `banishKey`. */
   banished: ReadonlySet<string>
+  /** Tome ids whose stats are all capped: a level of them would change nothing. */
+  maxed?: ReadonlySet<string>
   luck: number
   /** Holding an Anvil: every weapon upgrade raises three stats. */
   anvil: boolean
@@ -95,14 +97,16 @@ export function levelUpCandidates(input: LevelUpInput): LevelUpCandidate[] {
 
   if (input.tomes.length < input.maxTomes) {
     for (const def of input.tomePool) {
-      if (def.locked || ownedTomes.has(def.id) || input.banished.has(`tome:${def.id}`)) continue
+      if (def.locked || ownedTomes.has(def.id) || input.banished.has(`tome:${def.id}`) || input.maxed?.has(def.id))
+        continue
       ownedTomes.add(def.id)
       out.push({ type: 'newTome', id: def.id, weight: 1 })
     }
   }
   for (const tome of input.tomes) {
-    if (tome.level >= tomeMaxLevel(tome.def.id) || input.banished.has(`tome:${tome.def.id}`)) continue
-    out.push({ type: 'tomeUpgrade', id: tome.def.id, weight: OWNED_WEIGHT })
+    const id = tome.def.id
+    if (tome.level >= tomeMaxLevel(id) || input.banished.has(`tome:${id}`) || input.maxed?.has(id)) continue
+    out.push({ type: 'tomeUpgrade', id, weight: OWNED_WEIGHT })
   }
   return out
 }
@@ -196,6 +200,8 @@ export function upgradeStep(def: WeaponDef, stats: WeaponStats, key: WeaponStatK
 export interface ShrineInput {
   tomePool: readonly TomeDef[]
   banished: ReadonlySet<string>
+  /** Tome ids whose stats are all capped; their boons would do nothing. */
+  maxed?: ReadonlySet<string>
   luck: number
   count?: number
   /** Golden shrines are always legendary. */
@@ -205,19 +211,24 @@ export interface ShrineInput {
 }
 
 /** Tomes whose step a charge shrine can hand out. */
-export function shrinePool(tomes: readonly TomeDef[], banished: ReadonlySet<string>): TomeDef[] {
+export function shrinePool(
+  tomes: readonly TomeDef[],
+  banished: ReadonlySet<string>,
+  maxed?: ReadonlySet<string>,
+): TomeDef[] {
   return tomes.filter(
     (t) =>
       !t.locked &&
       t.perLevel.length > 0 &&
       !banished.has(`tome:${t.id}`) &&
+      !maxed?.has(t.id) &&
       t.perLevel.every((m) => !SHRINE_EXCLUDED.has(m.stat)),
   )
 }
 
 /** Charge shrine boons: one tome-level of a random stat each, times the rarity multiplier. */
 export function rollShrineOffers(input: ShrineInput, rng: Rng): Offer[] {
-  const pool = shrinePool(input.tomePool, input.banished)
+  const pool = shrinePool(input.tomePool, input.banished, input.maxed)
   const count = input.count ?? 3
   const offers: Offer[] = []
   while (offers.length < count && pool.length > 0) {
