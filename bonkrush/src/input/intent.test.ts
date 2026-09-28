@@ -6,13 +6,19 @@ describe('input intent', () => {
     expect(keyIntent('ArrowLeft')).toBe('left')
     expect(keyIntent('Space')).toBe('jump')
     expect(keyIntent('ShiftRight')).toBe('slide')
-    expect(keyIntent('ControlLeft')).toBe('slide')
+    expect(keyIntent('KeyC')).toBe('slide')
     expect(keyIntent('KeyE')).toBe('interact')
     expect(keyIntent('Escape')).toBe('pause')
     expect(keyIntent('KeyP')).toBe('pause')
     expect(keyIntent('Tab')).toBe('tab')
     expect(keyIntent('', ' ')).toBe('jump')
     expect(keyIntent('KeyQ', 'q')).toBeNull()
+  })
+
+  it('never binds Ctrl, whose combos the browser owns (Ctrl+W closes the tab)', () => {
+    expect(keyIntent('ControlLeft', 'Control')).toBeNull()
+    expect(keyIntent('ControlRight', 'Control')).toBeNull()
+    expect(keyIntent('', 'Control')).toBeNull()
   })
 
   it('knows which intents fire once per press', () => {

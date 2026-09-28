@@ -3,7 +3,8 @@
  * terrain out of the way, and how speed widens the view. Pure, so it's
  * testable without a renderer.
  */
-import type { Vector3 } from 'three'
+import { Vector3 } from 'three'
+import { wrapAngle, yawOf } from '../player/movement'
 
 /** Pitch limits; positive looks down on the player from above. */
 export const PITCH_MIN = -0.3
@@ -16,6 +17,10 @@ export const FOV_MIN = 70
 export const FOV_MAX = 85
 /** The base run speed camera effects are measured against (m/s). */
 export const BASE_RUN = 7
+/** The boom never gets shorter than this, so the character can't fill the view. */
+export const MIN_BOOM = 4
+/** Pitch search step when rising terrain pushes the view up (rad). */
+const PITCH_STEP = 0.06
 
 export function clampPitch(pitch: number): number {
   if (!Number.isFinite(pitch)) return DEFAULT_PITCH
@@ -49,7 +54,7 @@ export function clearBoom(
   maxLen: number,
   heightAt: (x: number, z: number) => number,
   clearance = 0.45,
-  minLen = 1.2,
+  minLen = MIN_BOOM,
   samples = 10,
 ): number {
   const blocked = (t: number) =>
@@ -69,6 +74,85 @@ export function clearBoom(
     clear = t
   }
   return maxLen
+}
+
+const _dir = new Vector3()
+
+/**
+ * The lowest pitch from `pitch` up to PITCH_MAX at which a boom of `len`
+ * keeps at least `need` × len clear of the ground. Rising ground behind the
+ * player (the rim, a hillside) lifts the view over it instead of pulling
+ * the camera into the character's back. PITCH_MAX when nothing clears.
+ */
+export function clearPitch(
+  target: Vector3,
+  yaw: number,
+  pitch: number,
+  len: number,
+  heightAt: (x: number, z: number) => number,
+  clearance = 0.45,
+  need = 0.85,
+): number {
+  const want = need * len - 1e-6
+  const clears = (p: number) => clearBoom(target, boomDirection(yaw, p, _dir), len, heightAt, clearance, 0) >= want
+  const start = clampPitch(pitch)
+  if (clears(start)) return start
+  let lo = start
+  while (lo < PITCH_MAX) {
+    const hi = Math.min(PITCH_MAX, lo + PITCH_STEP)
+    if (clears(hi)) {
+      // Refine inside the step so the result glides rather than jumping 0.06 at a time.
+      let a = lo
+      let b = hi
+      for (let k = 0; k < 4; k++) {
+        const mid = (a + b) / 2
+        if (clears(mid)) b = mid
+        else a = mid
+      }
+      return b
+    }
+    lo = hi
+  }
+  return PITCH_MAX
+}
+
+/** Touch auto-follow: seconds without look input before it starts. */
+export const AUTO_DELAY = 0.6
+/** How eagerly it eases in behind the run direction (per second, at run speed). */
+export const AUTO_RATE = 1.5
+/** It never turns the view faster than this: 40°/s. */
+export const AUTO_MAX_RATE = (40 * Math.PI) / 180
+/** It only acts while the stick points within this of straight ahead (rad, about 26°)… */
+export const AUTO_STICK_CONE = 0.45
+/** …and the run direction is within this of the view (rad, about 34°). */
+export const AUTO_MAX_ANGLE = 0.6
+
+/**
+ * How far the touch camera turns this step (radians, added to its yaw) to
+ * ease in behind where the player is running. Movement is camera-relative,
+ * so a view that chased the velocity while the stick points sideways would
+ * turn the run direction with it and circle forever; it only follows while
+ * the stick points mostly forward, fading out toward the edge of that cone,
+ * and never faster than AUTO_MAX_RATE.
+ */
+export function autoFollowTurn(
+  camYaw: number,
+  vel: { x: number; z: number },
+  move: { x: number; y: number },
+  sinceLook: number,
+  dt: number,
+): number {
+  if (!(dt > 0) || !(sinceLook > AUTO_DELAY)) return 0
+  const speed = Math.hypot(vel.x, vel.z)
+  if (!(speed > 2) || Math.hypot(move.x, move.y) < 0.3) return 0
+  const stick = Math.atan2(Math.abs(move.x), move.y)
+  if (!(stick < AUTO_STICK_CONE)) return 0
+  const diff = wrapAngle(yawOf(vel.x, vel.z) - camYaw)
+  if (!(Math.abs(diff) < AUTO_MAX_ANGLE)) return 0
+  const rate = AUTO_RATE * (1 - stick / AUTO_STICK_CONE) * Math.min(1, speed / BASE_RUN)
+  const turn = diff * (1 - Math.exp(-rate * dt))
+  const limit = AUTO_MAX_RATE * dt
+  return Math.max(-limit, Math.min(limit, turn))
 }
 
 /** Frame-rate independent exponential approach. */

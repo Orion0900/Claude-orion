@@ -5,6 +5,7 @@
  * behavior (`weapons/behaviors`).
  */
 import type { Rng } from '../core/rng'
+import { tierOf } from '../enemies/enemyDefs'
 import type { DamageRoll, Enemy, GameContext, WeaponApi, WeaponDef, WeaponInstance, WeaponStats } from '../game/types'
 import { BEHAVIORS } from './behaviors'
 import type { BehaviorFactory, WeaponBehavior } from './behaviors/types'
@@ -41,6 +42,7 @@ export class WeaponManager implements WeaponApi, DamageSource {
 
   constructor(private readonly ctx: GameContext) {
     this.rng = ctx.rng.fork(RNG_SALT)
+    // Builds the shared effect pools now (hidden while empty) so Game's shader prewarm compiles them.
     this.kit = new WeaponKit(ctx, this, this.rng)
     this.unsubs = [
       ctx.events.on('enemyHit', ({ source, amount }) => {
@@ -74,6 +76,7 @@ export class WeaponManager implements WeaponApi, DamageSource {
     const w: WeaponInstance = { def, level: 1, stats: { ...def.base }, timer: FIRST_SHOT_DELAY, dealt: 0, kills: 0 }
     const slot: Slot = { w, eff: effectiveStats(w.stats, this.ctx.progression.stats, def.behavior), behavior: IDLE }
     const factory: BehaviorFactory | undefined = BEHAVIORS[def.behavior]
+    // Behaviors build every mesh they will ever draw here, never on first use, for the same reason.
     if (factory) slot.behavior = factory(this.kit, slot)
     else console.warn(`[weapons] no behavior "${def.behavior}" for ${def.id}`)
 
@@ -113,7 +116,7 @@ export class WeaponManager implements WeaponApi, DamageSource {
     const stats = this.ctx.progression.stats
     const tiers = critTiers(arm.eff.critChance, this.rng.next())
     let amount = arm.eff.damage * critMultiplier(tiers, stats.critDamage)
-    if (enemy.elite || enemy.boss) amount *= stats.eliteDamage
+    if (isEliteClass(enemy)) amount *= stats.eliteDamage
     amount *= this.ctx.progression.outgoingMultiplier(enemy)
     out.amount = Number.isFinite(amount) ? Math.max(0, amount) : 0
     out.crit = tiers > 0
@@ -151,4 +154,9 @@ export class WeaponManager implements WeaponApi, DamageSource {
     for (const slot of this.slots) slot.behavior.clear()
     this.kit.clear()
   }
+}
+
+/** Elites, minibosses and bosses all take the eliteDamage bonus; minibosses carry neither flag. */
+function isEliteClass(enemy: Enemy): boolean {
+  return enemy.elite || enemy.boss || tierOf(enemy.def) !== 'normal'
 }

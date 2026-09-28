@@ -127,6 +127,57 @@ describe('movement', () => {
     expect(s.pos.x).toBeGreaterThan(20)
   })
 
+  /** Slides with W held from run speed down a ramp `length` m long at `deg`°, flat either side; speed at the bottom. */
+  function rampSlide(length: number, deg: number): number {
+    const k = Math.tan((deg * Math.PI) / 180)
+    const run = length * Math.cos((deg * Math.PI) / 180)
+    const ramp = terrain((x) => -Math.min(run, Math.max(0, x)) * k)
+    const s = grounded(-3, 0, 0)
+    s.vel.set(MOVE.runSpeed, 0, 0)
+    for (let i = 0; i < 600 && s.pos.x < run; i++) {
+      stepMovement(s, input({ moveY: 1, yaw: FACE_X, slideHeld: true }), PARAMS, ramp, DT)
+    }
+    expect(s.pos.x).toBeGreaterThanOrEqual(run)
+    return hspeed(s) / MOVE.runSpeed
+  }
+
+  it('takes a slide to 3–4× run speed down a long ramp', () => {
+    // The world's slide ramps are 30–40 m at 15–25°; even the gentlest one gets you to 3×.
+    expect(rampSlide(30, 15)).toBeGreaterThan(3.2)
+    expect(rampSlide(35, 20)).toBeGreaterThan(3.8)
+    expect(rampSlide(40, 25)).toBeLessThanOrEqual(MOVE.speedCap + 1e-9)
+  })
+
+  it('coasts a flat slide for several seconds', () => {
+    const s = grounded()
+    s.vel.set(MOVE.runSpeed, 0, 0)
+    let t = 0
+    while (t < 20) {
+      stepMovement(s, input({ slideHeld: true, yaw: FACE_X }), PARAMS, FLAT, DT)
+      t += DT
+      if (!s.sliding) break
+    }
+    expect(t).toBeGreaterThan(5)
+    expect(t).toBeLessThan(7)
+    expect(s.pos.x).toBeGreaterThan(20)
+    expect(s.pos.x).toBeLessThan(30)
+  })
+
+  it('makes hills faster than strafe-hopping on the flat', () => {
+    // Ideal air strafing: W+D with the camera tracking the velocity, jumping on every landing.
+    const s = grounded()
+    s.vel.set(0, 0, -MOVE.runSpeed)
+    let hops = 0
+    let hopsToThree = -1
+    for (let i = 0; i < 60 * 20 && hopsToThree < 0; i++) {
+      const yaw = yawOf(s.vel.x, s.vel.z)
+      if (stepMovement(s, input({ moveX: Math.SQRT1_2, moveY: Math.SQRT1_2, yaw, jumpPressed: s.onGround }), PARAMS, FLAT, DT).jumped) hops++
+      if (hspeed(s) >= MOVE.runSpeed * 3) hopsToThree = hops
+    }
+    // About 7 s of perfect hopping to reach 3×; a 20° ramp does it in about one second.
+    expect(hopsToThree).toBeGreaterThanOrEqual(9)
+  })
+
   it('loses speed sliding on flat ground or uphill', () => {
     const flat = grounded()
     flat.vel.set(10, 0, 0)

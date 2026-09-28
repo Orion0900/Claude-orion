@@ -8,6 +8,7 @@ import { EventBus } from '../core/events'
 import { Rng } from '../core/rng'
 import { CHARACTERS } from '../data/characters'
 import { STAGES } from '../data/stages'
+import { tierOf } from '../enemies/enemyDefs'
 import { AudioEngine } from '../audio/AudioEngine'
 import { ThirdPersonCamera } from '../camera/ThirdPersonCamera'
 import { EnemyManager } from '../enemies/EnemyManager'
@@ -91,6 +92,7 @@ export class Game implements ShellApi {
     this.applySettings()
     window.addEventListener('resize', this.resize)
     document.addEventListener('visibilitychange', this.onVisibility)
+    window.addEventListener('beforeunload', this.onBeforeUnload)
     this.resize()
 
     // Browsers only allow sound after a gesture.
@@ -317,8 +319,10 @@ export class Game implements ShellApi {
     on('playerDied', () => void this.endRun(false))
     on('enemyKilled', ({ enemy }) => {
       ctx.run.kills++
-      if (enemy.elite) ctx.run.elitesKilled++
+      if (enemy.elite || tierOf(enemy.def) === 'miniboss') ctx.run.elitesKilled++
     })
+    // A weapon taken mid-stage brings new materials; compile them while its level-up card is still up.
+    on('weaponAdded', () => this.prewarm())
     on('enemyHit', ({ amount }) => {
       ctx.run.damageDealt += amount
     })
@@ -523,6 +527,13 @@ export class Game implements ShellApi {
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
+  }
+
+  /** Ctrl+W can't be blocked, so a live run asks before the tab closes. */
+  private onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (!this.run || this.ending || this.params.has('bot')) return
+    e.preventDefault()
+    e.returnValue = ''
   }
 
   private onVisibility = () => {

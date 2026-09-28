@@ -15,8 +15,12 @@ export const MOVE = {
   /** Exponential rate (per second) that stops you when there's no input. */
   groundFriction: 10,
   airAccel: 18,
-  /** Speed gained per second while strafing diagonally to your velocity in the air (best at 45°). */
-  airStrafeGain: 2.5,
+  /**
+   * Speed gained per second while strafing diagonally to your velocity in the
+   * air (best at 45°). Small, so strafe-hopping on the flat stays slower than
+   * sliding down a hill: about 14 hops to the cap.
+   */
+  airStrafeGain: 1,
   gravity: 28,
   jumpVelocity: 10,
   coyoteTime: 0.1,
@@ -32,10 +36,15 @@ export const MOVE = {
    */
   slideBurstCeiling: 2,
   slideCooldown: 0.6,
-  slideFriction: 0.6,
+  /**
+   * Exponential slide drag (per second). Low enough that a flat slide coasts
+   * about 6 s / 25 m and a long hill runs a slide up to 3–4× run speed.
+   */
+  slideFriction: 0.3,
   /** How hard you can steer a slide; weak on purpose. */
   slideSteer: 6,
-  slopeDownhill: 1.6,
+  /** Downhill pull while sliding is g × sin(slope) × this; uphill drag uses `slopeUphill`. */
+  slopeDownhill: 2,
   slopeUphill: 1,
   bhopWindow: 0.12,
   bhopBonus: 1.06,

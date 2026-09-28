@@ -20,7 +20,7 @@ import {
   type MoveState,
 } from './movement'
 import { createCharacterModel, type CharacterRig } from './PlayerModel'
-import { IFRAMES, knockbackSpeed, rechargeShield, resolveHeal, resolveHit } from './vitals'
+import { IFRAMES, STOPWATCH_IFRAMES, knockbackSpeed, rechargeShield, resolveHeal, resolveHit } from './vitals'
 
 const RADIUS = 0.5
 /** How fast the body turns to face where it's going (per second, exponential). */
@@ -59,6 +59,8 @@ export class Player implements PlayerApi {
   private facing = 0
   private dead = false
   private iframes = 0
+  /** Stopwatch save: nothing at all hurts, falls included, so the save can't be undone a frame later. */
+  private invulnerable = 0
   private sinceHit = 99
   /** Blink only after real hits; a dodge's i-frames stay invisible. */
   private blink = false
@@ -184,6 +186,7 @@ export class Player implements PlayerApi {
     this.checkTeleport(TELEPORT_DISTANCE)
 
     this.iframes = Math.max(0, this.iframes - dt)
+    this.invulnerable = Math.max(0, this.invulnerable - dt)
     this.sinceHit += dt
     if (!this.dead) {
       if (stats.regen > 0 && this.hp < stats.maxHp) this.hp = Math.min(stats.maxHp, this.hp + stats.regen * dt)
@@ -226,7 +229,7 @@ export class Player implements PlayerApi {
 
   private takeDamage(amount: number, source: string, from: Vec3 | undefined, dodgeable: boolean): number {
     const ctx = this.ctx
-    if (this.dead || !(amount > 0)) return 0
+    if (this.dead || !(amount > 0) || this.invulnerable > 0) return 0
     if (dodgeable && this.iframes > 0) return 0
     const stats = ctx.progression.stats
     if (dodgeable && stats.evasion > 0 && this.rng.chance(stats.evasion)) {
@@ -250,6 +253,8 @@ export class Player implements PlayerApi {
     if (hit.toHp >= this.hp) {
       if (ctx.progression.tryCheatDeath()) {
         this.hp = 1
+        this.invulnerable = STOPWATCH_IFRAMES
+        this.blink = true
       } else {
         this.hp = 0
         ctx.fx.flash('#ff2a2a', 0.5)
@@ -286,6 +291,7 @@ export class Player implements PlayerApi {
     if (this.dead) return
     this.dead = true
     this.iframes = 0
+    this.invulnerable = 0
     this.deathTime = 0
     // Game plays the death sting when it hears this.
     this.ctx.events.emit('playerDied', {})
@@ -362,7 +368,8 @@ export class Player implements PlayerApi {
       this.rig.tilt.rotation.x = this.dead ? -t * t * (Math.PI / 2) : 0
     }
 
-    const flash = this.blink && this.iframes > 0 && Math.floor(this.iframes * BLINK_RATE) % 2 === 0
+    const safe = Math.max(this.iframes, this.invulnerable)
+    const flash = this.blink && safe > 0 && Math.floor(safe * BLINK_RATE) % 2 === 0
     if (flash !== this.flashOn) {
       this.flashOn = flash
       this.rig.material.emissive.setScalar(flash ? 0.6 : 0)

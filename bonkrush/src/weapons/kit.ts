@@ -30,8 +30,11 @@ export function sizeMul(arm: Armed): number {
 
 /** Height above the feet that shots leave from. */
 export const MUZZLE_HEIGHT = 1.1
-/** Broad-phase slack so the edges of big enemies are never missed. */
-const QUERY_PAD = 3.2
+/** A swept ball still hits a body this far below its feet or above its head. */
+const SWEEP_BELOW = 0.4
+const SWEEP_ABOVE = 0.2
+/** queryRadius's height gate reaches max(radius, this) metres from the centre. */
+const QUERY_HEIGHT = 2
 /** How far ahead the fallback aim looks to follow the ground. */
 const AIM_AHEAD = 8
 /** Shots lead a moving target by at most this long and this far. */
@@ -117,7 +120,7 @@ export class WeaponKit {
    * and whose height span is within `below`/`above` metres of it.
    */
   inRadius(center: Vec3, radius: number, below: number, above: number, out: Enemy[]): number {
-    const cand = this.query(center, radius)
+    const cand = this.query(center, radius, Math.max(below, above))
     let n = 0
     for (let i = 0; i < cand.length; i++) {
       const e = cand[i]
@@ -140,7 +143,9 @@ export class WeaponKit {
    */
   sweep(a: Vec3, b: Vec3, radius: number, skip: ReadonlySet<number> | null, out: Enemy[]): number {
     this.mid.addVectors(a, b).multiplyScalar(0.5)
-    const cand = this.query(this.mid, a.distanceTo(b) * 0.5 + radius)
+    // The height test runs at the closest point, up to half the rise away from the middle.
+    const vertical = radius + Math.max(SWEEP_BELOW, SWEEP_ABOVE) + Math.abs(b.y - a.y) * 0.5
+    const cand = this.query(this.mid, a.distanceTo(b) * 0.5 + radius, vertical)
     let n = 0
     for (let i = 0; i < cand.length; i++) {
       const e = cand[i]
@@ -151,7 +156,7 @@ export class WeaponKit {
       const r = radius + e.def.radius * e.scale
       if (x * x + z * z > r * r) continue
       const y = a.y + (b.y - a.y) * t
-      if (y < e.pos.y - radius - 0.4 || y > e.pos.y + e.def.height * e.scale + radius + 0.2) continue
+      if (y < e.pos.y - radius - SWEEP_BELOW || y > e.pos.y + e.def.height * e.scale + radius + SWEEP_ABOVE) continue
       out[n++] = e
     }
     out.length = n
@@ -319,9 +324,18 @@ export class WeaponKit {
     this.area.length = 0
   }
 
-  private query(center: Vec3, radius: number): Enemy[] {
+  /**
+   * Broad phase for the exact tests above. queryRadius already widens its
+   * search by the biggest body and tests `radius + body` in XZ, so no pad is
+   * added there. Its height gate, though, only reaches max(radius, 2) m, so a
+   * small probe that must reach higher (fliers hover 2–3 m up) asks for its
+   * `vertical` reach instead.
+   */
+  private query(center: Vec3, radius: number, vertical: number): Enemy[] {
+    const r = vertical > QUERY_HEIGHT ? Math.max(radius, vertical) : radius
+    // The contract only says "fills `out`"; never let stale candidates through.
     this.cand.length = 0
-    return this.ctx.enemies.queryRadius(center, radius + QUERY_PAD, this.cand)
+    return this.ctx.enemies.queryRadius(center, r, this.cand)
   }
 }
 

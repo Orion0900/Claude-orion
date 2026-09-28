@@ -1,19 +1,24 @@
 /**
  * Chase camera orbiting behind the player. Look input turns it instantly
- * (no mouse smoothing); only the follow point, boom length and FOV ease.
- * Movement input is relative to its yaw.
+ * (no mouse smoothing); only the follow point, boom length, terrain floor
+ * and FOV ease. Movement input is relative to its yaw.
  */
 import * as THREE from 'three'
 import type { CameraApi, GameContext } from '../game/types'
-import { wrapAngle, yawOf } from '../player/movement'
+import { wrapAngle } from '../player/movement'
 import {
   BASE_DISTANCE,
   DEFAULT_PITCH,
+  MIN_BOOM,
+  PITCH_MAX,
+  PITCH_MIN,
   SPEED_DISTANCE,
   approach,
+  autoFollowTurn,
   boomDirection,
   clampPitch,
   clearBoom,
+  clearPitch,
   fovFor,
   speedFactor,
 } from './cameraMath'
@@ -23,7 +28,14 @@ const LOOK_HEIGHT = 1.4
 /** How far the view drops while sliding. */
 const SLIDE_DROP = 0.55
 const CLEARANCE = 0.45
-const MIN_BOOM = 1.2
+/**
+ * The terrain floor aims for this much extra clearance, so the view rises a
+ * little before the ground actually reaches the boom rather than after.
+ */
+const FLOOR_MARGIN = 0.35
+/** How fast the floor rises over rising ground, and settles back once it's clear (per second). */
+const FLOOR_RATE = 5
+const FLOOR_RELAX = 2
 const FOLLOW_RATE = 16
 /** Vertical follow is lazier so jumps don't bob the whole view. */
 const FOLLOW_RATE_Y = 9
@@ -33,16 +45,19 @@ const BOOM_RELAX = 4
 const SNAP_DISTANCE = 20
 const DEAD_ORBIT = 0.3
 const DEAD_PITCH = 0.6
-/** Touch: seconds after the last look drag before auto-turning starts, its rate, and the widest turn it attempts. */
-const AUTO_DELAY = 0.6
-const AUTO_RATE = 1.1
-const AUTO_MAX_ANGLE = 2.4
 
 export class ThirdPersonCamera implements CameraApi {
   readonly camera: THREE.PerspectiveCamera
   private readonly ctx: GameContext
   private _yaw = 0
+  /** The player's own pitch. The view never goes below `floor`, but terrain alone never changes this. */
   private _pitch = DEFAULT_PITCH
+  /**
+   * The lowest pitch whose boom clears the ground behind the player, eased.
+   * An absolute floor rather than an offset, so look input above it is
+   * instant and nothing drifts back afterwards.
+   */
+  private floor = PITCH_MIN
   private readonly focus = new THREE.Vector3()
   private readonly target = new THREE.Vector3()
   private readonly dir = new THREE.Vector3()
@@ -65,8 +80,9 @@ export class ThirdPersonCamera implements CameraApi {
     return this._yaw
   }
 
+  /** The pitch the view actually has, terrain floor included. */
   get pitch(): number {
-    return this._pitch
+    return Math.min(PITCH_MAX, Math.max(this._pitch, this.floor))
   }
 
   update(dt: number): void {
@@ -79,19 +95,15 @@ export class ThirdPersonCamera implements CameraApi {
 
     if (step > 0) {
       const look = input.state.look
-      if (look.yaw !== 0 || look.pitch !== 0) this.sinceLook = 0
+      // A thumb resting on the look zone is holding the view even while it doesn't move.
+      if (look.yaw !== 0 || look.pitch !== 0 || (input.isTouch && input.looking)) this.sinceLook = 0
       else this.sinceLook += step
 
       if (player.alive) {
         this._yaw = wrapAngle(this._yaw - look.yaw)
-        this._pitch = clampPitch(this._pitch + look.pitch)
-        // Touch players steer with one thumb, so the view drifts round to where they're running.
-        if (input.isTouch && this.sinceLook > AUTO_DELAY && speed > 2) {
-          const diff = wrapAngle(yawOf(v.x, v.z) - this._yaw)
-          if (Math.abs(diff) < AUTO_MAX_ANGLE) {
-            this._yaw = wrapAngle(this._yaw + diff * (1 - Math.exp(-AUTO_RATE * Math.min(1, speed / 7) * step)))
-          }
-        }
+        this.turnPitch(look.pitch)
+        // Touch players steer with one thumb, so the view eases in behind where they're running.
+        if (input.isTouch) this._yaw = wrapAngle(this._yaw + autoFollowTurn(this._yaw, v, input.state.move, this.sinceLook, step))
       } else {
         this._yaw = wrapAngle(this._yaw + DEAD_ORBIT * step)
         this._pitch = approach(this._pitch, DEAD_PITCH, 1, step)
@@ -111,6 +123,16 @@ export class ThirdPersonCamera implements CameraApi {
     this.place(step)
   }
 
+  /**
+   * Vertical look works on the view the player sees: raising starts from the
+   * floor when the ground is holding the view up, and lowering stops at the
+   * floor instead of banking input that would show up later.
+   */
+  private turnPitch(d: number): void {
+    if (d > 0) this._pitch = clampPitch(Math.max(this._pitch, this.floor) + d)
+    else if (d < 0) this._pitch = clampPitch(Math.max(this._pitch + d, Math.min(this._pitch, this.floor)))
+  }
+
   snap(): void {
     const player = this.ctx.player
     this.lastReal = 0
@@ -121,7 +143,7 @@ export class ThirdPersonCamera implements CameraApi {
     this.drop = 0
     this.sinceLook = 99
     this.boom = BASE_DISTANCE + SPEED_DISTANCE
-    this.place(0)
+    this.place(0, true)
   }
 
   private realStep(): number {
@@ -131,10 +153,16 @@ export class ThirdPersonCamera implements CameraApi {
     return step
   }
 
-  private place(dt: number): void {
+  private place(dt: number, snap = false): void {
     const t = this.target.set(this.focus.x, this.focus.y + LOOK_HEIGHT - this.drop, this.focus.z)
-    const dir = boomDirection(this._yaw, this._pitch, this.dir)
-    const allowed = clearBoom(t, dir, BASE_DISTANCE + SPEED_DISTANCE * this.speedT, this.heightAt, CLEARANCE, MIN_BOOM)
+    const len = BASE_DISTANCE + SPEED_DISTANCE * this.speedT
+    // Rising ground behind the player lifts the view over it first; the boom
+    // only shortens (down to MIN_BOOM) once even the steepest view is blocked.
+    const want = clearPitch(t, this._yaw, PITCH_MIN, len, this.heightAt, CLEARANCE + FLOOR_MARGIN)
+    if (snap) this.floor = want
+    else if (dt > 0) this.floor = approach(this.floor, want, want > this.floor ? FLOOR_RATE : FLOOR_RELAX, dt)
+    const dir = boomDirection(this._yaw, this.pitch, this.dir)
+    const allowed = clearBoom(t, dir, len, this.heightAt, CLEARANCE, MIN_BOOM)
     // Pull in at once so the ground never hides the player; ease back out.
     if (allowed < this.boom) this.boom = allowed
     else if (dt > 0) this.boom = approach(this.boom, allowed, BOOM_RELAX, dt)

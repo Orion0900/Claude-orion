@@ -469,7 +469,7 @@ export interface InputState {
 export interface InputApi {
   readonly state: InputState
   readonly isTouch: boolean
-  /** Whether pointer lock / look control is active (desktop). */
+  /** Whether look control is active: pointer lock on desktop, or a thumb on the touch look zone. */
   readonly looking: boolean
   requestLook(): void
   releaseLook(): void
@@ -485,6 +485,7 @@ export interface CameraApi {
   readonly camera: THREE.PerspectiveCamera
   /** Camera yaw, radians. Movement is relative to this. */
   readonly yaw: number
+  /** View pitch, including any lift the camera adds to clear rising terrain. */
   readonly pitch: number
   update(dt: number): void
   /** Snap behind the player (stage start). */

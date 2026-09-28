@@ -5,6 +5,8 @@
 
 /** Invulnerability after a hit (or a dodge), seconds. */
 export const IFRAMES = 0.5
+/** After a Stopwatch save nothing hurts for this long, falls included (DESIGN: "invulnerable for 2 s"). */
+export const STOPWATCH_IFRAMES = 2
 /** Seconds without damage before the shield starts recharging. */
 export const SHIELD_DELAY = 4
 /** Fraction of the maximum shield restored per second while recharging. */

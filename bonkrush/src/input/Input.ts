@@ -6,6 +6,7 @@
 import type { InputApi, InputState } from '../game/types'
 import {
   MOUSE_LOOK,
+  SLIDE_MOUSE_BUTTON,
   TOUCH_LOOK,
   addLook,
   clampToRadius,
@@ -20,6 +21,10 @@ import {
 
 const STICK_RADIUS = 60
 const STICK_DEAD_ZONE = 0.12
+/** The held right mouse button's entry in the held-keys map. */
+const MOUSE_SLIDE = 'Mouse2'
+/** `MouseEvent.buttons` bit for the right button. */
+const RIGHT_BUTTON_BIT = 2
 
 const STYLE = `
 .bk-touch{position:fixed;inset:0;z-index:0;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
@@ -54,6 +59,12 @@ export class Input implements InputApi {
   private wasLocked = false
   private dragging = false
   private skipMove = false
+  /**
+   * A right press on the canvas (Slide) whose context menu hasn't fired yet.
+   * Windows fires it on release, wherever the cursor is by then: over a
+   * level-up card that opened mid-slide, say.
+   */
+  private slideMenuPending = false
   private sensitivity = 1
   private invertY = false
   /** Held keys by code, so releasing one of two Slide keys keeps sliding. */
@@ -149,7 +160,11 @@ export class Input implements InputApi {
     this.on(window, 'mousemove', this.onMouseMove)
     this.on(window, 'mouseup', this.onMouseUp)
     this.on(window, 'touchstart', this.onAnyTouch, { passive: true, capture: true })
+    this.on(window, 'mousedown', this.onAnyMouseDown, { capture: true })
     this.on(canvas, 'mousedown', this.onMouseDown)
+    // The right button is Slide, so it must never open the browser menu.
+    this.on(canvas, 'contextmenu', (e) => e.preventDefault())
+    this.on(window, 'contextmenu', this.onContextMenu, { capture: true })
     this.on(document, 'pointerlockchange', this.onLockChange)
   }
 
@@ -157,8 +172,9 @@ export class Input implements InputApi {
     return this.touch
   }
 
+  /** Mouse look (locked or dragging), or a thumb resting on the touch look zone. */
   get looking(): boolean {
-    return this.locked || this.dragging
+    return this.locked || this.dragging || this.lookId !== null
   }
 
   requestLook(): void {
@@ -211,6 +227,9 @@ export class Input implements InputApi {
     if (!intent) return
     // Tab would move focus; Space and arrows would scroll or press a stray focused control.
     if (intent === 'tab' || ((intent === 'jump' || e.code.startsWith('Arrow')) && !isControl(e.target))) e.preventDefault()
+    // Mid-run, a stray Ctrl/Cmd with a game key mustn't bookmark (D) or save the page (S).
+    // Ctrl+W can't be stopped from a page, which is why Ctrl isn't bound at all.
+    else if ((e.ctrlKey || e.metaKey) && this.wantLook) e.preventDefault()
     if (!(e.repeat && isOneShot(intent))) {
       if (intent === 'jump') this.state.jumpPressed = true
       else if (intent === 'interact') this.state.interactPressed = true
@@ -227,6 +246,7 @@ export class Input implements InputApi {
   private onBlur = () => {
     this.held.clear()
     this.dragging = false
+    this.slideMenuPending = false
     this.releaseTouches()
   }
 
@@ -278,10 +298,29 @@ export class Input implements InputApi {
     }
   }
 
+  /** Runs before the canvas hears the press: an earlier Slide's menu is over by now. */
+  private onAnyMouseDown = () => {
+    this.slideMenuPending = false
+  }
+
+  private onContextMenu = (e: MouseEvent) => {
+    if (!this.slideMenuPending) return
+    this.slideMenuPending = false
+    e.preventDefault()
+  }
+
   private onMouseDown = (e: MouseEvent) => {
-    if (e.button !== 0) return
+    this.syncMouseSlide(e.buttons)
+    if (e.button === SLIDE_MOUSE_BUTTON) {
+      e.preventDefault()
+      this.slideMenuPending = true
+      this.held.set(MOUSE_SLIDE, 'slide')
+      this.refreshKeys()
+    } else if (e.button !== 0) {
+      return
+    }
     if (this.wantLook && !this.locked) this.lock()
-    if (!this.locked) this.dragging = true
+    if (!this.locked && e.button === 0) this.dragging = true
   }
 
   private onMouseMove = (e: MouseEvent) => {
@@ -297,6 +336,16 @@ export class Input implements InputApi {
 
   private onMouseUp = (e: MouseEvent) => {
     if (e.button === 0) this.dragging = false
+    else if (e.button === SLIDE_MOUSE_BUTTON && this.held.delete(MOUSE_SLIDE)) this.refreshKeys()
+  }
+
+  /**
+   * A right-button release we never heard (it happened outside the window)
+   * shows up as a missing button on the next press. Moves aren't trusted for
+   * this: some synthetic moves report no buttons while one is held.
+   */
+  private syncMouseSlide(buttons: number): void {
+    if ((buttons & RIGHT_BUTTON_BIT) === 0 && this.held.delete(MOUSE_SLIDE)) this.refreshKeys()
   }
 
   private onLockChange = () => {

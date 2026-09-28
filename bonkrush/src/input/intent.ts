@@ -5,7 +5,11 @@
 
 export type KeyIntent = 'up' | 'down' | 'left' | 'right' | 'jump' | 'slide' | 'interact' | 'pause' | 'tab'
 
-/** Physical keys (KeyboardEvent.code), so WASD sits in the same place on AZERTY. */
+/**
+ * Physical keys (KeyboardEvent.code), so WASD sits in the same place on AZERTY.
+ * Ctrl is deliberately not Slide: the browser owns Ctrl+W (close tab), so
+ * steering a slide with it held would end the run.
+ */
 const KEYS: Readonly<Record<string, KeyIntent>> = {
   KeyW: 'up',
   ArrowUp: 'up',
@@ -18,8 +22,7 @@ const KEYS: Readonly<Record<string, KeyIntent>> = {
   Space: 'jump',
   ShiftLeft: 'slide',
   ShiftRight: 'slide',
-  ControlLeft: 'slide',
-  ControlRight: 'slide',
+  KeyC: 'slide',
   KeyE: 'interact',
   Escape: 'pause',
   KeyP: 'pause',
@@ -30,7 +33,6 @@ const KEYS: Readonly<Record<string, KeyIntent>> = {
 const KEY_NAMES: Readonly<Record<string, KeyIntent>> = {
   ' ': 'jump',
   Shift: 'slide',
-  Control: 'slide',
   Escape: 'pause',
   Tab: 'tab',
   ArrowUp: 'up',
@@ -42,6 +44,9 @@ const KEY_NAMES: Readonly<Record<string, KeyIntent>> = {
 export function keyIntent(code: string, key = ''): KeyIntent | null {
   return KEYS[code] ?? KEY_NAMES[key] ?? null
 }
+
+/** The right mouse button, held, is Slide too. */
+export const SLIDE_MOUSE_BUTTON = 2
 
 /** Intents that fire once per press; key repeat must not re-fire them. */
 export function isOneShot(intent: KeyIntent): boolean {

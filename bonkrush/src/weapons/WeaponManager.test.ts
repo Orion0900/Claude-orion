@@ -7,8 +7,10 @@ import * as THREE from 'three'
 import { EventBus } from '../core/events'
 import { Rng } from '../core/rng'
 import { STAGES } from '../data/stages'
-import type { DamageOptions, Enemy, EnemyDef, GameContext, GameEvents, StatBlock, Vec3 } from '../game/types'
+import { ENEMIES } from '../enemies/enemyDefs'
+import type { DamageOptions, DamageRoll, Enemy, EnemyDef, GameContext, GameEvents, StatBlock, Vec3 } from '../game/types'
 import { BASE_STATS } from '../progression/stats'
+import { WeaponKit, type Armed } from './kit'
 import { WEAPONS } from './weaponDefs'
 import { WeaponManager } from './WeaponManager'
 
@@ -42,6 +44,8 @@ interface Hit {
 class FakeEnemies {
   list: Enemy[] = []
   hits: Hit[] = []
+  /** Every radius asked of queryRadius, to check the broad phase isn't padded. */
+  queried: number[] = []
   slowed = 0
   burned = 0
   frozen = 0
@@ -55,11 +59,11 @@ class FakeEnemies {
 
   readonly boss = null
 
-  add(x: number, z: number, hp = ENEMY.hp, extra: Partial<Enemy> = {}): Enemy {
+  add(x: number, z: number, hp = ENEMY.hp, extra: Partial<Enemy> = {}, y = 0): Enemy {
     const e: Enemy = {
       uid: this.nextUid++,
       def: ENEMY,
-      pos: new THREE.Vector3(x, 0, z),
+      pos: new THREE.Vector3(x, y, z),
       vel: new THREE.Vector3(),
       yaw: 0,
       hp,
@@ -85,10 +89,17 @@ class FakeEnemies {
     return null
   }
 
+  /** Same rule as EnemyManager: bodies overlapping the circle in XZ, with a height gate of max(radius, 2). */
   queryRadius(center: Vec3, radius: number, out: Enemy[]): Enemy[] {
+    this.queried.push(radius)
     out.length = 0
+    const vertical = Math.max(radius, 2)
     for (const e of this.list) {
-      if (e.alive && Math.hypot(e.pos.x - center.x, e.pos.z - center.z) <= radius) out.push(e)
+      if (!e.alive) continue
+      if (Math.hypot(e.pos.x - center.x, e.pos.z - center.z) > radius + e.def.radius * e.scale) continue
+      const top = e.pos.y + e.def.height * e.scale
+      const gap = center.y < e.pos.y ? e.pos.y - center.y : center.y > top ? center.y - top : 0
+      if (gap <= vertical) out.push(e)
     }
     return out
   }
@@ -286,7 +297,11 @@ describe('WeaponManager', () => {
     crowd(h)
     const w = h.ctx.weapons.add(id)
     expect(w).not.toBeNull()
+    // Every mesh exists from the moment the weapon is added (so the shader prewarm sees it), hidden while empty.
+    const meshes = h.scene.children.length
+    for (const o of h.scene.children) if (o instanceof THREE.InstancedMesh) expect(o.visible).toBe(false)
     h.tick(360, true)
+    expect(h.scene.children.length).toBe(meshes)
 
     const mine = h.enemies.hits.filter((x) => x.source === id)
     expect(mine.length).toBeGreaterThan(0)
@@ -381,6 +396,15 @@ describe('WeaponManager', () => {
     h.ctx.weapons.dispose()
   })
 
+  it('builds the shared effect pools up front, hidden', () => {
+    const h = harness()
+    const pools = h.scene.children.filter((o) => o instanceof THREE.InstancedMesh)
+    expect(pools).toHaveLength(3)
+    for (const o of pools) expect(o.visible).toBe(false)
+    h.ctx.weapons.dispose()
+    expect(h.scene.children).toHaveLength(0)
+  })
+
   it('rolls crits, overcrits and elite damage', () => {
     const h = harness()
     const w = h.ctx.weapons.add('bow')!
@@ -399,6 +423,12 @@ describe('WeaponManager', () => {
     h.stats.critChance = -1
     h.stats.eliteDamage = 1.5
     expect(h.ctx.weapons.rollDamage(w, elite).amount).toBeCloseTo(19.5)
+    expect(h.ctx.weapons.rollDamage(w, plain).amount).toBe(13)
+    // Minibosses carry neither flag but are elite-class all the same.
+    const miniboss = h.enemies.add(0, -7, 100, { def: ENEMIES.scorpion_king })
+    expect(h.ctx.weapons.rollDamage(w, miniboss).amount).toBeCloseTo(19.5)
+    const boss = h.enemies.add(0, -8, 100, { boss: true })
+    expect(h.ctx.weapons.rollDamage(w, boss).amount).toBeCloseTo(19.5)
     h.ctx.weapons.dispose()
   })
 
@@ -437,5 +467,104 @@ describe('WeaponManager', () => {
       }
     })
     h.ctx.weapons.dispose()
+  })
+})
+
+describe('WeaponKit queries', () => {
+  const noDamage = { rollInto: (_arm: Armed, _e: Enemy, out: DamageRoll) => out }
+
+  function kitHarness(): { h: Harness; kit: WeaponKit } {
+    const h = harness()
+    return { h, kit: new WeaponKit(h.ctx, noDamage, new Rng(7)) }
+  }
+
+  it('is exact at the edge of a body in XZ', () => {
+    const { h, kit } = kitHarness()
+    const inside = h.enemies.add(1.45, 0)
+    h.enemies.add(1.55, 0)
+    const out: Enemy[] = []
+    // Probe 1 m plus the dummy's 0.5 m body.
+    expect(kit.inRadius(new THREE.Vector3(), 1, 2, 3, out)).toBe(1)
+    expect(out[0]).toBe(inside)
+    kit.dispose()
+  })
+
+  it('reaches hovering fliers that a small probe would lose to the height gate', () => {
+    const { h, kit } = kitHarness()
+    const low = h.enemies.add(0.8, 0, ENEMY.hp, {}, 2.8)
+    h.enemies.add(-0.8, 0, ENEMY.hp, {}, 3.3)
+    const out: Enemy[] = []
+    expect(kit.inRadius(new THREE.Vector3(), 0.5, 2, 3, out)).toBe(1)
+    expect(out[0]).toBe(low)
+    kit.dispose()
+
+    // The aura's own radius (2.6 m) falls short of a 2.8 m hover too.
+    const aura = harness()
+    const flier = aura.enemies.add(1.5, 0, ENEMY.hp, {}, 2.8)
+    aura.ctx.weapons.add('aura')
+    aura.tick(30)
+    expect(aura.enemies.hits.some((x) => x.uid === flier.uid)).toBe(true)
+    aura.ctx.weapons.dispose()
+  })
+
+  it('never drops in the broad phase what the exact test would hit', () => {
+    const { h, kit } = kitHarness()
+    const rng = new Rng(99)
+    const r = (lo: number, hi: number) => lo + rng.next() * (hi - lo)
+    for (let i = 0; i < 80; i++) {
+      const flier = rng.next() < 0.4
+      h.enemies.add(r(-8, 8), r(-8, 8), ENEMY.hp, { scale: r(0.6, 4) }, flier ? r(1.5, 4.5) : r(-0.5, 0.5))
+    }
+    const gated = h.enemies.queryRadius.bind(h.enemies)
+    const all = (_c: Vec3, _r: number, out: Enemy[]) => {
+      out.length = 0
+      for (const e of h.enemies.list) out.push(e)
+      return out
+    }
+    const uids = (list: Enemy[]) => list.map((e) => e.uid).sort((a, b) => a - b)
+    const a = new THREE.Vector3()
+    const b = new THREE.Vector3()
+    const got: Enemy[] = []
+    const want: Enemy[] = []
+    let hits = 0
+    for (let i = 0; i < 400; i++) {
+      a.set(r(-6, 6), r(-1, 4), r(-6, 6))
+      b.set(a.x + r(-2, 2), a.y + r(-3, 3), a.z + r(-2, 2))
+      const size = r(0.05, 2.5)
+      const below = r(0, 2.5)
+      const above = r(0, 4.5)
+      for (const [out, query] of [
+        [got, gated],
+        [want, all],
+      ] as const) {
+        h.enemies.queryRadius = query
+        const n = i % 2 ? kit.sweep(a, b, size, null, out) : kit.inRadius(a, size, below, above, out)
+        if (out === got) hits += n
+      }
+      expect(uids(got)).toEqual(uids(want))
+    }
+    expect(hits).toBeGreaterThan(50)
+    kit.dispose()
+  })
+
+  it('reaches from the middle of a long, steep step to a flier at its far end', () => {
+    const { h, kit } = kitHarness()
+    const flier = h.enemies.add(0.1, 0, ENEMY.hp, {}, 3)
+    const out: Enemy[] = []
+    // The middle is 3 m under the flier's feet; the end of the step is within reach of them.
+    expect(kit.sweep(new THREE.Vector3(0, -1.5, 0), new THREE.Vector3(0.1, 1.5, 0), 1.2, null, out)).toBe(1)
+    expect(out[0]).toBe(flier)
+    kit.dispose()
+  })
+
+  it('asks for no more than the probe needs', () => {
+    const { h, kit } = kitHarness()
+    const out: Enemy[] = []
+    // An arrow's step: half its length plus its radius, with no fixed pad on top.
+    kit.sweep(new THREE.Vector3(5, 1, 0), new THREE.Vector3(5, 1, -0.6), 0.3, null, out)
+    expect(h.enemies.queried.at(-1)).toBeCloseTo(0.6, 5)
+    kit.inRadius(new THREE.Vector3(), 4, 2, 3, out)
+    expect(h.enemies.queried.at(-1)).toBe(4)
+    kit.dispose()
   })
 })
