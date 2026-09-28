@@ -725,8 +725,9 @@ body {
   color: #ff6070;
 }
 
+/* On touch, clear the jump/slide/interact cluster in the bottom-right corner. */
 .ui-root.touch .prompt {
-  bottom: calc(40% + var(--sab));
+  bottom: calc(228px + var(--sab));
 }
 
 .xpbar {
@@ -3357,8 +3358,9 @@ body {
     font-size: 15px;
   }
 
+  /* Landscape has room beside the buttons, so the prompt stays low. */
   .ui-root.touch .prompt {
-    bottom: calc(46% + var(--sab));
+    bottom: calc(96px + var(--sab));
   }
 
   .xpbar {
