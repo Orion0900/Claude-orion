@@ -126,14 +126,32 @@ describe('slide ramps', () => {
     }
   })
 
+  it('leaves no bank around a lane too steep to walk up', () => {
+    const walkable = Math.cos(50 * deg)
+    for (const f of maps) {
+      for (const r of f.ramps) {
+        const fp = rampFootprint(r)
+        for (let u = -RAMP_SHAPE.deck - r.backBlend; u <= r.length + RAMP_SHAPE.runout + RAMP_SHAPE.frontBlend; u += 1) {
+          for (let v = -fp.half; v <= fp.half; v += 1) {
+            const x = r.x + r.dx * u - r.dz * v
+            const z = r.z + r.dz * u + r.dx * v
+            if (laneDistance(r, x, z) > 0) expect(f.flatness(x, z)).toBeGreaterThan(walkable)
+          }
+        }
+      }
+    }
+  })
+
   it('keeps every ramp out of the start clearing and off the rim, and apart from the others', () => {
     for (const f of maps) {
       for (const r of f.ramps) {
         const fp = rampFootprint(r)
-        expect(segmentPointDistance(fp.ax, fp.az, fp.bx, fp.bz, 0, 0) - fp.half).toBeGreaterThanOrEqual(TERRAIN_SHAPE.startRadius + TERRAIN_SHAPE.startBlend)
+        // Blends widened for walkable banks may reach into the start's own blend, never its flat.
+        expect(segmentPointDistance(fp.ax, fp.az, fp.bx, fp.bz, 0, 0) - fp.half).toBeGreaterThan(TERRAIN_SHAPE.startRadius + 3)
         expect(laneDistance(r, 0, 0)).toBeGreaterThanOrEqual(TERRAIN_SHAPE.startRadius + TERRAIN_SHAPE.startBlend + RAMP_SHAPE.sideBlend - 1e-6)
-        for (const [x, z] of [[fp.ax, fp.az], [fp.bx, fp.bz]]) {
-          expect(Math.max(Math.abs(x), Math.abs(z))).toBeLessThan(TERRAIN_SHAPE.rimStart)
+        // The lane itself ends well inside the rim.
+        for (const u of [-RAMP_SHAPE.deck, r.length + RAMP_SHAPE.runout]) {
+          expect(Math.max(Math.abs(r.x + r.dx * u), Math.abs(r.z + r.dz * u))).toBeLessThan(TERRAIN_SHAPE.rimStart - 10)
         }
         for (const other of f.ramps) {
           if (other === r) continue

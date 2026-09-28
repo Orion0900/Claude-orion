@@ -2,8 +2,8 @@ import type { Vector3 } from 'three'
 import { Rng } from '../core/rng'
 import { STAGES } from '../data/stages'
 import { laneDistance } from './ramps'
-import { SPOT_CLEARANCE, SPOT_RAMP_CLEAR, SPOT_RULES, placeSpots } from './spots'
-import { generateTerrain } from './terrain'
+import { SPOT_CLEARANCE, SPOT_PADS, SPOT_RAMP_CLEAR, SPOT_RULES, padRimFits, placeSpots } from './spots'
+import { generateTerrain, HeightField } from './terrain'
 
 const minGap = (list: readonly Vector3[]): number => {
   let min = Infinity
@@ -85,6 +85,20 @@ describe('placeSpots', () => {
     }
   })
 
+  it('leaves every levelled pad with a rim a player can walk up', () => {
+    const walkable = Math.cos((50 * Math.PI) / 180)
+    for (const { spots, field } of layouts) {
+      const pads = [{ p: spots.altar, pad: SPOT_PADS.altar }, ...spots.shrines.map((p) => ({ p, pad: SPOT_PADS.shrine }))]
+      for (const { p, pad } of pads) {
+        for (let r = pad.radius; r <= pad.radius + pad.blend + 1; r += 0.5) {
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 16) {
+            expect(field.flatness(p.x + Math.cos(a) * r, p.z + Math.sin(a) * r)).toBeGreaterThan(walkable)
+          }
+        }
+      }
+    }
+  })
+
   it('is deterministic for the same seed and terrain', () => {
     const stage = STAGES[1]
     const a = placeSpots(generateTerrain(stage.terrain), new Rng(5))
@@ -93,5 +107,34 @@ describe('placeSpots', () => {
     expect(a.altar.toArray()).toEqual(b.altar.toArray())
     const c = placeSpots(generateTerrain(stage.terrain), new Rng(6))
     expect(c.chests.map((p) => p.toArray())).not.toEqual(a.chests.map((p) => p.toArray()))
+  })
+})
+
+describe('padRimFits', () => {
+  const pad = SPOT_PADS.shrine
+  const field = (height: (x: number, z: number) => number) => {
+    const f = new HeightField(20, 1)
+    for (let j = 0; j < f.size; j++) for (let i = 0; i < f.size; i++) f.heights[j * f.size + i] = height(f.coord(i), f.coord(j))
+    return f
+  }
+
+  it('takes flat ground and gentle slopes', () => {
+    expect(padRimFits(field(() => 3), 0, 0, pad, SPOT_RULES.padRim)).toBe(true)
+    expect(padRimFits(field((x) => 0.2 * x), 0, 0, pad, SPOT_RULES.padRim)).toBe(true)
+  })
+
+  it('refuses a spot whose levelled pad would end in a bank too steep to walk up', () => {
+    const steepest = (f: HeightField) => {
+      let min = 1
+      for (let x = -10; x <= 10; x += 0.25) for (let z = -10; z <= 10; z += 0.25) min = Math.min(min, f.flatness(x, z))
+      return Math.acos(min) / (Math.PI / 180)
+    }
+    // Walkable as it stands (a 45° bank a few metres off, or a 3 m hollow), but not once the pad cuts in.
+    for (const height of [(x: number) => Math.max(0, x - 3.5), (x: number, z: number) => -0.8 * Math.max(0, Math.hypot(x, z) - 3.4)]) {
+      const f = field(height)
+      expect(padRimFits(f, 0, 0, pad, SPOT_RULES.padRim)).toBe(false)
+      f.flatten(0, 0, pad.radius, pad.blend)
+      expect(steepest(f)).toBeGreaterThan(47)
+    }
   })
 })

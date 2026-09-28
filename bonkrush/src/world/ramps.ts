@@ -7,7 +7,8 @@ import { smoothstep } from './noise'
  * places where a slide reliably runs up to 3–4× speed: a flat deck to start
  * from, a 30–40 m face at 15–25° and a flat run-out. The face eases in at
  * the lip and out at the foot, so a fast slide neither launches off the top
- * nor slams into the bottom.
+ * nor slams into the bottom, and the ground around the lane blends back
+ * into the hills no steeper than a player can walk.
  *
  * A ramp is described in its own frame: `u` metres downhill from the lip
  * (negative on the deck), `v` metres across the lane.
@@ -25,6 +26,13 @@ export interface SlideRamp {
   angle: number
   /** Height of the deck. */
   top: number
+  /**
+   * How far the ramp blends back into the hills to each side and behind the
+   * deck, metres: wider where the lane cuts deep into (or stands proud of)
+   * the hills, so the banks around it stay walkable.
+   */
+  sideBlend: number
+  backBlend: number
 }
 
 export const RAMP_SHAPE = {
@@ -38,7 +46,10 @@ export const RAMP_SHAPE = {
   halfWidth: 4.5,
   /** The lane is dished this much at its edges, so a slide stays in it. */
   bank: 0.5,
-  /** How far the ramp blends back into the hills to each side, behind the deck and past the run-out. */
+  /**
+   * How far the ramp blends back into the hills to each side and behind the
+   * deck (at the least; see `RAMP_RULES.maxBank`), and past the run-out.
+   */
   sideBlend: 6,
   backBlend: 10,
   frontBlend: 10,
@@ -53,15 +64,24 @@ export const RAMP_RULES = {
   angle: [18, 23] as readonly [number, number],
   /** Everything a ramp touches stays inside this square (where the rim has barely begun)... */
   limit: 76,
-  /** ...and outside the flat start and its blend. */
+  /** ...and outside the flat start and its blend... */
   startClear: 22,
+  /** ...though blends widened for walkable banks may reach this much further (never into the flat start). */
+  blendSlack: 6,
   /** Room between two ramps' footprints, and between their middles. */
   gap: 6,
   spread: 40,
   /** Candidates tried; the ones that fit the hills best win. */
-  candidates: 1500,
+  candidates: 2500,
   /** A ramp may not stand prouder of, or sink deeper into, the natural ground than this. */
   maxMisfit: 6,
+  /**
+   * Steepest ground a ramp's blend may leave, degrees (walking tops out at
+   * 50°); the side and back blends widen in steps until it holds, up to
+   * `maxBlend` times their least.
+   */
+  maxBank: 47,
+  maxBlend: 2,
 }
 
 /** Metres the face has dropped `u` metres past the lip: 0 on the deck, the full drop at the foot and beyond. */
@@ -97,10 +117,10 @@ export function rampWeight(r: SlideRamp, u: number, v: number): number {
   const back = -s.deck
   const front = r.length + s.runout
   let wu = 1
-  if (u < back) wu = 1 - smoothstep(0, s.backBlend, back - u)
+  if (u < back) wu = 1 - smoothstep(0, r.backBlend, back - u)
   else if (u > front) wu = 1 - smoothstep(0, s.frontBlend, u - front)
   const side = Math.abs(v) - s.halfWidth
-  const wv = side <= 0 ? 1 : 1 - smoothstep(0, s.sideBlend, side)
+  const wv = side <= 0 ? 1 : 1 - smoothstep(0, r.sideBlend, side)
   return wu * wv
 }
 
@@ -135,14 +155,14 @@ export function nearRamp(ramps: readonly SlideRamp[], x: number, z: number, marg
 /** The footprint (everything the ramp changes) as a centre-line segment and a half-width. */
 export function rampFootprint(r: SlideRamp): { ax: number; az: number; bx: number; bz: number; half: number } {
   const s = RAMP_SHAPE
-  const back = -s.deck - s.backBlend
+  const back = -s.deck - r.backBlend
   const front = r.length + s.runout + s.frontBlend
   return {
     ax: r.x + r.dx * back,
     az: r.z + r.dz * back,
     bx: r.x + r.dx * front,
     bz: r.z + r.dz * front,
-    half: s.halfWidth + s.sideBlend,
+    half: s.halfWidth + r.sideBlend,
   }
 }
 
@@ -151,13 +171,14 @@ export function rampFootprint(r: SlideRamp): { ax: number; az: number; bx: numbe
  * random lanes that keep clear of the start and the rim; each one's deck
  * height is fitted to the hills under it, and the lanes that fit best (the
  * least earthwork, so they follow a natural slope) win, spread out over the
- * map. Deterministic for a seed.
+ * map, as long as their blends can be made walkable. Deterministic for a seed.
  */
 export function planRamps(heightAt: (x: number, z: number) => number, seed: number, rules = RAMP_RULES): SlideRamp[] {
   const rng = new Rng((seed ^ 0x51a1de) >>> 0)
   const s = RAMP_SHAPE
   const deg = Math.PI / 180
-  const candidates: Array<{ ramp: SlideRamp; misfit: number }> = []
+  // The blends are fitted when a candidate is first considered; `blend` says whether they could be.
+  const candidates: Array<{ ramp: SlideRamp; misfit: number; blend?: boolean }> = []
 
   for (let n = 0; n < rules.candidates; n++) {
     const length = rng.range(rules.length[0], rules.length[1])
@@ -169,7 +190,7 @@ export function planRamps(heightAt: (x: number, z: number) => number, seed: numb
     const dz = Math.sin(yaw)
     // Centre the whole footprint on (cx, cz).
     const mid = (-s.deck - s.backBlend + length + s.runout + s.frontBlend) / 2
-    const ramp: SlideRamp = { x: cx - dx * mid, z: cz - dz * mid, dx, dz, length, angle, top: 0 }
+    const ramp: SlideRamp = { x: cx - dx * mid, z: cz - dz * mid, dx, dz, length, angle, top: 0, sideBlend: s.sideBlend, backBlend: s.backBlend }
     if (!fitsMap(ramp, rules)) continue
 
     // Least-squares deck height against the ground along the middle and both edges of the lane.
@@ -206,17 +227,64 @@ export function planRamps(heightAt: (x: number, z: number) => number, seed: numb
   const picked: SlideRamp[] = []
   // Spread them out first; if the map is too cramped for that, settle for not overlapping.
   for (const spread of [rules.spread, 0]) {
+    const roomFor = (r: SlideRamp) => picked.every((p) => apart(p, r, rules.gap, spread))
     for (const c of candidates) {
       if (picked.length >= want) break
-      if (picked.includes(c.ramp)) continue
-      if (picked.every((p) => apart(p, c.ramp, rules.gap, spread))) picked.push(c.ramp)
+      if (picked.includes(c.ramp) || c.blend === false || !roomFor(c.ramp)) continue
+      // Fitting the banks is the costly part, so only lanes with room get that far; wider blends need more room.
+      if (c.blend === undefined) c.blend = fitBlend(c.ramp, heightAt, rules) && fitsMap(c.ramp, rules, rules.blendSlack)
+      if (c.blend && roomFor(c.ramp)) picked.push(c.ramp)
     }
   }
   return picked
 }
 
-/** Whether a ramp's whole footprint stays inside the square and out of the start clearing. */
-function fitsMap(r: SlideRamp, rules: typeof RAMP_RULES): boolean {
+/**
+ * Widens the ramp's side and back blends (from their least, up to
+ * `maxBlend` times that) until no ground around the lane is steeper than
+ * `maxBank`, or than the hills already were there. False if none does.
+ */
+function fitBlend(r: SlideRamp, heightAt: (x: number, z: number) => number, rules: typeof RAMP_RULES): boolean {
+  const limit = Math.tan((rules.maxBank * Math.PI) / 180)
+  const holds = (k: number) => {
+    r.sideBlend = RAMP_SHAPE.sideBlend * k
+    r.backBlend = RAMP_SHAPE.backBlend * k
+    return banksHold(r, heightAt, limit)
+  }
+  // Most lanes need no widening, and a lane the widest blend can't tame is dropped at once.
+  if (holds(1)) return true
+  if (!holds(rules.maxBlend)) return false
+  for (let k = 1.25; k < rules.maxBlend; k += 0.25) if (holds(k)) return true
+  return holds(rules.maxBlend)
+}
+
+/** Whether every sampled point of the ramp's blend (its footprint off the lane) is at most `limit` steep, or no steeper than the ground was. */
+function banksHold(r: SlideRamp, heightAt: (x: number, z: number) => number, limit: number): boolean {
+  const s = RAMP_SHAPE
+  const e = 0.5
+  const blended = (x: number, z: number) => rampHeight(r, x, z, heightAt(x, z))
+  const gradient = (fn: (x: number, z: number) => number, x: number, z: number) =>
+    Math.hypot(fn(x + e, z) - fn(x - e, z), fn(x, z + e) - fn(x, z - e)) / (2 * e)
+  const u0 = -s.deck - r.backBlend
+  const u1 = r.length + s.runout + s.frontBlend
+  const half = s.halfWidth + r.sideBlend
+  // A blend is at least 6 m wide and smooth, so a sample every metre or two finds its steepest.
+  const across = r.sideBlend / 6
+  for (let u = u0; u <= u1; u += 1.5) {
+    const onLane = u >= -s.deck && u <= r.length + s.runout
+    for (let v = -half; v <= half; v += across) {
+      if (onLane && Math.abs(v) < s.halfWidth) continue
+      const x = r.x + r.dx * u - r.dz * v
+      const z = r.z + r.dz * u + r.dx * v
+      const g = gradient(blended, x, z)
+      if (g > limit && g > gradient(heightAt, x, z) + 0.02) return false
+    }
+  }
+  return true
+}
+
+/** Whether a ramp's whole footprint stays inside the square and out of the start clearing, give or take `slack`. */
+function fitsMap(r: SlideRamp, rules: typeof RAMP_RULES, slack = 0): boolean {
   const f = rampFootprint(r)
   // The footprint is a rectangle around the segment; its corners bound it.
   const px = -r.dz * f.half
@@ -227,9 +295,9 @@ function fitsMap(r: SlideRamp, rules: typeof RAMP_RULES): boolean {
     [f.bx + px, f.bz + pz],
     [f.bx - px, f.bz - pz],
   ]) {
-    if (Math.abs(x) > rules.limit || Math.abs(z) > rules.limit) return false
+    if (Math.abs(x) > rules.limit + slack || Math.abs(z) > rules.limit + slack) return false
   }
-  return segmentPointDistance(f.ax, f.az, f.bx, f.bz, 0, 0) - f.half >= rules.startClear
+  return segmentPointDistance(f.ax, f.az, f.bx, f.bz, 0, 0) - f.half >= rules.startClear - slack
 }
 
 function apart(a: SlideRamp, b: SlideRamp, gap: number, spread: number): boolean {

@@ -3,8 +3,11 @@ import type { StageDef } from '../game/types'
 import { PLAY_LIMIT, type ColliderGrid } from './colliders'
 import { buildCliffRock, buildPropModel, TUMBLEWEED_RADIUS } from './models'
 import { hash2 } from './noise'
+import { blocksSight, measureProfile, placedReach, sightMargin, type PlacedProfile, type Profile, type Sightline } from './occlusion'
 import type { PropGroup, PropInstance } from './scatter'
 import type { HeightField } from './terrain'
+
+type XYZ = { readonly x: number; readonly y: number; readonly z: number }
 
 /** Emissive strength of each glowing kind, and how hard it flickers (0 = steady pulse). */
 const GLOW_STYLE: Record<string, { intensity: number; flicker: number }> = {
@@ -36,14 +39,16 @@ const SHADOW_TILES = 4
 const SEE_THROUGH = 0.7
 /** Seconds a prop takes to fade out of the way, or back in. */
 export const FADE_TIME = 0.15
-/**
- * Clearance kept around the camera→player line, widening toward the lens,
- * since anything that close to the camera fills the screen.
- */
-const LINE_MARGIN = 0.25
-const LENS_MARGIN = 0.8
-/** The line may pass this far over a prop's top and still count as blocked (its silhouette is lumpy). */
-const TOP_MARGIN = 0.2
+/** The part of the player the camera must see, metres above the feet. */
+const SIGHT_LOW = 0.3
+const SIGHT_HIGH = 1.7
+/** Room kept clear either side of the view (about the player's half-width)... */
+const LINE_MARGIN = 0.3
+/** ...and near the lens, whatever is in view (a cone about 90° wide) over the first couple of metres. */
+const LENS_SPREAD = 1
+const LENS_REACH = 2.5
+/** Most props of one batch that can be see-through at once; a crowd past that just stays solid. */
+export const FADE_SLOTS = 24
 
 const BAYER_4X4 = '0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.'
 
@@ -52,25 +57,21 @@ const BAYER_4X4 = '0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 
  * `aFade` (0 = solid, 1 = faded), and a faded instance discards pixels by
  * a 4×4 ordered dither. Cut-out pixels write no depth, so whatever is behind
  * shows through; the shadow pass uses its own material, so shadows stay.
+ * A `discard` anywhere in a shader costs the GPU its early depth test, so
+ * only the small see-through meshes use these materials.
  */
 function addFade(shader: { vertexShader: string; fragmentShader: string }): void {
   shader.vertexShader = shader.vertexShader
     .replace(
       '#include <common>',
       `#include <common>
-      #ifdef USE_INSTANCING
-        attribute float aFade;
-      #endif
+      attribute float aFade;
       varying float vFade;`,
     )
     .replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
-      #ifdef USE_INSTANCING
-        vFade = aFade;
-      #else
-        vFade = 0.0;
-      #endif`,
+      vFade = aFade;`,
     )
   shader.fragmentShader = shader.fragmentShader
     .replace(
@@ -81,15 +82,16 @@ function addFade(shader: { vertexShader: string; fragmentShader: string }): void
     )
     .replace(
       '#include <clipping_planes_fragment>',
-      `if (vFade > 0.0) {
-        ivec2 cell = ivec2(mod(gl_FragCoord.xy, 4.0));
-        if ((BAYER_4X4[cell.x + cell.y * 4] + 0.5) / 16.0 < vFade * ${SEE_THROUGH.toFixed(3)}) discard;
+      `{
+        ivec2 bayerCell = ivec2(mod(gl_FragCoord.xy, 4.0));
+        if ((BAYER_4X4[bayerCell.x + bayerCell.y * 4] + 0.5) / 16.0 < vFade * ${SEE_THROUGH.toFixed(3)}) discard;
       }
       #include <clipping_planes_fragment>`,
     )
 }
 
-function fadeMaterial<T extends THREE.Material>(mat: T): T {
+/** Gives a plain prop material the see-through dither. */
+function seeThrough<T extends THREE.Material>(mat: T): T {
   mat.onBeforeCompile = addFade
   mat.customProgramCacheKey = () => 'bonk-prop-fade'
   return mat
@@ -112,22 +114,34 @@ class PropTile extends THREE.InstancedMesh {
   }
 }
 
+/**
+ * The see-through copies of one batch: while a solid is in the way it is
+ * hidden in its tile (scaled to nothing) and drawn here instead, with the
+ * dithering material, until it has faded back in.
+ */
+interface FadeBatch {
+  body: THREE.InstancedMesh
+  glow: THREE.InstancedMesh | null
+  /** Shared by body and glow, so a crypt's windows fade with its walls. */
+  fade: THREE.InstancedBufferAttribute
+  /** The solid in each slot. */
+  ids: Int32Array
+  used: number
+}
+
+/** A solid prop that can fade: where it stands, its shape, and where it is drawn. */
+interface Solid extends PlacedProfile {
+  batch: FadeBatch
+  tile: PropTile
+  glowTile: PropTile | null
+  /** Its instance in the tile (and the glow tile). */
+  slot: number
+  /** Its slot in the batch's see-through meshes, or -1. */
+  fadeSlot: number
+}
+
 /** Swaying tops reach a little past their rest pose. */
 const SWAY_MARGIN = 0.3
-
-/** Widest reach from the model's own axis and its highest point, metres at scale 1. */
-function measure(geo: THREE.BufferGeometry): { radius: number; top: number } {
-  const pos = geo.getAttribute('position')
-  let r2 = 0
-  let top = 0
-  for (let v = 0; v < pos.count; v++) {
-    const x = pos.getX(v)
-    const z = pos.getZ(v)
-    r2 = Math.max(r2, x * x + z * z)
-    top = Math.max(top, pos.getY(v))
-  }
-  return { radius: Math.sqrt(r2), top }
-}
 
 function triangles(geo: THREE.BufferGeometry): number {
   return (geo.index ? geo.index.count : geo.getAttribute('position').count) / 3
@@ -145,20 +159,20 @@ export class PropLayer {
   private readonly meshes: THREE.InstancedMesh[] = []
   private readonly geometries: THREE.BufferGeometry[] = []
   private readonly materials: THREE.Material[] = []
-  private readonly solidMat = this.own(fadeMaterial(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })))
-  private readonly swayMats = new Map<number, THREE.MeshLambertMaterial>()
+  private readonly solidMat = this.own(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }))
+  private readonly swayMats = new Map<string, THREE.MeshLambertMaterial>()
   private readonly swayTime = { value: 0 }
-  private readonly flickers: Array<{ mat: THREE.MeshLambertMaterial; base: number; flicker: number; phase: number }> = []
+  private readonly flickers: Array<{ mats: THREE.MeshLambertMaterial[]; base: number; flicker: number; phase: number }> = []
+  /** Each prop material's see-through twin, and how to make it. */
+  private readonly twins = new Map<THREE.Material, THREE.Material>()
+  private readonly twinMakers = new Map<THREE.Material, () => THREE.Material>([
+    [this.solidMat, () => this.own(seeThrough(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })))],
+  ])
   private tumble: Tumbleweeds | null = null
   private time = 0
 
-  /** See-through state per solid, indexed like the collider grid. */
-  private readonly fadeAttr: Array<THREE.InstancedBufferAttribute | undefined>
-  private readonly fadeSlot: Int32Array
-  private readonly fadeX: Float32Array
-  private readonly fadeZ: Float32Array
-  private readonly fadeR: Float32Array
-  private readonly fadeTop: Float32Array
+  /** Every solid that can fade, indexed like the collider grid. */
+  private readonly solids: Array<Solid | undefined>
   private readonly fade: Float32Array
   /** The frame each solid was last found in the way. */
   private readonly wanted: Int32Array
@@ -166,6 +180,7 @@ export class PropLayer {
   private readonly fading: number[] = []
   private readonly isFading: Uint8Array
   private readonly hits: number[] = []
+  private readonly sight: Sightline = { ex: 0, ey: 0, ez: 0, px: 0, pz: 0, low: 0, high: 0 }
   /** How far any solid's silhouette reaches past its collider. */
   private overhang = 0
   private frame = 0
@@ -187,16 +202,11 @@ export class PropLayer {
     /** The sun's shadow frustum (`LightShadow.getFrustum()`); without it casters shadow from their visible tiles. */
     private readonly shadowFrustum: THREE.Frustum | null = null,
   ) {
-    const solids = colliders?.count ?? 0
-    this.fadeAttr = new Array(solids)
-    this.fadeSlot = new Int32Array(solids)
-    this.fadeX = new Float32Array(solids)
-    this.fadeZ = new Float32Array(solids)
-    this.fadeR = new Float32Array(solids)
-    this.fadeTop = new Float32Array(solids)
-    this.fade = new Float32Array(solids)
-    this.wanted = new Int32Array(solids)
-    this.isFading = new Uint8Array(solids)
+    const count = colliders?.count ?? 0
+    this.solids = new Array(count)
+    this.fade = new Float32Array(count)
+    this.wanted = new Int32Array(count)
+    this.isFading = new Uint8Array(count)
 
     // Rocks and walls take on the stage's stone colour, lightened a little so they read against the cliffs.
     const stone = new THREE.Color(palette.cliff).lerp(new THREE.Color('#9a9aa2'), 0.4).multiplyScalar(1.15)
@@ -218,7 +228,7 @@ export class PropLayer {
         if (list.length === 0) continue
         const model = buildPropModel(group.kind, v)
         this.geometries.push(model.body)
-        const mat = group.spec.sway > 0 ? this.swayMaterial(group.spec.sway) : this.solidMat
+        const mat = group.spec.sway > 0 ? this.swayMaterial(group.spec.sway, false) : this.solidMat
         const tint = group.spec.tint === 'cliff' ? stone : null
         let glow: { geo: THREE.BufferGeometry; mat: THREE.Material } | null = null
         if (model.glow) {
@@ -244,34 +254,37 @@ export class PropLayer {
       const wobble = f.flicker > 0
         ? 0.12 * Math.sin(t * 11 + f.phase) + 0.07 * Math.sin(t * 27.3 + f.phase * 2.1) + 0.04 * Math.sin(t * 5.1)
         : 0.15 * Math.sin(t * 1.3 + f.phase)
-      f.mat.emissiveIntensity = f.base * (1 + wobble * (f.flicker > 0 ? f.flicker : 1))
+      const intensity = f.base * (1 + wobble * (f.flicker > 0 ? f.flicker : 1))
+      for (const mat of f.mats) mat.emissiveIntensity = intensity
     }
     this.tumble?.update(dt)
   }
 
   /**
    * Fades the solid props standing between the camera (`eye`) and the
-   * player (`focus`, about chest height) and eases everything else back in.
-   * With no eye or focus (the title screen) everything eases back in.
-   * Only the collider cells along the line are looked at.
+   * player's body (from `SIGHT_LOW` to `SIGHT_HIGH` over `feet`) and eases
+   * everything else back in. With no eye or feet (the title screen)
+   * everything eases back in. Only the collider cells along the view are
+   * looked at.
    */
-  updateOcclusion(dt: number, eye: THREE.Vector3 | null, focus: THREE.Vector3 | null): void {
+  updateOcclusion(dt: number, eye: XYZ | null, feet: XYZ | null): void {
     const frame = ++this.frame
-    if (eye && focus && this.colliders) this.markOccluders(eye, focus, frame)
+    if (eye && feet && this.colliders) this.markOccluders(eye, feet, frame)
     const step = dt / FADE_TIME
     const list = this.fading
     for (let n = list.length - 1; n >= 0; n--) {
       const id = list[n]
+      const solid = this.solids[id]!
       const target = this.wanted[id] === frame ? 1 : 0
       const was = this.fade[id]
       const now = target === 1 ? Math.min(1, was + step) : Math.max(0, was - step)
       if (now !== was) {
         this.fade[id] = now
-        const attr = this.fadeAttr[id]!
-        attr.array[this.fadeSlot[id]] = now
-        attr.needsUpdate = true
+        solid.batch.fade.array[solid.fadeSlot] = now
+        solid.batch.fade.needsUpdate = true
       }
       if (now === 0 && target === 0) {
+        this.restore(solid)
         list[n] = list[list.length - 1]
         list.pop()
         this.isFading[id] = 0
@@ -296,40 +309,101 @@ export class PropLayer {
     this.geometries.length = 0
     this.materials.length = 0
     this.swayMats.clear()
+    this.twins.clear()
+    this.twinMakers.clear()
     this.flickers.length = 0
     this.fading.length = 0
     this.tumble = null
   }
 
-  private markOccluders(eye: THREE.Vector3, focus: THREE.Vector3, frame: number): void {
-    const ax = eye.x
-    const az = eye.z
-    const ex = focus.x - ax
-    const ez = focus.z - az
-    const len2 = ex * ex + ez * ez
-    const hits = this.colliders!.querySegment(ax, az, focus.x, focus.z, this.overhang + LINE_MARGIN + LENS_MARGIN, this.hits)
-    for (const id of hits) {
-      if (!this.fadeAttr[id]) continue
-      const cx = this.fadeX[id]
-      const cz = this.fadeZ[id]
-      const t = len2 > 1e-8 ? Math.max(0, Math.min(1, ((cx - ax) * ex + (cz - az) * ez) / len2)) : 0
-      const dx = ax + ex * t - cx
-      const dz = az + ez * t - cz
-      const reach = this.fadeR[id] + LINE_MARGIN + LENS_MARGIN * (1 - t)
-      if (dx * dx + dz * dz > reach * reach) continue
-      // The view passes over anything whose top is below the line there.
-      if (eye.y + (focus.y - eye.y) * t > this.fadeTop[id] + TOP_MARGIN) continue
-      this.wanted[id] = frame
+  private markOccluders(eye: XYZ, feet: XYZ, frame: number): void {
+    const s = this.sight
+    s.ex = eye.x
+    s.ey = eye.y
+    s.ez = eye.z
+    s.px = feet.x
+    s.pz = feet.z
+    s.low = feet.y + SIGHT_LOW
+    s.high = feet.y + SIGHT_HIGH
+    const pad = this.overhang + sightMargin(LENS_REACH / 2, LINE_MARGIN, LENS_SPREAD, LENS_REACH)
+    for (const id of this.colliders!.querySegment(s.ex, s.ez, s.px, s.pz, pad, this.hits)) {
+      const solid = this.solids[id]
+      if (!solid || !blocksSight(solid, s, LINE_MARGIN, LENS_SPREAD, LENS_REACH)) continue
       if (!this.isFading[id]) {
+        // A batch with every see-through slot taken leaves the rest solid.
+        if (!this.hide(solid, id)) continue
         this.isFading[id] = 1
         this.fading.push(id)
       }
+      this.wanted[id] = frame
+    }
+  }
+
+  /** Moves a solid from its tile into its batch's see-through meshes. */
+  private hide(solid: Solid, id: number): boolean {
+    const batch = solid.batch
+    if (batch.used >= batch.ids.length) return false
+    const k = batch.used++
+    batch.ids[k] = id
+    solid.fadeSlot = k
+    batch.fade.array[k] = 0
+    batch.fade.needsUpdate = true
+    this.moveInstance(solid.tile, solid.slot, batch.body, k, true)
+    if (solid.glowTile && batch.glow) this.moveInstance(solid.glowTile, solid.slot, batch.glow, k, false)
+    this.showBatch(batch)
+    return true
+  }
+
+  /** Puts a solid that has faded back in back in its tile, and closes the gap in its batch. */
+  private restore(solid: Solid): void {
+    const batch = solid.batch
+    const k = solid.fadeSlot
+    const last = --batch.used
+    this.moveInstance(batch.body, k, solid.tile, solid.slot, false)
+    if (solid.glowTile && batch.glow) this.moveInstance(batch.glow, k, solid.glowTile, solid.slot, false)
+    if (k !== last) {
+      const moved = this.solids[batch.ids[last]]!
+      this.moveInstance(batch.body, last, batch.body, k, true)
+      if (batch.glow) this.moveInstance(batch.glow, last, batch.glow, k, false)
+      batch.fade.array[k] = batch.fade.array[last]
+      batch.fade.needsUpdate = true
+      batch.ids[k] = batch.ids[last]
+      moved.fadeSlot = k
+    }
+    solid.fadeSlot = -1
+    this.showBatch(batch)
+  }
+
+  /** Copies instance `from` of one mesh to instance `to` of another (with its colour when asked) and hides the original. */
+  private moveInstance(src: THREE.InstancedMesh, from: number, dst: THREE.InstancedMesh, to: number, colour: boolean): void {
+    src.getMatrixAt(from, this.m)
+    dst.setMatrixAt(to, this.m)
+    touch(dst.instanceMatrix, to * 16, 16)
+    if (colour && src.instanceColor && dst.instanceColor) {
+      src.getColorAt(from, this.c)
+      dst.setColorAt(to, this.c)
+      touch(dst.instanceColor, to * 3, 3)
+    }
+    // Scaled to nothing where it stands, so it draws no pixels (the sway still reads its position).
+    this.m.decompose(this.p, this.q, this.s)
+    src.setMatrixAt(from, this.m.compose(this.p, this.q, this.s.setScalar(0)))
+    touch(src.instanceMatrix, from * 16, 16)
+  }
+
+  private showBatch(batch: FadeBatch): void {
+    batch.body.count = batch.used
+    batch.body.visible = batch.used > 0
+    if (batch.glow) {
+      batch.glow.count = batch.used
+      batch.glow.visible = batch.used > 0
     }
   }
 
   /**
    * Draws `list` as one InstancedMesh per map tile it touches, plus the
-   * glow part's. Solids (props with a collider) get a see-through slot.
+   * glow part's. Solids (props with a collider) can fade: they share a
+   * batch of see-through meshes, built now (hidden) so the shader prewarm
+   * compiles their materials.
    */
   private addBatch(
     body: THREE.BufferGeometry,
@@ -340,34 +414,67 @@ export class PropLayer {
     glow: { geo: THREE.BufferGeometry; mat: THREE.Material } | null,
     colliderRadius: number,
   ): void {
-    const shape = measure(body)
     const tiles = tilesFor(triangles(body) * list.length)
     const shadowTiles = castShadow && this.shadowFrustum ? tiles.shadow : 0
+    const viewCasts = castShadow && shadowTiles === 0
     for (const tile of this.split(list, shadowTiles)) {
       const mesh = this.instanced(body, mat, tile.length, true)
       mesh.shadowOnly = this.shadowFrustum
       // Coloured like the visible tiles, so the prewarm compiles no extra program for them.
       this.fill(mesh, tile, tint)
     }
-    for (const tile of this.split(list, tiles.view)) {
-      // Body and glow share one fade attribute, so a crypt's windows fade with its walls.
-      const fade = new THREE.InstancedBufferAttribute(new Float32Array(tile.length), 1)
-      this.fill(this.instanced(body, mat, tile.length, castShadow && shadowTiles === 0, fade), tile, tint)
+
+    const solid = (inst: PropInstance) => inst.collider !== undefined && inst.collider >= 0 && inst.collider < this.solids.length
+    let batch: FadeBatch | null = null
+    let profile: Profile | null = null
+    if (this.colliders && list.some(solid)) {
+      profile = measureProfile(body)
+      const fade = new THREE.InstancedBufferAttribute(new Float32Array(FADE_SLOTS), 1)
+      const see = this.instanced(body, this.twin(mat), FADE_SLOTS, viewCasts, fade)
+      see.frustumCulled = false
+      // Colour slots exist from the start, so the program compiled now is the one used later.
+      for (let k = 0; k < FADE_SLOTS; k++) see.setColorAt(k, this.c.setScalar(1))
+      let seeGlow: THREE.InstancedMesh | null = null
       if (glow) {
-        const glowMesh = this.instanced(glow.geo, glow.mat, tile.length, false, fade)
+        seeGlow = this.instanced(glow.geo, this.twin(glow.mat), FADE_SLOTS, false, fade)
+        seeGlow.receiveShadow = false
+        seeGlow.frustumCulled = false
+      }
+      batch = { body: see, glow: seeGlow, fade, ids: new Int32Array(FADE_SLOTS), used: 0 }
+      this.showBatch(batch)
+    }
+
+    for (const tile of this.split(list, tiles.view)) {
+      const mesh = this.instanced(body, mat, tile.length, viewCasts)
+      this.fill(mesh, tile, tint)
+      let glowMesh: PropTile | null = null
+      if (glow) {
+        glowMesh = this.instanced(glow.geo, glow.mat, tile.length, false)
         glowMesh.receiveShadow = false
         this.fill(glowMesh, tile, null, false)
       }
+      if (!batch || !profile) continue
       tile.forEach((inst, i) => {
-        const id = inst.collider
-        if (id === undefined || id < 0 || id >= this.fadeAttr.length) return
-        this.fadeAttr[id] = fade
-        this.fadeSlot[id] = i
-        this.fadeX[id] = inst.x
-        this.fadeZ[id] = inst.z
-        this.fadeR[id] = shape.radius * Math.max(inst.sx, inst.sz)
-        this.fadeTop[id] = inst.y + shape.top * inst.sy
-        this.overhang = Math.max(this.overhang, this.fadeR[id] - colliderRadius * inst.scale)
+        if (!solid(inst)) return
+        const placed: Solid = {
+          profile: profile!,
+          x: inst.x,
+          y: inst.y,
+          z: inst.z,
+          sx: inst.sx,
+          sy: inst.sy,
+          sz: inst.sz,
+          cos: Math.cos(inst.yaw),
+          sin: Math.sin(inst.yaw),
+          lean: Math.sin(Math.min(Math.PI / 2, Math.hypot(inst.leanX, inst.leanZ))),
+          batch: batch!,
+          tile: mesh,
+          glowTile: glowMesh,
+          slot: i,
+          fadeSlot: -1,
+        }
+        this.solids[inst.collider!] = placed
+        this.overhang = Math.max(this.overhang, placedReach(placed) - colliderRadius * inst.scale)
       })
     }
   }
@@ -384,21 +491,17 @@ export class PropLayer {
     return buckets.filter((b) => b.length > 0)
   }
 
-  /**
-   * An InstancedMesh over a view of `source`: the vertex buffers are shared
-   * (three uploads each attribute once), but every mesh gets its own
-   * per-instance `aFade`, since the fade shader reads it on every prop.
-   */
+  /** An InstancedMesh over a view of `source`: the vertex buffers are shared, so three uploads each attribute once. */
   private instanced(
     source: THREE.BufferGeometry,
     mat: THREE.Material,
     count: number,
     castShadow: boolean,
-    fade = new THREE.InstancedBufferAttribute(new Float32Array(count), 1),
+    fade: THREE.InstancedBufferAttribute | null = null,
   ): PropTile {
     const geo = new THREE.BufferGeometry()
     for (const name of Object.keys(source.attributes)) geo.setAttribute(name, source.getAttribute(name))
-    geo.setAttribute('aFade', fade)
+    if (fade) geo.setAttribute('aFade', fade)
     geo.boundingBox = source.boundingBox?.clone() ?? null
     geo.boundingSphere = source.boundingSphere?.clone() ?? null
     const mesh = new PropTile(geo, mat, count)
@@ -430,23 +533,42 @@ export class PropLayer {
     mesh.boundingBox?.expandByScalar(SWAY_MARGIN)
   }
 
-  /** One emissive material per glowing kind and variant; each flickers on its own phase. */
+  /** The see-through twin of a prop material, made the first time a batch of solids needs it. */
+  private twin(mat: THREE.Material): THREE.Material {
+    let twin = this.twins.get(mat)
+    if (!twin) {
+      const make = this.twinMakers.get(mat)
+      if (!make) throw new Error('PropLayer: this material has no see-through twin')
+      twin = make()
+      this.twins.set(mat, twin)
+    }
+    return twin
+  }
+
+  /** One emissive material per glowing kind and variant; each flickers on its own phase, its twin in step. */
   private glowMaterial(kind: string, glow: string | undefined): THREE.MeshLambertMaterial {
     const style = GLOW_STYLE[kind] ?? { intensity: 1.2, flicker: 0 }
-    const mat = this.own(
-      fadeMaterial(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: glow ?? '#ffc05a', emissiveIntensity: style.intensity })),
-    )
-    this.flickers.push({ mat, base: style.intensity, flicker: style.flicker, phase: this.flickers.length * 2.3 })
+    const make = () => new THREE.MeshLambertMaterial({ color: 0x000000, emissive: glow ?? '#ffc05a', emissiveIntensity: style.intensity })
+    const mat = this.own(make())
+    const flicker = { mats: [mat], base: style.intensity, flicker: style.flicker, phase: this.flickers.length * 2.3 }
+    this.flickers.push(flicker)
+    this.twinMakers.set(mat, () => {
+      const twin = this.own(seeThrough(make()))
+      flicker.mats.push(twin)
+      return twin
+    })
     return mat
   }
 
   /**
    * Lambert plus a wind sway in the vertex shader: each instance leans by
    * `amount × height²`, phased by where it stands so a forest ripples
-   * instead of nodding in unison. One material per amount, sharing a clock.
+   * instead of nodding in unison. One material per amount (and one
+   * see-through twin), sharing a clock.
    */
-  private swayMaterial(amount: number): THREE.MeshLambertMaterial {
-    const cached = this.swayMats.get(amount)
+  private swayMaterial(amount: number, fades: boolean): THREE.MeshLambertMaterial {
+    const key = `${amount}|${fades}`
+    const cached = this.swayMats.get(key)
     if (cached) return cached
     const mat = this.own(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }))
     const time = this.swayTime
@@ -465,10 +587,11 @@ export class PropLayer {
         transformed.x += sin(uSwayTime * 1.3 + swayPhase) * swayK;
         transformed.z += cos(uSwayTime * 1.1 + swayPhase * 1.3) * swayK * 0.6;`,
       )
-      addFade(shader)
+      if (fades) addFade(shader)
     }
-    mat.customProgramCacheKey = () => `bonk-prop-sway-${amount}`
-    this.swayMats.set(amount, mat)
+    mat.customProgramCacheKey = () => `bonk-prop-sway-${amount}${fades ? '-fade' : ''}`
+    this.swayMats.set(key, mat)
+    if (!fades) this.twinMakers.set(mat, () => this.swayMaterial(amount, true))
     return mat
   }
 
@@ -476,6 +599,12 @@ export class PropLayer {
     this.materials.push(mat)
     return mat
   }
+}
+
+/** Marks a range of an attribute for upload; three merges the ranges and sends only those. */
+function touch(attr: THREE.BufferAttribute, start: number, count: number): void {
+  attr.addUpdateRange(start, count)
+  attr.needsUpdate = true
 }
 
 /**

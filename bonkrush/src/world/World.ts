@@ -37,8 +37,6 @@ export class World implements WorldApi {
   private readonly motes: Motes
   private readonly glow: GroundGlow
   private readonly focus = new THREE.Vector3()
-  /** Where the camera has to see: the player's chest. */
-  private readonly sightline = new THREE.Vector3()
   private disposed = false
 
   constructor(private readonly ctx: GameContext) {
@@ -109,8 +107,7 @@ export class World implements WorldApi {
     this.props.update(dt)
     // Last frame's camera is close enough; the fade eases over 0.15 s anyway.
     const eye = (this.ctx.camera as CameraApi | undefined)?.camera.position
-    const seen = valid ? this.sightline.set(at.x, at.y + 1, at.z) : null
-    this.props.updateOcclusion(dt, eye ?? null, seen)
+    this.props.updateOcclusion(dt, eye ?? null, valid ? at : null)
     this.glow.update(dt)
     this.motes.update(dt, this.focus)
   }

@@ -14,7 +14,10 @@ import {
 import { segmentPointDistance } from './colliders'
 
 const deg = Math.PI / 180
-const ramp: SlideRamp = { x: 10, z: -20, dx: 0.6, dz: 0.8, length: 35, angle: 20 * deg, top: 12 }
+const ramp: SlideRamp = {
+  x: 10, z: -20, dx: 0.6, dz: 0.8, length: 35, angle: 20 * deg, top: 12,
+  sideBlend: RAMP_SHAPE.sideBlend, backBlend: RAMP_SHAPE.backBlend,
+}
 
 describe('rampDrop', () => {
   it('is flat on the deck, eases in and out, and holds the full angle in the middle', () => {
@@ -100,14 +103,18 @@ describe('planRamps', () => {
         expect(r.length).toBeLessThanOrEqual(RAMP_RULES.length[1])
         expect(r.angle / deg).toBeGreaterThanOrEqual(RAMP_RULES.angle[0])
         expect(r.angle / deg).toBeLessThanOrEqual(RAMP_RULES.angle[1])
-        const f = rampFootprint(r)
-        expect(segmentPointDistance(f.ax, f.az, f.bx, f.bz, 0, 0) - f.half).toBeGreaterThanOrEqual(RAMP_RULES.startClear - 1e-9)
-        // The footprint rectangle's corners stay inside the square.
-        const px = -r.dz * f.half
-        const pz = r.dx * f.half
-        for (const [x, z] of [[f.ax + px, f.az + pz], [f.ax - px, f.az - pz], [f.bx + px, f.bz + pz], [f.bx - px, f.bz - pz]]) {
-          expect(Math.abs(x)).toBeLessThanOrEqual(RAMP_RULES.limit + 1e-9)
-          expect(Math.abs(z)).toBeLessThanOrEqual(RAMP_RULES.limit + 1e-9)
+        // With its least blends the footprint keeps the rules exactly; widened, within the slack.
+        const least = { ...r, sideBlend: RAMP_SHAPE.sideBlend, backBlend: RAMP_SHAPE.backBlend }
+        for (const [shape, slack] of [[least, 0], [r, RAMP_RULES.blendSlack]] as const) {
+          const f = rampFootprint(shape)
+          expect(segmentPointDistance(f.ax, f.az, f.bx, f.bz, 0, 0) - f.half).toBeGreaterThanOrEqual(RAMP_RULES.startClear - slack - 1e-9)
+          // The footprint rectangle's corners stay inside the square.
+          const px = -r.dz * f.half
+          const pz = r.dx * f.half
+          for (const [x, z] of [[f.ax + px, f.az + pz], [f.ax - px, f.az - pz], [f.bx + px, f.bz + pz], [f.bx - px, f.bz - pz]]) {
+            expect(Math.abs(x)).toBeLessThanOrEqual(RAMP_RULES.limit + slack + 1e-9)
+            expect(Math.abs(z)).toBeLessThanOrEqual(RAMP_RULES.limit + slack + 1e-9)
+          }
         }
       }
       for (let i = 0; i < ramps.length; i++) {
@@ -136,6 +143,38 @@ describe('planRamps', () => {
       }
       expect(worst).toBeLessThanOrEqual(RAMP_RULES.maxMisfit)
     }
+  })
+
+  it('widens the blends where a lane cuts into steep hills, so every bank stays walkable', () => {
+    // A hillside steeper than any face: each deck cuts into it and each run-out stands proud of it.
+    const valley = (x: number, z: number) => -0.4 * x + 3 * Math.exp(-(x * x + z * z) / 400)
+    const limit = Math.tan(RAMP_RULES.maxBank * deg)
+    const gradient = (fn: (x: number, z: number) => number, x: number, z: number) =>
+      Math.hypot(fn(x + 0.5, z) - fn(x - 0.5, z), fn(x, z + 0.5) - fn(x, z - 0.5))
+    let widened = 0
+    for (const seed of [1, 2, 3]) {
+      const ramps = planRamps(valley, seed)
+      expect(ramps.length).toBeGreaterThan(0)
+      for (const r of ramps) {
+        expect(r.sideBlend).toBeGreaterThanOrEqual(RAMP_SHAPE.sideBlend)
+        expect(r.sideBlend).toBeLessThanOrEqual(RAMP_SHAPE.sideBlend * RAMP_RULES.maxBlend)
+        expect(r.backBlend / r.sideBlend).toBeCloseTo(RAMP_SHAPE.backBlend / RAMP_SHAPE.sideBlend, 9)
+        if (r.sideBlend > RAMP_SHAPE.sideBlend) widened++
+        const blended = (x: number, z: number) => rampHeight(r, x, z, valley(x, z))
+        const f = rampFootprint(r)
+        for (let u = -RAMP_SHAPE.deck - r.backBlend; u <= r.length + RAMP_SHAPE.runout + RAMP_SHAPE.frontBlend; u += 0.5) {
+          for (let v = -f.half; v <= f.half; v += 0.5) {
+            const x = r.x + r.dx * u - r.dz * v
+            const z = r.z + r.dz * u + r.dx * v
+            if (laneDistance(r, x, z) === 0) continue
+            // Up to sampling slack, never steeper than the limit unless the hills already were.
+            expect(gradient(blended, x, z)).toBeLessThan(Math.max(limit * 1.03, gradient(valley, x, z) + 0.03))
+          }
+        }
+      }
+    }
+    // The narrowest blend would leave cliffs on this hillside.
+    expect(widened).toBeGreaterThan(0)
   })
 
   it('gives up gracefully when there is no room', () => {
