@@ -176,7 +176,29 @@ export function isOffRoute(progress: RouteProgress, tolerance = OFF_ROUTE_METERS
   return progress.offRouteBy > tolerance
 }
 
+/**
+ * How close to the end counts as finished. A fixed distance rather than a share
+ * of the route: 3% of a 5 mile loop is a quarter of a kilometre, which ended
+ * runs while the runner could still see a block and a half to go.
+ */
+export const FINISH_METERS = 40
+
 /** True once you're back at the start having covered essentially the whole route. */
-export function hasFinished(progress: RouteProgress, totalDistance: number): boolean {
-  return progress.distanceAlong >= totalDistance * 0.97
+export function hasFinished(progress: RouteProgress): boolean {
+  return progress.distanceRemaining <= FINISH_METERS
+}
+
+/** A runner's pace with room to spare, for sizing the search after a gap. */
+const GAP_SPEED_MPS = 7
+
+/**
+ * How far ahead of the last fix to look, given how long ago it was.
+ *
+ * The window that keeps a loop from matching against itself assumes the next
+ * fix is a second away. After the screen has been off, or GPS lost in a
+ * tunnel, the runner can be a kilometre further on — well outside it.
+ */
+export function lookAheadAfter(secondsSinceLastFix: number, base = 300): number {
+  if (!Number.isFinite(secondsSinceLastFix) || secondsSinceLastFix <= 0) return base
+  return Math.max(base, secondsSinceLastFix * GAP_SPEED_MPS)
 }

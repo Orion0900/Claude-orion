@@ -496,7 +496,11 @@ input[type='range'] {
   background: #10131a;
 }
 
-.leaflet-tile-pane {
+/* Applied tile by tile rather than to the whole tile pane: a filter on the pane
+   makes the browser redraw the entire (oversized, tilted) map into one
+   offscreen image every frame, which is heavy enough on a phone to get the
+   page killed for using too much memory. Per tile it is a small, fixed cost. */
+.leaflet-tile {
   filter: brightness(0.72) saturate(0.75) hue-rotate(178deg) invert(1) contrast(0.92);
 }
 
@@ -567,27 +571,23 @@ input[type='range'] {
   inset: 0;
 }
 
-/* Navigating tilts and turns the whole map. The rotor is oversized so the
-   receding "horizon" is still covered by loaded tiles once tilted.
-
-   One number drives the camera: the runner sits at --nav-puck-y down the
-   screen. The rotor is shifted so its centre — which is where the map is
-   panned to — lands exactly there, and the puck is pinned to the same spot,
-   so the two can never drift apart. The rotor is 220% tall, so shifting its
-   centre by 12% of the viewport means translating 12/2.2 ≈ 5.45% of itself. */
-/* --nav-puck-y is set by MapView, which derives the rotor shift from the same
-   number, so the camera centre and the puck can never disagree. */
+/* Navigating tilts and turns the whole map. MapView sizes the rotor from the
+   screen (see lib/camera.ts): a square large enough that, whichever way it is
+   turned, the screen stays covered, centred on the runner's spot at
+   --nav-puck-y. The perspective origin sits on the same spot so tilting
+   pivots around the runner rather than the middle of the screen. */
 .map-viewport.navigating {
-  perspective: var(--nav-perspective, 900px);
+  perspective: var(--nav-perspective, 1400px);
   perspective-origin: 50% var(--nav-puck-y, 62%);
+  /* Past the far edge of the tilted map: a night sky to match the dark map,
+     not a flat void. */
+  background: linear-gradient(to bottom, #0b0d11 0%, #161b23 30%, #1c212a 100%);
 }
 
 .map-viewport.navigating .map-rotor {
   inset: auto;
   top: 50%;
   left: 50%;
-  width: var(--nav-rotor-size, 260%);
-  height: var(--nav-rotor-size, 260%);
   transform-origin: 50% 50%;
   /* Headings are already eased in JS and arrive every frame, so this is just
      enough to take the edge off — any longer and the map visibly trails the
@@ -637,9 +637,9 @@ input[type='range'] {
   background: radial-gradient(circle, rgba(26, 115, 232, 0.3) 0%, rgba(26, 115, 232, 0) 70%);
 }
 
-/* Tilting makes the far edge of the map recede past the loaded tiles. A short
-   haze at the very top reads as distance without swallowing the map. Flat on
-   there is no horizon to suggest, so it goes. */
+/* Tilting makes the far edge of the map recede. A haze at the top, like a
+   navigation app's horizon, reads as distance and hides where the map ends.
+   Flat on there is no horizon to suggest, so it goes. */
 .map-viewport.navigating.flat::after {
   display: none;
 }
@@ -648,10 +648,16 @@ input[type='range'] {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
-  height: 18%;
+  height: 26%;
   z-index: 450;
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--bg) 0%, rgba(15, 17, 21, 0.55) 55%, transparent 100%);
+  background: linear-gradient(
+    to bottom,
+    #0f1115 0%,
+    #141820 52%,
+    rgba(20, 24, 32, 0.6) 72%,
+    rgba(20, 24, 32, 0) 100%
+  );
 }
 
 /* Leaflet's own credit sits inside the rotor and would be skewed with it, and
@@ -802,6 +808,12 @@ input[type='range'] {
   color: #2a0d0d;
   font-size: 15px;
   font-weight: 700;
+}
+
+.nav-end.confirming {
+  background: #fff;
+  color: #b91c1c;
+  box-shadow: 0 0 0 2px var(--danger);
 }
 
 .nav-attribution {
@@ -1041,5 +1053,32 @@ input[type='range'] {
 }
 
 .nav-perspective[aria-pressed='false'] {
+  color: var(--text-dim);
+}
+
+/* ---- Last-resort error screen ---- */
+.crash {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.crash h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.crash p {
+  margin: 0 0 8px;
+  max-width: 28ch;
   color: var(--text-dim);
 }
