@@ -10,12 +10,15 @@ import {
 } from './lib/savedRoutes'
 import { SavedRoutes } from './components/SavedRoutes'
 import { requestCompassPermission } from './services/compass'
+import { createKeepAwake } from './services/keepAwake'
+import { primeSpeech } from './services/speech'
+import { createActiveRunStore } from './lib/activeRun'
 import { createMapPerspectivePreference, type MapPerspective } from './lib/preferences'
 import { reverseRoute, type RunDirection } from './lib/direction'
 import { compassLabel } from './lib/routeSearch'
 import { formatDistance } from './lib/units'
 import { ControlPanel, type CriteriaForm } from './components/ControlPanel'
-import { NavigationView } from './components/NavigationView'
+import { NavigationView, type RunResume } from './components/NavigationView'
 import { MapView } from './components/MapView'
 import { RouteList } from './components/RouteList'
 import { pointAtFraction, type LatLng } from './lib/geo'
@@ -43,11 +46,19 @@ const INITIAL_FORM: CriteriaForm = {
 }
 
 export default function App() {
+  // A run interrupted by the app being closed or reloaded is picked straight
+  // back up, rather than leaving the runner on the planning screen mid-run.
+  const runStore = useMemo(() => createActiveRunStore(), [])
+  const [interrupted] = useState(() => runStore.read())
+  const keepAwake = useMemo(() => createKeepAwake(), [])
+
   const [form, setForm] = useState<CriteriaForm>(INITIAL_FORM)
-  const [start, setStart] = useState<LatLng | null>(null)
-  const [startLabel, setStartLabel] = useState<string | null>(null)
-  const [routes, setRoutes] = useState<RouteResult[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [start, setStart] = useState<LatLng | null>(() => interrupted?.route.path[0] ?? null)
+  const [startLabel, setStartLabel] = useState<string | null>(() =>
+    interrupted ? 'Start of your run in progress' : null,
+  )
+  const [routes, setRoutes] = useState<RouteResult[]>(() => (interrupted ? [interrupted.route] : []))
+  const [selectedId, setSelectedId] = useState<string | null>(() => interrupted?.route.id ?? null)
   const [searching, setSearching] = useState(false)
   const [progress, setProgress] = useState<SearchProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -55,12 +66,24 @@ export default function App() {
   const [locationError, setLocationError] = useState<string | null>(null)
   const [scrub, setScrub] = useState<number | null>(null)
   const [seed, setSeed] = useState(1)
-  const [followingId, setFollowingId] = useState<string | null>(null)
+  const [followingId, setFollowingId] = useState<string | null>(() => interrupted?.route.id ?? null)
+  const [resume, setResume] = useState<RunResume | null>(() =>
+    interrupted
+      ? {
+          startedAt: interrupted.startedAt,
+          distanceAlong: interrupted.distanceAlong,
+          segment: interrupted.segment,
+          directionSettled: interrupted.directionSettled,
+          updatedAt: interrupted.updatedAt,
+        }
+      : null,
+  )
+  const [detour, setDetour] = useState<LatLng[] | null>(null)
   const [livePosition, setLivePosition] = useState<LatLng | null>(null)
   const [heading, setHeading] = useState<number | null>(null)
   const [traveled, setTraveled] = useState(0)
   const [browsing, setBrowsing] = useState(false)
-  const [runDirection, setRunDirection] = useState<RunDirection>('forward')
+  const [runDirection, setRunDirection] = useState<RunDirection>(() => interrupted?.direction ?? 'forward')
   const perspectivePref = useMemo(() => createMapPerspectivePreference(), [])
   const [perspective, setPerspective] = useState<MapPerspective>(() => perspectivePref.read())
 
@@ -69,6 +92,24 @@ export default function App() {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const searchRef = useRef<AbortController | null>(null)
+
+  // A resumed run keeps the screen on too; the first touch lets iOS agree.
+  useEffect(() => {
+    if (interrupted) keepAwake.start()
+    return () => keepAwake.stop()
+  }, [interrupted, keepAwake])
+
+  const onDirection = useCallback(
+    (direction: RunDirection) => {
+      setRunDirection(direction)
+      runStore.update({ direction, directionSettled: true })
+    },
+    [runStore],
+  )
+  const onCheckpoint = useCallback(
+    (checkpoint: { distanceAlong: number; segment: number }) => runStore.update(checkpoint),
+    [runStore],
+  )
   const routing = useMemo(() => createOsrmProvider(), [])
   const elevation = useMemo(() => createOpenMeteoProvider(), [])
 
@@ -205,6 +246,10 @@ export default function App() {
       : null
 
   const stopRun = () => {
+    runStore.clear()
+    keepAwake.stop()
+    setResume(null)
+    setDetour(null)
     setFollowingId(null)
     setLivePosition(null)
     setHeading(null)
@@ -270,6 +315,13 @@ export default function App() {
                 // iOS only grants the compass from inside a gesture, so the ask
                 // happens here rather than once the navigation view mounts.
                 void requestCompassPermission()
+                // Screen and voice both need this tap to be allowed on iOS.
+                keepAwake.start()
+                primeSpeech('Starting your run')
+                const route = routes.find((candidate) => candidate.id === id)
+                if (route) runStore.begin(route)
+                setResume(null)
+                setDetour(null)
                 setRunDirection('forward')
                 setFollowingId(id)
                 setSelectedId(id)
@@ -305,6 +357,10 @@ export default function App() {
       {following ? (
         <NavigationView
           route={following}
+          routing={routing}
+          resume={resume}
+          onCheckpoint={onCheckpoint}
+          onDetour={setDetour}
           distanceUnit={form.distanceUnit}
           elevationUnit={form.elevationUnit}
           paceSeconds={paceSeconds}
@@ -313,7 +369,7 @@ export default function App() {
           onProgress={setTraveled}
           browsing={browsing}
           onRecenter={() => setBrowsing(false)}
-          onDirection={setRunDirection}
+          onDirection={onDirection}
           reversed={runDirection === 'reverse'}
           perspective={perspective}
           onTogglePerspective={() => {
@@ -340,6 +396,7 @@ export default function App() {
         perspective={perspective}
         traveled={traveled}
         browsing={browsing}
+        detour={detour}
         onBrowse={() => {
           if (following) setBrowsing(true)
         }}

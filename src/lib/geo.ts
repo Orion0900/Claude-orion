@@ -145,7 +145,8 @@ export function pointAtFraction(path: LatLng[], fraction: number): LatLng {
 export function splitPath(path: LatLng[], fraction: number): [LatLng[], LatLng[]] {
   if (path.length < 2) return [path.slice(), path.slice()]
 
-  const clamped = Math.min(1, Math.max(0, fraction))
+  // A NaN here would reach the map as an invalid coordinate and throw.
+  const clamped = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0
   const cum = cumulativeDistances(path)
   const total = cum[cum.length - 1]
   if (total === 0) return [path.slice(), path.slice()]

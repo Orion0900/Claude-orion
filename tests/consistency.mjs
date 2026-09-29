@@ -138,6 +138,8 @@ async function runOnce(browser, iteration) {
   const monotonic = samples.every((v, i) => i === 0 || v >= samples[i - 1])
   const finalDone = samples[samples.length - 1] ?? null
 
+  // End asks for a second tap, so a stray one can't throw a run away.
+  await page.locator('.nav-end').click()
   await page.locator('.nav-end').click()
   await page.waitForTimeout(500)
   const startAfter = await page.locator('.panel-section .hint').first().innerText()

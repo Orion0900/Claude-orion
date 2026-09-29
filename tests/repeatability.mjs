@@ -147,6 +147,7 @@ async function session(browser, { cycles, noiseMetres, label }) {
     }
     const elapsed = Date.now() - t
     await page.locator('.nav-end').click()
+    await page.locator('.nav-end').click()
     await page.waitForTimeout(400)
 
     const monotonic = samples.every((v, i) => i === 0 || v >= samples[i - 1])
