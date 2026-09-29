@@ -1,6 +1,7 @@
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { cameraFor } from '../lib/camera'
 import { splitPath, type LatLng } from '../lib/geo'
 import { createDoubleTapDetector } from '../lib/gestures'
 import type { MapPerspective } from '../lib/preferences'
@@ -31,6 +32,8 @@ interface MapViewProps {
   onBrowse: () => void
   /** Fired on a double tap, which puts the runner back in the middle. */
   onRecenter: () => void
+  /** A way back to the route after straying from it, drawn dashed. */
+  detour: LatLng[] | null
   onSelect: (id: string) => void
   onPickStart: (point: LatLng) => void
   status: string | null
@@ -38,32 +41,18 @@ interface MapViewProps {
 
 const FALLBACK_VIEW: [number, number] = [42.3601, -71.0589]
 
-/**
- * Where the runner sits on screen while navigating, as a percentage down the
- * viewport, and how much bigger the rotor is than the viewport.
- *
- * These two numbers place both the camera and the puck. Leaflet pans the map so
- * the runner is at the rotor's centre, so the rotor is shifted until that centre
- * lands on the puck — and because the shift is expressed in the rotor's own
- * size, it has to be divided by the rotor's scale. Get this wrong and the map
- * is centred somewhere the puck isn't, which is exactly how the runner ends up
- * hidden behind the bottom card.
- */
-const PUCK_Y = 62
+/** Where the runner sits on screen while navigating, as a fraction down it. */
+const PUCK_FRACTION = 0.62
+
+/** Street level: close enough to read the next junction, far enough to see it coming. */
+const NAV_ZOOM = 17
 
 /**
- * How much bigger than the screen the rotor is, per view.
- *
- * Tilting pushes the rotor's far edge up-screen, so the third-person view needs
- * plenty of margin to hide the seam. Flat on, only the corners of a rotated
- * square have to be covered, which needs far less — and loads far fewer tiles.
+ * How long the map takes to glide to each new fix. About the gap between fixes,
+ * and linear, so the map moves continuously the way a navigation app's does
+ * rather than lurching once a second.
  */
-const ROTOR_SCALE = { '3d': 2.6, '2d': 1.7 } as const
-
-/** Degrees the map is pitched back in the third-person view. */
-const TILT_DEGREES = 52
-
-const rotorShift = (scale: number) => (PUCK_Y - 50) / scale
+const GLIDE_SECONDS = 0.9
 
 export function MapView({
   start,
@@ -78,16 +67,25 @@ export function MapView({
   browsing,
   onBrowse,
   onRecenter,
+  detour,
   onSelect,
   onPickStart,
   status,
 }: MapViewProps) {
+  const frameRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const startMarkerRef = useRef<L.CircleMarker | null>(null)
   const cursorMarkerRef = useRef<L.CircleMarker | null>(null)
   const positionMarkerRef = useRef<L.CircleMarker | null>(null)
+  // The route while running, as two lines updated in place on every fix.
+  const behindLineRef = useRef<L.Polyline | null>(null)
+  const aheadLineRef = useRef<L.Polyline | null>(null)
+  const detourLineRef = useRef<L.Polyline | null>(null)
+  // Whether the map has been put on the runner since following (re)started.
+  const followingRef = useRef(false)
+  const [viewport, setViewport] = useState({ width: 0, height: 0 })
   // Handlers change every render; a ref keeps the Leaflet listener stable.
   const onPickStartRef = useRef(onPickStart)
   const onSelectRef = useRef(onSelect)
@@ -175,6 +173,28 @@ export function MapView({
     }
   }, [])
 
+  // The camera is sized from the screen, so it has to know when that changes.
+  useEffect(() => {
+    const frame = frameRef.current
+    if (!frame) return
+    const measure = () => {
+      const { width, height } = frame.getBoundingClientRect()
+      setViewport((current) =>
+        Math.round(current.width) === Math.round(width) && Math.round(current.height) === Math.round(height)
+          ? current
+          : { width, height },
+      )
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure)
+      return () => window.removeEventListener('resize', measure)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(frame)
+    return () => observer.disconnect()
+  }, [])
+
   // Start marker follows the chosen location; the map only recentres when the
   // runner moves somewhere genuinely new, not on every route selection.
   useEffect(() => {
@@ -198,36 +218,44 @@ export function MapView({
     if (!map.getBounds().contains(latlng)) map.setView(latlng, 14)
   }, [start])
 
+  // The route lines. Rebuilt only when the routes or the mode change — never
+  // per GPS fix, which is what used to refit the whole route and throw the
+  // map from street level to an overview and back every second of a run.
   useEffect(() => {
     const map = mapRef.current
     const layer = routeLayerRef.current
     if (!map || !layer) return
     layer.clearLayers()
+    behindLineRef.current = null
+    aheadLineRef.current = null
 
     const toLatLngs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number])
+    const selected = routes.find((route) => route.id === selectedId)
+
+    // Running: just your route, the road ahead bright and the ground already
+    // covered dimmed, so "which way now" reads at a glance.
+    if (navigating) {
+      if (!selected) return
+      behindLineRef.current = L.polyline([], {
+        color: '#5a6472',
+        weight: 7,
+        opacity: 0.55,
+        lineJoin: 'round',
+        interactive: false,
+      }).addTo(layer)
+      aheadLineRef.current = L.polyline(toLatLngs(selected.path), {
+        color: '#4ade80',
+        weight: 11,
+        opacity: 1,
+        lineJoin: 'round',
+        lineCap: 'round',
+        interactive: false,
+      }).addTo(layer)
+      return
+    }
 
     for (const route of routes) {
       const isSelected = route.id === selectedId
-
-      // Navigating shows the road ahead brightly and the ground already
-      // covered dimmed, so "which way now" reads at a glance.
-      if (navigating && isSelected) {
-        const [behind, ahead] = splitPath(route.path, traveled)
-        layer.addLayer(
-          L.polyline(toLatLngs(behind), { color: '#5a6472', weight: 7, opacity: 0.55, lineJoin: 'round' }),
-        )
-        layer.addLayer(
-          L.polyline(toLatLngs(ahead), {
-            color: '#4ade80',
-            weight: 11,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round',
-          }),
-        )
-        continue
-      }
-
       const line = L.polyline(toLatLngs(route.path), {
         color: isSelected ? '#4ade80' : '#7c8798',
         weight: isSelected ? 5 : 3,
@@ -242,16 +270,35 @@ export function MapView({
       if (isSelected) line.bringToFront()
     }
 
-    if (!navigating) startMarkerRef.current?.bringToFront()
+    startMarkerRef.current?.bringToFront()
 
-    const selected = routes.find((route) => route.id === selectedId)
     if (selected) {
-      map.fitBounds(
-        L.latLngBounds(selected.path.map((p) => [p.lat, p.lng] as [number, number])),
-        { padding: [48, 48] },
-      )
+      map.fitBounds(L.latLngBounds(toLatLngs(selected.path)), { padding: [48, 48] })
     }
+  }, [routes, selectedId, navigating])
+
+  // Progress along the route only moves the join between the two lines.
+  useEffect(() => {
+    const selected = routes.find((route) => route.id === selectedId)
+    if (!navigating || !selected || !aheadLineRef.current || !behindLineRef.current) return
+    const [behind, ahead] = splitPath(selected.path, traveled)
+    const toLatLngs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number])
+    behindLineRef.current.setLatLngs(toLatLngs(behind))
+    aheadLineRef.current.setLatLngs(toLatLngs(ahead))
   }, [routes, selectedId, navigating, traveled])
+
+  // The way back after going off route, dashed like a navigation app's reroute.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    detourLineRef.current?.remove()
+    detourLineRef.current = null
+    if (!navigating || !detour || detour.length < 2) return
+    detourLineRef.current = L.polyline(
+      detour.map((p) => [p.lat, p.lng] as [number, number]),
+      { color: '#1a73e8', weight: 8, opacity: 0.95, dashArray: '2 14', lineCap: 'round', interactive: false },
+    ).addTo(map)
+  }, [detour, navigating])
 
   useEffect(() => {
     const map = mapRef.current
@@ -275,21 +322,29 @@ export function MapView({
     }
   }, [cursor])
 
-  // Navigating takes the map away from the finger and gives it to the route.
+  const camera =
+    navigating && !browsing && viewport.width > 0
+      ? cameraFor({ ...viewport, puckFraction: PUCK_FRACTION, perspective })
+      : null
+
+  // Navigating takes over double-tap for re-centring; dragging and pinching
+  // stay enabled so the runner can look ahead.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    // Dragging and pinching stay enabled while navigating so the runner can
-    // look ahead; only double-click zoom is taken over, for re-centring.
     if (navigating) map.doubleClickZoom.disable()
     else map.doubleClickZoom.enable()
-    // The rotor is oversized while the tilted camera is on and normal size
-    // otherwise, so Leaflet has to be told the container changed shape —
-    // both when navigation starts and each time the runner flattens it to
-    // look around.
+  }, [navigating])
+
+  // The rotor changes size with the camera, so Leaflet has to be told its
+  // container changed shape, and the runner put back in the middle of it.
+  const rotorSize = camera?.rotorSize ?? null
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
     map.invalidateSize({ animate: false })
-    if (navigating && !browsing) map.setZoom(17)
-  }, [navigating, browsing, perspective])
+    followingRef.current = false
+  }, [rotorSize, navigating, browsing])
 
   // While following, the map tracks the runner rather than the whole route.
   useEffect(() => {
@@ -307,7 +362,14 @@ export function MapView({
     if (navigating) {
       positionMarkerRef.current?.remove()
       positionMarkerRef.current = null
-      if (!browsing) map.panTo(latlng, { animate: true, duration: 0.4 })
+      if (browsing) return
+      if (!followingRef.current || map.getZoom() !== NAV_ZOOM) {
+        // Starting out, or coming back from looking around: jump, don't fly.
+        map.setView(latlng, NAV_ZOOM, { animate: false })
+        followingRef.current = true
+      } else {
+        map.panTo(latlng, { animate: true, duration: GLIDE_SECONDS, easeLinearity: 1, noMoveStart: true })
+      }
       return
     }
 
@@ -324,51 +386,43 @@ export function MapView({
     }
     positionMarkerRef.current.bringToFront()
     map.panTo(latlng, { animate: true })
-  }, [position, navigating, browsing])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !navigating || browsing || !position) return
-    map.setView([position.lat, position.lng], 17, { animate: true })
-  }, [browsing, navigating, position])
+  }, [position, navigating, browsing, rotorSize])
 
   return renderMap()
 
   function renderMap() {
     return (
       <div
+        ref={frameRef}
         className={navigating ? 'map in-run' : 'map'}
         style={
           navigating
             ? ({
-                '--nav-puck-y': `${PUCK_Y}%`,
-                '--nav-rotor-size': `${ROTOR_SCALE[perspective] * 100}%`,
+                '--nav-puck-y': `${PUCK_FRACTION * 100}%`,
                 // A flat map needs no vanishing point.
-                '--nav-perspective': perspective === '3d' ? '900px' : 'none',
+                '--nav-perspective': camera?.perspectivePx ? `${camera.perspectivePx}px` : 'none',
               } as CSSProperties)
             : undefined
         }
       >
         <div
           className={
-            navigating && !browsing
-              ? `map-viewport navigating${perspective === '2d' ? ' flat' : ''}`
-              : 'map-viewport'
+            camera ? `map-viewport navigating${camera.tilt === 0 ? ' flat' : ''}` : 'map-viewport'
           }
         >
           <div
             className="map-rotor"
             style={
-              navigating && !browsing
+              camera
                 ? {
-                    // Shift the map down so the runner sits low on screen with
-                    // the road ahead filling the view. North-up until a heading
-                    // is known, then the map turns to face the way you're going.
-                    // Both views turn to the heading and keep the runner in the
-                    // same place; only the pitch differs.
+                    // A square, sized so that whichever way it turns the screen
+                    // stays covered, centred on the runner. North-up until a
+                    // heading is known, then turned to face the way you're going.
+                    width: `${camera.rotorSize}px`,
+                    height: `${camera.rotorSize}px`,
                     transform:
-                      `translate(-50%, -50%) translateY(${rotorShift(ROTOR_SCALE[perspective])}%) ` +
-                      (perspective === '3d' ? `rotateX(${TILT_DEGREES}deg) ` : '') +
+                      `translate(-50%, -50%) translateY(${camera.shiftY}px) ` +
+                      (camera.tilt ? `rotateX(${camera.tilt}deg) ` : '') +
                       `rotate(${-(heading ?? 0)}deg)`,
                   }
                 : undefined

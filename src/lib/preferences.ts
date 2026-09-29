@@ -17,7 +17,7 @@ export interface PreferenceStorage {
   setItem(key: string, value: string): void
 }
 
-function browserStorage(): PreferenceStorage | null {
+export function browserStorage(): PreferenceStorage | null {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage
   } catch {

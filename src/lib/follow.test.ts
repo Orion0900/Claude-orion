@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cumulativeDistances, destination, haversine, type LatLng } from './geo'
-import { hasFinished, isOffRoute, locateOnRoute, projectOntoSegment } from './follow'
+import { FINISH_METERS, hasFinished, isOffRoute, locateOnRoute, lookAheadAfter, projectOntoSegment } from './follow'
 
 const start: LatLng = { lat: 42.3601, lng: -71.0589 }
 
@@ -126,15 +126,37 @@ describe('locateOnRoute', () => {
 describe('hasFinished', () => {
   const path = squareLoop()
   const cumulative = cumulativeDistances(path)
-  const total = cumulative[cumulative.length - 1]
 
   it('is false partway round', () => {
-    expect(hasFinished(locateOnRoute(path, destination(start, 0, 150)), total)).toBe(false)
+    expect(hasFinished(locateOnRoute(path, destination(start, 0, 150)))).toBe(false)
+  })
+
+  it('is false standing at the start before setting off', () => {
+    expect(hasFinished(locateOnRoute(path, start, {}, cumulative))).toBe(false)
   })
 
   it('is true back at the start after a full lap', () => {
     const progress = locateOnRoute(path, start, { fromSegment: path.length - 3 }, cumulative)
-    expect(hasFinished(progress, total)).toBe(true)
+    expect(hasFinished(progress)).toBe(true)
+  })
+
+  it('waits until the finish is in reach, not a share of the route away', () => {
+    // 100 m short of the end is 90% of this loop — finished by the old rule.
+    const shy = locateOnRoute(path, destination(start, 90, 100), { fromSegment: path.length - 4 }, cumulative)
+    expect(shy.distanceRemaining).toBeGreaterThan(FINISH_METERS)
+    expect(hasFinished(shy)).toBe(false)
+  })
+})
+
+describe('lookAheadAfter', () => {
+  it('keeps the normal window between regular fixes', () => {
+    expect(lookAheadAfter(1)).toBe(300)
+    expect(lookAheadAfter(0)).toBe(300)
+    expect(lookAheadAfter(Number.NaN)).toBe(300)
+  })
+
+  it('widens to cover how far a runner could have gone in a gap', () => {
+    expect(lookAheadAfter(180)).toBeGreaterThanOrEqual(180 * 6)
   })
 })
 
