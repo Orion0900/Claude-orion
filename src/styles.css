@@ -761,6 +761,26 @@ input[type='range'] {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  /* A button, so it can flip between views, that shouldn't look like one. */
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-summary .nav-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.nav-eta.is-paused {
+  color: var(--warn);
 }
 
 .nav-eta {
@@ -857,6 +877,101 @@ input[type='range'] {
   flex: 1;
 }
 
+/* Sound and view, floating over the map's edge as navigation apps do. */
+.nav-float {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.nav-float .nav-icon-btn {
+  background: rgba(30, 34, 43, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.nav-pause.is-paused {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b2415;
+}
+
+.nav-icon-btn:disabled {
+  opacity: 0.45;
+}
+
+/* The clock has stopped: say so, and make carrying on one tap. */
+.nav-paused {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 14px 0;
+  padding: 10px 10px 10px 14px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: var(--warn);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.nav-resume {
+  flex: none;
+  width: auto;
+  min-height: 40px;
+  padding: 0 18px;
+}
+
+/* 3, 2, 1: the whole screen, big, like every running app's start. */
+.nav-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  border: 0;
+  background: rgba(10, 12, 16, 0.78);
+  color: #fff;
+  font: inherit;
+  pointer-events: auto;
+}
+
+.nav-countdown-number {
+  font-size: 128px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  animation: countdown-pop 0.9s ease-out both;
+}
+
+.nav-countdown-hint {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+@keyframes countdown-pop {
+  0% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.92);
+    opacity: 0.9;
+  }
+}
+
 /* ---- Saving routes ---- */
 .star {
   flex: none;
@@ -946,9 +1061,12 @@ input[type='range'] {
   padding: 24px;
   background: rgba(15, 17, 21, 0.94);
   backdrop-filter: blur(10px);
+  overflow-y: auto;
 }
 
 .finish-card {
+  position: relative;
+  z-index: 2;
   width: 100%;
   max-width: 26rem;
   background: var(--panel);
@@ -1004,9 +1122,186 @@ input[type='range'] {
 }
 
 .finish-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+/* Done spans the row: it is the way out. */
+.finish-actions > :last-child {
+  grid-column: 1 / -1;
+}
+
+.finish-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.finish-badges {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
+  text-align: left;
+}
+
+.finish-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  animation: badge-in 0.5s ease-out both;
+}
+
+.finish-badge:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.finish-badge:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.finish-badge strong {
+  display: block;
+  font-size: 14.5px;
+}
+
+.finish-badge-emoji {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.14);
+  font-size: 20px;
+}
+
+.finish-badge-detail {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+@keyframes badge-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A one-off burst over the finish card. */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.confetti-bit {
+  position: absolute;
+  top: -12px;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+
+.confetti-bit.wide {
+  width: 11px;
+  height: 6px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 0), 92vh) rotate(var(--spin, 360deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+  .nav-countdown-number,
+  .finish-badge {
+    animation: none;
+  }
+}
+
+/* ---- Your running: the log on the planning screen ---- */
+.history-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.history-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+}
+
+.history-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.history-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.history-date {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.history-stats {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .finish-continue {
