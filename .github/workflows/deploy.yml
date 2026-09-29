@@ -55,6 +55,17 @@ jobs:
           mkdir -p dist/caddie
           cp -r caddie/dist/. dist/caddie/
 
+      - name: Build Bonkrush
+        working-directory: bonkrush
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Bonkrush to the site
+        run: |
+          mkdir -p dist/bonkrush
+          cp -r bonkrush/dist/. dist/bonkrush/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
