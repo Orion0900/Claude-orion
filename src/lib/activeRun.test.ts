@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ACTIVE_RUN_MAX_AGE_MS, createActiveRunStore } from './activeRun'
+import { ACTIVE_RUN_MAX_AGE_MS, createActiveRunStore, discardActiveRun } from './activeRun'
 import type { RouteResult } from './routeSearch'
 
 function memoryStorage() {
@@ -52,6 +52,27 @@ describe('createActiveRunStore', () => {
     expect(resumed?.directionSettled).toBe(true)
   })
 
+  it('keeps the stopwatch, pause and all', () => {
+    const storage = memoryStorage()
+    const store = createActiveRunStore(storage)
+    const begun = store.begin(route, 1000)
+    store.update({ clock: { startedAt: 1000, pausedMs: 5000, pausedAt: 9000 } }, 9000)
+    const resumed = createActiveRunStore(storage).read(9500)
+    expect(resumed?.runId).toBe(begun.runId)
+    expect(resumed?.clock).toEqual({ startedAt: 1000, pausedMs: 5000, pausedAt: 9000 })
+  })
+
+  it('picks up a run saved before pauses existed', () => {
+    const storage = memoryStorage()
+    storage.setItem(
+      'loopmaker.activeRun.v1',
+      JSON.stringify({ version: 1, route, direction: 'forward', directionSettled: false, startedAt: 500, distanceAlong: 10, segment: 1, updatedAt: 600 }),
+    )
+    const run = createActiveRunStore(storage).read(700)
+    expect(run?.clock).toEqual({ startedAt: 500, pausedMs: 0, pausedAt: null })
+    expect(run?.runId).toBe('run-500')
+  })
+
   it('forgets a run once it is ended', () => {
     const storage = memoryStorage()
     const store = createActiveRunStore(storage)
@@ -73,6 +94,24 @@ describe('createActiveRunStore', () => {
     storage.setItem('loopmaker.activeRun.v1', '{"version":1,"route":{}}')
     expect(createActiveRunStore(storage).read()).toBeNull()
     storage.setItem('loopmaker.activeRun.v1', 'not json')
+    expect(createActiveRunStore(storage).read()).toBeNull()
+  })
+
+  it('refuses a route whose geometry or steps are damaged', () => {
+    const storage = memoryStorage()
+    const base = { version: 1, direction: 'forward', directionSettled: false, startedAt: 1, distanceAlong: 0, segment: 0, updatedAt: 1 }
+    storage.setItem('loopmaker.activeRun.v1', JSON.stringify({ ...base, route: { ...route, path: [{ lat: 1 }, { lat: 2, lng: 2 }] } }))
+    expect(createActiveRunStore(storage).read(2)).toBeNull()
+    storage.setItem('loopmaker.activeRun.v1', JSON.stringify({ ...base, route: { ...route, steps: [null] } }))
+    expect(createActiveRunStore(storage).read(2)).toBeNull()
+    storage.setItem('loopmaker.activeRun.v1', JSON.stringify({ ...base, route: { ...route, profile: null } }))
+    expect(createActiveRunStore(storage).read(2)).toBeNull()
+  })
+
+  it('can be discarded from outside, for the crash screen', () => {
+    const storage = memoryStorage()
+    createActiveRunStore(storage).begin(route)
+    discardActiveRun(storage)
     expect(createActiveRunStore(storage).read()).toBeNull()
   })
 

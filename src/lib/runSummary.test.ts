@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRunSummary, MIN_DISTANCE_FOR_PACE, summaryHeadline } from './runSummary'
+import { buildRunSummary, MIN_DISTANCE_FOR_PACE, runShareText, summaryHeadline } from './runSummary'
 import { feetToMeters, milesToMeters } from './units'
 
 const fiveMiles = milesToMeters(5)
@@ -96,5 +96,18 @@ describe('buildRunSummary', () => {
     expect(summary.gain).toBe(0)
     expect(summary.paceSecondsPerUnit).toBeNull()
     expect(summary.completed).toBe(false)
+  })
+})
+
+describe('runShareText', () => {
+  it('reads like a post about the run', () => {
+    const summary = buildRunSummary({
+      distanceCovered: 8078,
+      elapsedSeconds: 2712,
+      routeDistance: 8078,
+      routeGain: 40,
+      unit: 'mi',
+    })
+    expect(runShareText(summary, 'mi')).toBe('I ran a 5.02 mi loop in 45:12 (9:00 /mi) with LoopMaker 🏃')
   })
 })

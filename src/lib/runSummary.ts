@@ -5,7 +5,7 @@
  * it's worth reporting what actually happened rather than what was predicted.
  * Pace here is measured, not estimated.
  */
-import { metersToDistance, type DistanceUnit } from './units'
+import { formatDuration, formatPace, metersToDistance, type DistanceUnit } from './units'
 
 export interface RunSummary {
   /** Distance actually covered along the route, in meters. */
@@ -53,4 +53,13 @@ export function buildRunSummary(input: {
 /** A line that reads like something you'd say out loud about the run. */
 export function summaryHeadline(summary: RunSummary): string {
   return summary.completed ? 'Run complete' : 'Run ended early'
+}
+
+/** What to send a friend: "I ran 5.02 mi in 45:12 (9:00 /mi) with LoopMaker". */
+export function runShareText(summary: RunSummary, unit: DistanceUnit): string {
+  const distance = `${metersToDistance(summary.distance, unit).toFixed(2)} ${unit}`
+  const pace = summary.paceSecondsPerUnit === null ? '' : ` (${formatPace(summary.paceSecondsPerUnit, unit)})`
+  const verb = summary.completed ? 'ran a' : 'ran'
+  const loop = summary.completed ? ' loop' : ''
+  return `I ${verb} ${distance}${loop} in ${formatDuration(summary.elapsedSeconds)}${pace} with LoopMaker 🏃`
 }

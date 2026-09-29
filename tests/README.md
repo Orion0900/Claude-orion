@@ -12,6 +12,8 @@ node tests/consistency.mjs     # six fresh sessions, compared
 node tests/repeatability.mjs   # repeated runs in one session, and noisy GPS
 node tests/route-cards.mjs     # how a route is described before it is chosen
 node tests/run-resilience.mjs  # a run interrupted the ways real runs are
+node tests/run-features.mjs    # countdown, pauses, splits, badges, the log
+node tests/soak.mjs            # two long laps, watching memory and errors
 ```
 
 `harness.mjs` holds the stand-in city and the shared steps (open the app, find
@@ -38,3 +40,17 @@ without reloading, the same again with realistic GPS noise, and repeated
 searches in one session to catch slowdown or leaks. The second run in a session
 is where state carried over from the first shows up — which is exactly the bug
 these found.
+
+`run-features.mjs` walks through what makes a run feel like one: the 3-2-1
+countdown (spoken, skippable), auto-pause at a crossing and resuming on the
+move, a manual pause that holds, the time-and-pace view surviving a reload,
+spoken mile splits, halfway and last-half-mile calls, the finish badges and
+confetti, sharing, and the running log — including a run ended early, and a
+false start that leaves no trace.
+
+`soak.mjs` is the "will it last a whole run" check: two laps of a ~5 mile loop,
+about 2,700 noisy fixes with the compass turning, GPS dropouts, view toggles,
+the map dragged and re-centred, pauses, and a reload halfway. It fails on any
+page or console error, on memory or element counts creeping up, on tiles or
+route lines piling up, and on any main-thread stall over 200 ms. Chromium is
+launched with `--expose-gc` so memory is compared after collection.

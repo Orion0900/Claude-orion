@@ -13,6 +13,10 @@ import { requestCompassPermission } from './services/compass'
 import { createKeepAwake } from './services/keepAwake'
 import { primeSpeech } from './services/speech'
 import { createActiveRunStore } from './lib/activeRun'
+import { achievementsFor } from './lib/achievements'
+import { createHistoryStore, type RunRecord } from './lib/runHistory'
+import type { RunClock } from './lib/runClock'
+import { RunHistory } from './components/RunHistory'
 import { createMapPerspectivePreference, type MapPerspective } from './lib/preferences'
 import { reverseRoute, type RunDirection } from './lib/direction'
 import { compassLabel } from './lib/routeSearch'
@@ -51,6 +55,13 @@ export default function App() {
   const runStore = useMemo(() => createActiveRunStore(), [])
   const [interrupted] = useState(() => runStore.read())
   const keepAwake = useMemo(() => createKeepAwake(), [])
+  const [runId, setRunId] = useState<string | null>(() => interrupted?.runId ?? null)
+
+  // Every run logged, for this week's totals, the streak and the badges.
+  const historyStore = useMemo(() => createHistoryStore(), [])
+  const [history, setHistory] = useState<RunRecord[]>(() => historyStore.read())
+  const historyRef = useRef(history)
+  historyRef.current = history
 
   const [form, setForm] = useState<CriteriaForm>(INITIAL_FORM)
   const [start, setStart] = useState<LatLng | null>(() => interrupted?.route.path[0] ?? null)
@@ -71,6 +82,7 @@ export default function App() {
     interrupted
       ? {
           startedAt: interrupted.startedAt,
+          clock: interrupted.clock,
           distanceAlong: interrupted.distanceAlong,
           segment: interrupted.segment,
           directionSettled: interrupted.directionSettled,
@@ -105,6 +117,18 @@ export default function App() {
       runStore.update({ direction, directionSettled: true })
     },
     [runStore],
+  )
+  const onClock = useCallback((clock: RunClock) => runStore.update({ clock }), [runStore])
+  const onRecord = useCallback(
+    (record: RunRecord) => {
+      // Judged against everything before this run, then added to it.
+      const earned = achievementsFor(record, historyRef.current, form.distanceUnit)
+      const next = historyStore.save(record)
+      historyRef.current = next
+      setHistory(next)
+      return earned
+    },
+    [historyStore, form.distanceUnit],
   )
   const onCheckpoint = useCallback(
     (checkpoint: { distanceAlong: number; segment: number }) => runStore.update(checkpoint),
@@ -248,6 +272,7 @@ export default function App() {
   const stopRun = () => {
     runStore.clear()
     keepAwake.stop()
+    setRunId(null)
     setResume(null)
     setDetour(null)
     setFollowingId(null)
@@ -266,6 +291,8 @@ export default function App() {
             <h1>LoopMaker</h1>
             <p>Runs that start and finish at your door, sized to your legs.</p>
           </header>
+
+          <RunHistory runs={history} distanceUnit={form.distanceUnit} />
 
           <SavedRoutes
             routes={saved}
@@ -319,7 +346,7 @@ export default function App() {
                 keepAwake.start()
                 primeSpeech('Starting your run')
                 const route = routes.find((candidate) => candidate.id === id)
-                if (route) runStore.begin(route)
+                if (route) setRunId(runStore.begin(route).runId)
                 setResume(null)
                 setDetour(null)
                 setRunDirection('forward')
@@ -357,6 +384,9 @@ export default function App() {
       {following ? (
         <NavigationView
           route={following}
+          runId={runId ?? `run-${followingId}`}
+          onClock={onClock}
+          onRecord={onRecord}
           routing={routing}
           resume={resume}
           onCheckpoint={onCheckpoint}

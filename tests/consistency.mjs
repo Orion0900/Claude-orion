@@ -141,6 +141,8 @@ async function runOnce(browser, iteration) {
   // End asks for a second tap, so a stray one can't throw a run away.
   await page.locator('.nav-end').click()
   await page.locator('.nav-end').click()
+  // A run long enough to count ends on its summary; Done leaves it.
+  await page.locator('.finish-actions button', { hasText: 'Done' }).click({ timeout: 3000 }).catch(() => undefined)
   await page.waitForTimeout(500)
   const startAfter = await page.locator('.panel-section .hint').first().innerText()
 
