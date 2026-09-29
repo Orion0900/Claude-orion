@@ -212,7 +212,7 @@ export class InteractableManager implements InteractableApi {
   /** Extra free chests owed to the next boss or miniboss by curse shrines. */
   private curseChests = 0
   private focus: Usable | null = null
-  private promptValue: { text: string; cost?: number } | null = null
+  private promptValue: { text: string; cost?: number; passive?: boolean } | null = null
 
   private chestsDirty = true
   private potsDirty = true
@@ -1139,7 +1139,7 @@ export class InteractableManager implements InteractableApi {
         this.setPrompt('Open chest', focus.free ? undefined : this.chestCost)
         break
       case 'shrineCharge':
-        this.setPrompt(chargeText(focus.charge))
+        this.setPrompt(chargeText(focus.charge), undefined, true)
         break
       case 'shrineGreed':
         this.setPrompt(`Greed shrine: +${GREED_GOLD} gold, +${Math.round(GREED_DIFFICULTY * 100)}% difficulty`)
@@ -1176,9 +1176,12 @@ export class InteractableManager implements InteractableApi {
   }
 
   /** Keeps the same object while nothing changed, so the HUD can compare by identity. */
-  private setPrompt(text: string, cost?: number): void {
+  private setPrompt(text: string, cost?: number, passive = false): void {
     const p = this.promptValue
-    if (p && p.text === text && p.cost === cost) return
-    this.promptValue = cost === undefined ? { text } : { text, cost }
+    if (p && p.text === text && p.cost === cost && !!p.passive === passive) return
+    const next: { text: string; cost?: number; passive?: boolean } = { text }
+    if (cost !== undefined) next.cost = cost
+    if (passive) next.passive = true
+    this.promptValue = next
   }
 }

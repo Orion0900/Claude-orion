@@ -164,21 +164,41 @@ describe('PropLayer see-through', () => {
   })
 })
 
+describe('PropLayer rim walls', () => {
+  it('fades a wall rock between a camera backed against the rim and the player, and leaves walls alone mid-map', () => {
+    const pines: PropGroup = { kind: 'pine', solid: true, spec: propSpec('pine'), instances: [inst(-60, -60, 0)] }
+    const grid = new ColliderGrid([{ x: -60, z: -60, r: pines.spec.radius }], field.halfSize)
+    // A rim rock 5 m tall just outside the walkable square, with no collider of its own.
+    const wall = { ...inst(0, 103), sx: 3, sy: 5, sz: 3, scale: 3 }
+    const root = new THREE.Group()
+    const layer = new PropLayer(root, [pines], [wall], field, STAGES[0].palette, grid)
+    // The rock's id follows the colliders: 1 here.
+    const rimId = 1
+    // Player at the wall, camera lifted out behind the rock.
+    layer.updateOcclusion(1, new THREE.Vector3(0, 3, 106), new THREE.Vector3(0, 0, 96))
+    // Fully cleared, not dithered: a dithered wall would screen-door half the view.
+    expect(layer.fadeOf(rimId)).toBeGreaterThan(1)
+    // Mid-map the walls aren't even looked at.
+    layer.updateOcclusion(1, new THREE.Vector3(0, 4, 20), new THREE.Vector3(0, 0, 0))
+    expect(layer.fadeOf(rimId)).toBe(0)
+  })
+})
+
 describe('PropLayer tiles', () => {
-  it('splits big batches into quadrants and small ones not at all; shadow tiles only for big casters', () => {
+  it('keeps on-screen batches whole and tiles only the big shadow casters', () => {
     expect(tilesFor(500)).toEqual({ view: 1, shadow: 0 })
-    expect(tilesFor(3000).view).toBe(1)
-    expect(tilesFor(3000).shadow).toBe(4)
-    expect(tilesFor(20000)).toEqual({ view: 2, shadow: 4 })
+    expect(tilesFor(3000)).toEqual({ view: 1, shadow: 0 })
+    expect(tilesFor(12000)).toEqual({ view: 1, shadow: 4 })
+    expect(tilesFor(20000).view).toBe(1)
   })
 
-  it('bounds each tile tightly, draws shadow-only tiles in the shadow pass alone, with no see-through copies for props that cannot fade', () => {
+  it('bounds each shadow tile tightly, draws them in the shadow pass alone, with no see-through copies for props that cannot fade', () => {
     const spots = [-90, -40, 40, 90]
     const pines: PropGroup = {
       kind: 'pine',
       solid: false,
       spec: propSpec('pine'),
-      instances: spots.flatMap((x) => spots.flatMap((z) => Array.from({ length: 12 }, (_, k) => inst(x + k * 0.5, z)))),
+      instances: spots.flatMap((x) => spots.flatMap((z) => Array.from({ length: 40 }, (_, k) => inst(x + k * 0.25, z)))),
     }
     const root = new THREE.Group()
     const shadow = new THREE.Frustum()
@@ -186,15 +206,15 @@ describe('PropLayer tiles', () => {
     const meshes = root.children.filter((o): o is THREE.InstancedMesh => o instanceof THREE.InstancedMesh)
     const visible = meshes.filter((m) => !m.castShadow)
     const casters = meshes.filter((m) => m.castShadow)
-    expect(visible.length).toBe(4)
+    expect(visible.length).toBe(1)
     expect(casters.length).toBe(16)
     expect(visible.reduce((n, m) => n + m.count, 0)).toBe(pines.instances.length)
     expect(casters.reduce((n, m) => n + m.count, 0)).toBe(pines.instances.length)
     for (const m of meshes) {
       expect(m.boundingBox).not.toBeNull()
-      expect(m.boundingBox!.max.x - m.boundingBox!.min.x).toBeLessThan(60)
       expect(m.geometry.getAttribute('aFade')).toBeUndefined()
     }
+    for (const m of casters) expect(m.boundingBox!.max.x - m.boundingBox!.min.x).toBeLessThan(60)
     // Shadow tiles only answer to the shadow frustum; everything passes a frustum that holds the whole map.
     const everything = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().makeOrthographic(-500, 500, 500, -500, -500, 500))
     shadow.copy(everything)

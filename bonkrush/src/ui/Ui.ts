@@ -45,6 +45,8 @@ export class Ui implements UiApi {
   private readonly settingsLayer: HTMLDivElement
   private readonly tooltip: Tooltip
   private settings: SettingsPanel | null = null
+  /** The button that opened Settings, to hand focus back to on the title. */
+  private settingsReturn: HTMLElement | null = null
   private active: Active | null = null
   private queue: Pending[] = []
   private ctx: GameContext | null = null
@@ -238,6 +240,8 @@ export class Ui implements UiApi {
 
   private openSettings(): void {
     if (this.settings || this.disposed) return
+    const f = document.activeElement
+    this.settingsReturn = f instanceof HTMLElement && f !== document.body ? f : null
     const panel = new SettingsPanel(this.shell, () => this.closeSettings(), (id) => this.sfx(id), !!this.ctx)
     this.settings = panel
     this.settingsLayer.appendChild(panel.root)
@@ -251,7 +255,9 @@ export class Ui implements UiApi {
     this.settings = null
     s.root.remove()
     // Hand keyboard focus back to whatever is underneath.
-    this.active?.modal.shown()
+    if (this.active) this.active.modal.shown()
+    else if (!this.shell.input.isTouch && this.settingsReturn?.isConnected) this.settingsReturn.focus({ preventScroll: true })
+    this.settingsReturn = null
   }
 
   // ─────────────────────────── notices ───────────────────────────

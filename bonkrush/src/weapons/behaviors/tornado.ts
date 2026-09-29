@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Enemy } from '../../game/types'
+import { PLAY_LIMIT } from '../../world/colliders'
 import type { Armed, WeaponKit } from '../kit'
 import { solidMaterial, tornadoGeometry } from '../models'
 import { InstancePool } from '../pool'
@@ -74,7 +75,7 @@ export class TornadoBehavior implements WeaponBehavior {
   update(dt: number): void {
     const kit = this.kit
     const eff = this.arm.eff
-    const limit = kit.ctx.world.halfSize - 2
+    const limit = Math.min(PLAY_LIMIT, kit.ctx.world.halfSize) - 2
     const dustChance = 14 * dt * kit.fxScale
     const list = this.pool.active
     for (let i = list.length - 1; i >= 0; i--) {

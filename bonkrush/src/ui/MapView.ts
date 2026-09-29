@@ -1,4 +1,5 @@
-import type { GameContext, InteractableKind } from '../game/types'
+import { tierOf } from '../enemies/enemyDefs'
+import type { Enemy, GameContext, InteractableKind } from '../game/types'
 import {
   arrowAngle,
   clampToCircle,
@@ -105,9 +106,9 @@ export class MapView {
     const n = Math.min(list.length, ENEMY_SCAN_CAP)
     for (let i = 0; i < n; i++) {
       const e = list[i]
-      if (!e.alive || !(e.elite || e.boss)) continue
+      if (!e.alive || !(e.elite || isBig(e))) continue
       worldToMap(e.pos.x - player.x, e.pos.z - player.z, yaw, scale, p)
-      if (clampToCircle(p, rim - 5) && !e.boss) continue
+      if (clampToCircle(p, rim - 5) && !isBig(e)) continue
       this.enemyDot(g, c + p.x, c + p.y, e.boss, 1)
     }
 
@@ -153,7 +154,7 @@ export class MapView {
     const n = Math.min(list.length, ENEMY_SCAN_CAP)
     for (let i = 0; i < n; i++) {
       const e = list[i]
-      if (e.alive && (e.elite || e.boss)) this.enemyDot(g, toX(e.pos.x), toY(e.pos.z), e.boss, 1.3)
+      if (e.alive && (e.elite || isBig(e))) this.enemyDot(g, toX(e.pos.x), toY(e.pos.z), e.boss, 1.3)
     }
     const player = ctx.player.pos
     this.arrow(g, toX(player.x), toY(player.z), arrowAngle(0, ctx.player.yaw), 1.5)
@@ -246,4 +247,9 @@ export class MapView {
     g.fill()
     g.restore()
   }
+}
+
+/** Bosses and minibosses: always drawn, and pinned to the rim when off the map so they can be found. */
+function isBig(e: Enemy): boolean {
+  return e.boss || tierOf(e.def) === 'miniboss'
 }

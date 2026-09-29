@@ -94,7 +94,7 @@ export function timerLabel(key: number): TimerLabel {
 
 /** "E — Open chest · 34 🪙", or "Tap ✋ — …" on touch; unaffordable when the cost beats the gold. */
 export function promptLabel(
-  prompt: { text: string; cost?: number },
+  prompt: { text: string; cost?: number; passive?: boolean },
   isTouch: boolean,
   gold: number,
 ): { text: string; affordable: boolean } {
@@ -102,7 +102,7 @@ export function promptLabel(
   const cost = prompt.cost
   const hasCost = cost !== undefined && Number.isFinite(cost) && cost > 0
   return {
-    text: `${key} — ${prompt.text}${hasCost ? ` · ${formatCount(cost)} 🪙` : ''}`,
+    text: prompt.passive ? prompt.text : `${key} — ${prompt.text}${hasCost ? ` · ${formatCount(cost)} 🪙` : ''}`,
     affordable: !hasCost || Math.floor(gold) >= cost,
   }
 }

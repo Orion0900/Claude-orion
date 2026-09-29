@@ -32,14 +32,6 @@ const _identity = new THREE.Quaternion()
 /** Kills by souls must not release more souls, or one kill chains through the whole horde. */
 const SOUL_SOURCE = 'item:soul_reaper'
 
-/**
- * `ItemHooks` whose `onKill` also gets the kill's damage source, so an item
- * can ignore kills it made itself. Plain `ItemHooks` fit it as they are.
- */
-export interface KillAwareHooks extends ItemHooks {
-  onKill?(ctx: GameContext, enemy: Enemy, stacks: number, source?: string): void
-}
-
 /** Bosses and minibosses: never executed, and slowed where others would be frozen. */
 export function isBossClass(enemy: Enemy): boolean {
   return enemy.boss || tierOf(enemy.def) !== 'normal'
@@ -578,7 +570,7 @@ export const ITEM_HOOKS = {
       rt.stillSeconds = still ? rt.stillSeconds + dt : 0
     },
   },
-} satisfies Record<string, KillAwareHooks>
+} satisfies Record<string, ItemHooks>
 
 /** Big Bonk's odds per hit, per stack. */
 export const BIG_BONK_CHANCE = 0.02

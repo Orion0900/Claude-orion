@@ -28,7 +28,7 @@ export type StatId =
   | 'shield' // flat shield points; recharges after 4 s without damage
   | 'armor' // damage reduction fraction, 0..0.8
   | 'evasion' // chance to dodge a hit, 0..0.75
-  | 'lifesteal' // fraction of damage dealt that heals, chance-based per hit
+  | 'lifesteal' // HP healed per hit: the whole part always, the fraction as a chance (cap 5)
   | 'thorns' // flat damage dealt back to melee attackers
   // Offence
   | 'damage' // multiplier, base 1
@@ -40,7 +40,7 @@ export type StatId =
   | 'size' // area / projectile scale multiplier
   | 'projectileSpeed' // multiplier
   | 'duration' // multiplier for lingering effects
-  | 'eliteDamage' // multiplier vs elites and bosses
+  | 'eliteDamage' // multiplier vs elites, minibosses and bosses
   | 'knockback' // multiplier
   // Movement
   | 'moveSpeed' // multiplier on base run speed
@@ -124,7 +124,8 @@ export interface TomeDef {
 
 /** Hooks an item can react to. All are optional. `stacks` is how many the player holds. */
 export interface ItemHooks {
-  onKill?(ctx: GameContext, enemy: Enemy, stacks: number): void
+  /** `source` is what dealt the killing blow (weapon id, 'item:<id>', 'burn'…). */
+  onKill?(ctx: GameContext, enemy: Enemy, stacks: number, source?: string): void
   onHit?(ctx: GameContext, enemy: Enemy, damage: number, crit: boolean, stacks: number): void
   onPlayerDamaged?(ctx: GameContext, amount: number, stacks: number): void
   onJump?(ctx: GameContext, stacks: number): void
@@ -250,7 +251,10 @@ export type PickupKind = 'xp' | 'gold' | 'silver' | 'health' | 'magnet' | 'bomb'
 // ─────────────────────────────── Systems ─────────────────────────────
 
 export interface WorldApi {
-  /** Half the side of the square play area; the map spans [-halfSize, halfSize]. */
+  /**
+   * Half the side of the whole map mesh, which spans [-halfSize, halfSize].
+   * The walkable square is smaller: ±PLAY_LIMIT from world/colliders.
+   */
   readonly halfSize: number
   /** Ground height at (x, z). Cheap enough to call per entity per frame. */
   heightAt(x: number, z: number): number
@@ -307,7 +311,7 @@ export interface EnemyApi {
   applyFreeze(enemy: Enemy, seconds: number): void
   /** Despawns one enemy silently: no drops, no events (swarm and wave room-making). */
   remove(enemy: Enemy): void
-  /** Removes every non-boss enemy (stage transitions). */
+  /** Removes every non-boss enemy (includeBoss: every one). Stage changes dispose the manager instead. */
   clear(includeBoss?: boolean): void
   update(dt: number): void
   dispose(): void
@@ -378,7 +382,11 @@ export type InteractableKind =
 
 export interface InteractableApi {
   /** The thing in reach the player could use with Interact, with its prompt text. */
-  readonly prompt: { text: string; cost?: number } | null
+  /**
+   * What Interact would do right now. `passive` marks progress only (a charge
+   * shrine filling): pressing Interact does nothing, so no key or button is shown.
+   */
+  readonly prompt: { text: string; cost?: number; passive?: boolean } | null
   /** Called when the player presses Interact. */
   interact(): void
   /** Shows the exit portal (after the boss dies). */
@@ -575,6 +583,11 @@ export interface RunState {
   totalTime: number
   /** Stage length before the final swarm, seconds. */
   stageDuration: number
+  /**
+   * totalTime when the current stage began. stageTime jumps ahead when the
+   * boss dies, so elapsed stage time is totalTime − stageStartTime.
+   */
+  stageStartTime: number
   kills: number
   gold: number
   silver: number

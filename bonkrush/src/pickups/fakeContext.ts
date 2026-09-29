@@ -135,6 +135,7 @@ export function fakeContext(spots: FakeSpots = {}, seed = 1): FakeContext {
     portalOpen: false,
     curse: 0,
     greed: 0,
+      stageStartTime: 0,
     chestsPaid: 0,
   }
   const stats: StatBlock = { ...BASE_STATS }

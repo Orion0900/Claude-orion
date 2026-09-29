@@ -93,6 +93,8 @@ export class Spawner implements SpawnerApi {
   private readonly spot: Point2 = { x: 0, z: 0 }
   private readonly ring: Point2[] = []
   private readonly at = new THREE.Vector3()
+  /** Where the warned encirclement will close, fixed when the warning shows. */
+  private readonly encircleAt = { x: 0, z: 0, set: false }
 
   constructor(ctx: GameContext) {
     this.ctx = ctx
@@ -293,6 +295,10 @@ export class Spawner implements SpawnerApi {
   private warnEncircle(): void {
     const ctx = this.ctx
     const p = ctx.player.pos
+    // The ring closes where it was shown, so the warning tells the truth and a quick player can break out.
+    this.encircleAt.x = p.x
+    this.encircleAt.z = p.z
+    this.encircleAt.set = true
     ctx.ui.banner('SURROUNDED!', 'Break out of the ring', WARN)
     // A low drum hit, and a red ring showing where they'll stand.
     ctx.audio.play('explode', { pitch: 0.45, volume: 0.5 })
@@ -304,8 +310,11 @@ export class Spawner implements SpawnerApi {
     const id = ctx.stage.roster.find((r) => ENEMIES[r])
     if (!id) return
     const p = ctx.player.pos
+    const cx = this.encircleAt.set ? this.encircleAt.x : p.x
+    const cz = this.encircleAt.set ? this.encircleAt.z : p.z
+    this.encircleAt.set = false
     const count = encircleCount(ctx.stage.index)
-    const n = ringSpots(count, ENCIRCLE_RADIUS, p.x, p.z, this.rng.next() * Math.PI * 2, this.limit(), this.ring)
+    const n = ringSpots(count, ENCIRCLE_RADIUS, cx, cz, this.rng.next() * Math.PI * 2, this.limit(), this.ring)
     const ceiling = encircleCeiling(cap, count)
     let placed = 0
     // The ring is the point: it goes over the alive cap (far-off enemies still make room first).

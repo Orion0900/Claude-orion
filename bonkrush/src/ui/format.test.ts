@@ -314,3 +314,10 @@ describe('misc', () => {
     expect(bestStageLabel(3, 3, 5)).toBe('Victory!')
   })
 })
+
+describe('promptLabel for progress', () => {
+  it('shows a passive prompt without a key, since there is nothing to press', () => {
+    expect(promptLabel({ text: 'Charging… 45%', passive: true }, false, 0).text).toBe('Charging… 45%')
+    expect(promptLabel({ text: 'Charging… 45%', passive: true }, true, 0).text).toBe('Charging… 45%')
+  })
+})

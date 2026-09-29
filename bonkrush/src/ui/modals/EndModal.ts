@@ -67,6 +67,8 @@ export class EndModal extends Modal {
       if (moveFocus(this.panel, dir)) this.env.sfx('uiMove', { volume: 0.5 })
       return true
     }
+    // Space is jump: a mashed jump must never throw the summary away. Enter, R or a click retry.
+    if (e.key === ' ') return true
     if (e.repeat) return false
     if (activateFocused(this.panel, e)) return true
     if (e.key === 'r' || e.key === 'R') {

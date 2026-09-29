@@ -18,7 +18,7 @@ export class PauseModal extends Modal {
     const side = el('div', 'pause-side', undefined, this.panel)
     bouncyText('PAUSED', 'modal-title title-pause ol', side)
     const info = el('div', 'run-info', undefined, side)
-    el('div', 'run-info-stage ol', `${ctx.stage.name} · ${formatTime(ctx.run.stageTime)}`, info)
+    el('div', 'run-info-stage ol', `${ctx.stage.name} · ${formatTime(ctx.run.totalTime - ctx.run.stageStartTime)}`, info)
     el(
       'div',
       'run-info-line',

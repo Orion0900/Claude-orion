@@ -161,6 +161,7 @@ export class Game implements ShellApi {
       stageTime: 0,
       totalTime: 0,
       stageDuration: STAGES[0].duration,
+      stageStartTime: 0,
       kills: 0,
       gold: 0,
       silver: 0,
@@ -241,6 +242,7 @@ export class Game implements ShellApi {
     ctx.stage = stage
     ctx.run.stageIndex = stage.index
     ctx.run.stageTime = 0
+    ctx.run.stageStartTime = ctx.run.totalTime
     ctx.run.stageDuration = stage.duration
     ctx.run.bossSpawned = false
     ctx.run.bossDefeated = false
@@ -272,21 +274,26 @@ export class Game implements ShellApi {
       return
     }
     this.audio.play('portal')
-    await this.ui.openModal({ kind: 'stageClear', nextStage: next })
+    const closed = this.ui.openModal({ kind: 'stageClear', nextStage: next })
+    // Build the next stage behind the stage-clear card, once it has painted,
+    // so the build and shader compile stall there instead of in play.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     // The player can die in the same tick they step through; that run is over.
     if (this.run !== ctx || this.ending || !ctx.player.alive) return
     this.meta.bestStage = Math.max(this.meta.bestStage, next)
     writeSave(this.meta)
     this.disposeStage(ctx)
     this.buildStage(ctx, STAGES[next])
-    const start = ctx.world.spots.playerStart
-    ctx.player.pos.copy(start)
+    ctx.player.pos.copy(ctx.world.spots.playerStart)
     ctx.player.vel.set(0, 0, 0)
     ctx.player.refresh()
     ctx.camera.snap()
+    this.prewarm()
+    this.renderer.render(this.scene, this.camera)
+    await closed
+    if (this.run !== ctx || this.ending) return
     this.ui.attach(ctx)
     this.audio.startMusic(next)
-    this.prewarm()
   }
 
   private async endRun(victory: boolean): Promise<void> {
@@ -493,6 +500,8 @@ export class Game implements ShellApi {
     } else {
       // Keep floating numbers and particles settled while paused.
       ctx.fx.update(0)
+      // Behind the game-over card the camera orbits the body, so props must keep fading out of its way.
+      if (this.ending && !ctx.player.alive) ctx.world.update(dt)
     }
     ctx.camera.update(paused ? 0 : dt)
   }

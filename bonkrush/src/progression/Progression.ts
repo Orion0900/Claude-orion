@@ -9,6 +9,7 @@ import type {
   Enemy,
   GameContext,
   GameEvents,
+  ItemHooks,
   Offer,
   ProgressionApi,
   Rarity,
@@ -19,7 +20,7 @@ import type {
 } from '../game/types'
 import { WEAPONS } from '../weapons/weaponDefs'
 import { ITEM_BY_ID, ITEMS } from './itemDefs'
-import { BIG_BONK_CHANCE, BIG_BONK_MULT, itemRuntime, type ItemRuntime, type KillAwareHooks } from './itemEffects'
+import { BIG_BONK_CHANCE, BIG_BONK_MULT, itemRuntime, type ItemRuntime } from './itemEffects'
 import {
   conditionalMultiplier,
   lifestealHeal,
@@ -48,7 +49,7 @@ const SKIP_GOLD = 0.2
 /** Chance per Wrench that a shrine boon rolls one rarity higher (stacks like independent rolls). */
 const WRENCH_BUMP = 0.25
 
-type HeldItem = { hooks: KillAwareHooks; stacks: number }
+type HeldItem = { hooks: ItemHooks; stacks: number }
 
 const LEVEL_UP_TYPES: ReadonlySet<Offer['type']> = new Set<Offer['type']>([
   'newWeapon',

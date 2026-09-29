@@ -424,7 +424,9 @@ export class Player implements PlayerApi {
   private updateHint(): void {
     const input = this.ctx.input
     if (!hasInteractHint(input)) return
-    const show = !this.dead && this.ctx.interactables.prompt !== null
+    // A charge shrine's progress is only information: there's nothing to tap.
+    const prompt = this.ctx.interactables.prompt
+    const show = !this.dead && prompt !== null && !prompt.passive
     if (show === this.hintShown) return
     this.hintShown = show
     input.setInteractHint(show)

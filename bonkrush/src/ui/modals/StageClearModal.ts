@@ -15,7 +15,7 @@ export class StageClearModal extends Modal {
 
     const grid = el('div', 'end-stats', undefined, this.panel)
     const cells: Array<[string, string, string]> = [
-      ['⏱️', 'Stage time', formatTime(run.stageTime)],
+      ['⏱️', 'Stage time', formatTime(run.totalTime - run.stageStartTime)],
       ['⭐', 'Level', String(ctx.progression.level)],
       ['💀', 'Kills', formatCount(run.kills)],
       ['🪙', 'Gold', formatCount(run.gold)],

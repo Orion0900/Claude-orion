@@ -26,13 +26,13 @@ const GLOW_STYLE: Record<string, { intensity: number; flicker: number }> = {
  * four tiles under it are drawn instead of the whole map.
  */
 export function tilesFor(triangles: number): { view: number; shadow: number } {
-  return {
-    view: triangles >= VIEW_SPLIT_TRIANGLES ? 2 : 1,
-    shadow: triangles >= SHADOW_SPLIT_TRIANGLES ? SHADOW_TILES : 0,
-  }
+  // On screen every batch stays whole: with a 400 m far plane and the quadrants
+  // meeting at the start clearing, split view batches rarely culled and only
+  // cost draw calls. Shadows are different: the sun's box is small, so the
+  // biggest casters are tiled for it.
+  return { view: 1, shadow: triangles >= SHADOW_SPLIT_TRIANGLES ? SHADOW_TILES : 0 }
 }
-const VIEW_SPLIT_TRIANGLES = 6000
-const SHADOW_SPLIT_TRIANGLES = 2500
+const SHADOW_SPLIT_TRIANGLES = 10000
 const SHADOW_TILES = 4
 
 /** How much of a prop in the way the dither cuts out: a screen door, so the player shows through it. */
@@ -191,6 +191,12 @@ export class PropLayer {
   private readonly sight: Sightline = { ex: 0, ey: 0, ez: 0, px: 0, pz: 0, low: 0, high: 0 }
   /** How far any solid's silhouette reaches past its collider. */
   private overhang = 0
+  /**
+   * Solid ids at and past this are the rim's wall rocks. They have no
+   * collider (the walkable limit keeps players off them) but can still come
+   * between the camera and a player at the wall, so they fade like the rest.
+   */
+  private readonly rimStart: number
   private frame = 0
 
   private readonly m = new THREE.Matrix4()
@@ -210,7 +216,8 @@ export class PropLayer {
     /** The sun's shadow frustum (`LightShadow.getFrustum()`); without it casters shadow from their visible tiles. */
     private readonly shadowFrustum: THREE.Frustum | null = null,
   ) {
-    const count = colliders?.count ?? 0
+    this.rimStart = colliders?.count ?? 0
+    const count = this.rimStart + (colliders ? walls.length : 0)
     this.solids = new Array(count)
     this.fade = new Float32Array(count)
     this.wanted = new Int32Array(count)
@@ -251,7 +258,8 @@ export class PropLayer {
     if (walls.length > 0) {
       const rock = buildCliffRock()
       this.geometries.push(rock)
-      this.addBatch(rock, walls, this.solidMat, true, stone, null, 0)
+      const ids = colliders ? walls.map((w, k) => ({ ...w, collider: this.rimStart + k })) : walls
+      this.addBatch(rock, ids, this.solidMat, true, stone, null, 0)
     }
   }
 
@@ -284,7 +292,8 @@ export class PropLayer {
     for (let n = list.length - 1; n >= 0; n--) {
       const id = list[n]
       const solid = this.solids[id]!
-      const target = this.wanted[id] === frame ? (this.nearLens[id] ? FULL_FADE : 1) : 0
+      // Wall rocks are huge and hide nothing worth seeing, so they clear fully like props against the lens.
+      const target = this.wanted[id] === frame ? (this.nearLens[id] || id >= this.rimStart ? FULL_FADE : 1) : 0
       const was = this.fade[id]
       const now = target > was ? Math.min(target, was + step) : Math.max(target, was - step)
       if (now !== was) {
@@ -335,18 +344,28 @@ export class PropLayer {
     s.low = feet.y + SIGHT_LOW
     s.high = feet.y + SIGHT_HIGH
     const pad = this.overhang + sightMargin(LENS_REACH / 2, LINE_MARGIN, LENS_SPREAD, LENS_REACH)
-    for (const id of this.colliders!.querySegment(s.ex, s.ez, s.px, s.pz, pad, this.hits)) {
-      const solid = this.solids[id]
-      if (!solid || !blocksSight(solid, s, LINE_MARGIN, LENS_SPREAD, LENS_REACH)) continue
-      if (!this.isFading[id]) {
-        // A batch with every see-through slot taken leaves the rest solid.
-        if (!this.hide(solid, id)) continue
-        this.isFading[id] = 1
-        this.fading.push(id)
+    for (const id of this.colliders!.querySegment(s.ex, s.ez, s.px, s.pz, pad, this.hits)) this.consider(id, frame)
+    // The wall rocks only matter with the camera near the rim; a cheap distance cull keeps this to a handful.
+    if (Math.max(Math.abs(s.ex), Math.abs(s.ez)) > PLAY_LIMIT - 10) {
+      for (let id = this.rimStart; id < this.solids.length; id++) {
+        const rock = this.solids[id]
+        if (rock && Math.hypot(rock.x - s.ex, rock.z - s.ez) < placedReach(rock) + 12) this.consider(id, frame)
       }
-      this.wanted[id] = frame
-      this.nearLens[id] = lensInside(solid, s, LENS_CLEAR) ? 1 : 0
     }
+  }
+
+  private consider(id: number, frame: number): void {
+    const s = this.sight
+    const solid = this.solids[id]
+    if (!solid || !blocksSight(solid, s, LINE_MARGIN, LENS_SPREAD, LENS_REACH)) return
+    if (!this.isFading[id]) {
+      // A batch with every see-through slot taken leaves the rest solid.
+      if (!this.hide(solid, id)) return
+      this.isFading[id] = 1
+      this.fading.push(id)
+    }
+    this.wanted[id] = frame
+    this.nearLens[id] = lensInside(solid, s, LENS_CLEAR) ? 1 : 0
   }
 
   /** Moves a solid from its tile into its batch's see-through meshes. */
@@ -484,7 +503,8 @@ export class PropLayer {
           fadeSlot: -1,
         }
         this.solids[inst.collider!] = placed
-        this.overhang = Math.max(this.overhang, placedReach(placed) - colliderRadius * inst.scale)
+        // Rim rocks aren't in the collider grid, so they don't widen its searches.
+        if (inst.collider! < this.rimStart) this.overhang = Math.max(this.overhang, placedReach(placed) - colliderRadius * inst.scale)
       })
     }
   }

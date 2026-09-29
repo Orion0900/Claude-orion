@@ -46,6 +46,13 @@ export class LevelUpModal extends Modal {
     this.reroll = actionButton('Reroll', touch ? '' : 'R', 'btn-blue', () => this.doReroll(), actions)
     this.skip = actionButton('Skip', touch ? '' : 'S', 'btn-ghost', () => this.doSkip(), actions)
     this.banish = actionButton('Banish', touch ? '' : 'B', 'btn-red', () => this.toggleBanish(), actions)
+    // A click or tap leaves focus on the button; drop it so a later Space (jump) can't fire it again unseen.
+    // Keyboard activation (detail 0) keeps focus so arrow-key players can repeat on purpose.
+    for (const b of [this.reroll.btn, this.skip.btn, this.banish.btn]) {
+      b.addEventListener('click', (e) => {
+        if (e.detail > 0) b.blur()
+      })
+    }
     this.hint = el('div', 'modal-hint', '', this.panel)
     this.roll()
   }
