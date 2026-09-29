@@ -112,6 +112,8 @@ export class Ui implements UiApi {
       ev.on('wave', ({ encircle }) => this.hud.pulseWave(encircle)),
     )
     // Every stage opens with its name and the goal; attach runs once per stage.
+    // A new stage starts clean: the last stage's PORTAL OPEN or FINAL SWARM banner mustn't linger over it.
+    this.notices.clear()
     this.notices.banner(ctx.stage.name.toUpperCase(), STAGE_GOAL, ctx.stage.palette.accent)
   }
 

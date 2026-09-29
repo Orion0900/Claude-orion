@@ -1,4 +1,4 @@
-import { defaultSave, loadSave, silverForRun, writeSave } from './save'
+import { DEFAULT_SETTINGS, defaultSave, loadSave, silverForRun, writeSave } from './save'
 
 describe('silverForRun', () => {
   const base = { totalTime: 0, kills: 0, bossesKilled: 3, silverGain: 1, silver: 0 }
@@ -22,6 +22,17 @@ describe('save', () => {
     save.unlockedCharacters.push('kage')
     writeSave(save, storage)
     expect(loadSave(storage)).toEqual(save)
+  })
+
+  it('cleans each setting on its own', () => {
+    const raw = JSON.stringify({ settings: { master: 'loud', music: 7, sensitivity: null, quality: 'ultra', invertY: 'yes', screenShake: false } })
+    const s = loadSave({ getItem: () => raw }).settings
+    expect(s.master).toBe(DEFAULT_SETTINGS.master)
+    expect(s.music).toBe(1)
+    expect(s.sensitivity).toBe(DEFAULT_SETTINGS.sensitivity)
+    expect(s.quality).toBe(DEFAULT_SETTINGS.quality)
+    expect(s.invertY).toBe(false)
+    expect(s.screenShake).toBe(false)
   })
 
   it('survives a corrupt save', () => {

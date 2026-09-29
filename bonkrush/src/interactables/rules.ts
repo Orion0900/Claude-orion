@@ -56,6 +56,7 @@ export function chargeSpeed(wrenchStacks: number): number {
 
 /** One step of a charge shrine's 0..1 progress: fills inside the ring, drains outside. */
 export function stepCharge(progress: number, inside: boolean, dt: number, speed = 1): number {
+  if (!(dt > 0)) return progress
   const p = inside ? progress + (dt * Math.max(0, speed)) / CHARGE_TIME : progress - dt * CHARGE_DRAIN
   return Math.min(1, Math.max(0, p))
 }

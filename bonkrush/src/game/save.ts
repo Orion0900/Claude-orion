@@ -45,7 +45,7 @@ export function loadSave(storage: Pick<Storage, 'getItem'> | undefined = safeSto
       bestKills: num(data.bestKills, 0),
       bestStage: num(data.bestStage, 0),
       runs: num(data.runs, 0),
-      settings: { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' ? data.settings : {}) },
+      settings: cleanSettings(data.settings),
     }
   } catch {
     return fresh
@@ -67,6 +67,25 @@ export function writeSave(save: MetaSave, storage: Pick<Storage, 'setItem'> | un
 export function silverForRun(r: { totalTime: number; kills: number; stageIndex: number; bossesKilled: number; silverGain: number; silver: number }): number {
   const base = r.totalTime / 60 + r.kills / 150 + r.stageIndex * 8 + r.bossesKilled * 10
   return Math.max(0, Math.floor(base * r.silverGain) + Math.floor(r.silver))
+}
+
+/** Settings from storage, each checked: a hand-edited or stale save falls back per field, never breaks a slider. */
+function cleanSettings(raw: unknown): Settings {
+  const d = DEFAULT_SETTINGS
+  const s = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Partial<Record<keyof Settings, unknown>>
+  const range = (v: unknown, min: number, max: number, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
+  const flag = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback)
+  return {
+    master: range(s.master, 0, 1, d.master),
+    music: range(s.music, 0, 1, d.music),
+    sfx: range(s.sfx, 0, 1, d.sfx),
+    sensitivity: range(s.sensitivity, 0.2, 3, d.sensitivity),
+    invertY: flag(s.invertY, d.invertY),
+    quality: s.quality === 'low' || s.quality === 'medium' || s.quality === 'high' ? s.quality : d.quality,
+    showDamageNumbers: flag(s.showDamageNumbers, d.showDamageNumbers),
+    screenShake: flag(s.screenShake, d.screenShake),
+  }
 }
 
 function num(v: unknown, fallback: number): number {
