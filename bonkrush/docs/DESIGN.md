@@ -46,7 +46,7 @@ The movement is what makes the game fun. Tuning targets:
 - **Bunny hop:** jumping within 0.12 s of landing skips that landing's
   friction and adds +6% horizontal speed.
   - Slide-jumps keep the slide's speed, and diagonal strafing adds a little.
-  - Hard cap is 4× base speed. Over run speed on the ground and not sliding,
+  - Hard cap is 5× base speed. Over run speed on the ground and not sliding,
     speed decays toward run speed at 6 m/s².
 - **Terrain:** the player stands on `world.heightAt`. Steep cliffs over about
   50° can't be walked up, but you can jump up them. Solid props block the

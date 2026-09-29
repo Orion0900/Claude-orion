@@ -118,7 +118,7 @@ export class FirestaffBehavior implements WeaponBehavior {
     const dps = eff.damage * BURN_SHARE
     for (let i = 0; i < n; i++) {
       const e = this.burned[i]
-      if (e.alive) kit.ctx.enemies.applyBurn(e, dps, eff.duration)
+      if (e.alive) kit.ctx.enemies.applyBurn(e, dps, eff.duration, this.arm.w.def.id)
     }
     kit.blasts.spawn(pos, r * 0.85, this.blast, 0.32)
     kit.embers.burst(pos, this.orange, kit.count(10), 7, 0.2, 0.5, 6)

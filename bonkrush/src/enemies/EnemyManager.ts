@@ -91,6 +91,7 @@ const FLING_TIME = 0.45
 const FLING_GRAVITY = 24
 const TOPPLE_TIME = 1.1
 
+/** Reused for every burn tick; its source is set to whoever lit the burn. */
 const BURN: DamageOptions = { source: 'burn', noProcs: true }
 const THORNS: DamageOptions = { source: 'thorns', noProcs: true }
 
@@ -306,9 +307,12 @@ export class EnemyManager implements EnemyApi, BossHost {
     enemy.slow = Math.max(enemy.slow, seconds)
   }
 
-  applyBurn(enemy: Enemy, dps: number, seconds: number): void {
+  applyBurn(enemy: Enemy, dps: number, seconds: number, source = 'burn'): void {
     if (!enemy.alive || !(dps > 0) || !(seconds > 0)) return
-    if (enemy.burn <= 0 || dps >= enemy.burnDps) enemy.burnDps = dps
+    if (enemy.burn <= 0 || dps >= enemy.burnDps) {
+      enemy.burnDps = dps
+      enemy.burnSource = source
+    }
     enemy.burn = Math.max(enemy.burn, seconds)
   }
 
@@ -725,6 +729,7 @@ export class EnemyManager implements EnemyApi, BossHost {
       e.burnTick += dt
       if (e.burnTick >= 0.5) {
         e.burnTick -= 0.5
+        BURN.source = e.burnSource
         this.damage(e, e.burnDps * 0.5, BURN)
       }
       if (e.burn <= 0) {

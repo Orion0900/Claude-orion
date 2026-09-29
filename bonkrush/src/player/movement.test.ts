@@ -232,7 +232,7 @@ describe('movement', () => {
     expect(hspeed(runner)).toBeCloseTo(MOVE.runSpeed, 3)
   })
 
-  it('caps horizontal speed at 4× run speed', () => {
+  it('caps horizontal speed at 5× run speed', () => {
     const s = grounded()
     s.vel.set(100, 0, 0)
     stepMovement(s, input(), PARAMS, FLAT, DT)

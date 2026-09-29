@@ -470,7 +470,8 @@ export class Game implements ShellApi {
     const input = this.input.state
     if (input.pausePressed && !this.ui.modalOpen && !this.ending) void this.ui.openModal({ kind: 'pause' })
 
-    const paused = this.ui.modalOpen || this.ending
+    // Holding Tab for the map and stats pauses the run, like the original.
+    const paused = this.ui.modalOpen || this.ending || input.tabHeld
     if (!paused) {
       this.simTime += dt
       ctx.run.stageTime += dt

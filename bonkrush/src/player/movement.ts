@@ -48,8 +48,8 @@ export const MOVE = {
   slopeUphill: 1,
   bhopWindow: 0.12,
   bhopBonus: 1.06,
-  /** Hard cap on horizontal speed, × run speed. */
-  speedCap: 4,
+  /** Hard cap on horizontal speed, × run speed (~37 m/s): the original's steep slides reach 35+. */
+  speedCap: 5,
   overspeedDecay: 6,
   maxSlopeTan: Math.tan((50 * Math.PI) / 180),
   /** How far above your feet ground can be and still be stepped onto from the air. */

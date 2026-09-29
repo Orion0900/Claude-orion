@@ -78,6 +78,7 @@ export function fakeEnemy(uid: number, pos = new THREE.Vector3(), id = 'goblin')
     slow: 0,
     burn: 0,
     burnDps: 0,
+    burnSource: 'burn',
     freeze: 0,
     hitFlash: 0,
     t: 0,
