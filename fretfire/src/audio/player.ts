@@ -16,6 +16,44 @@ export interface Stem {
 
 type TimestampContext = AudioContext & { outputLatency?: number }
 
+/**
+ * Maps performance.now() timestamps to the audio context time being heard at
+ * that moment. The output timestamp is when a sample actually leaves the
+ * speaker, so this follows what the player hears, latency included.
+ */
+export class AudioClock {
+  /** Audio-context seconds minus performance.now() seconds, smoothed. */
+  private offset = Number.NaN
+
+  constructor(private readonly engine: AudioEngine) {}
+
+  reset(): void {
+    this.offset = Number.NaN
+  }
+
+  /** Re-reads the hardware clock; call once per frame. */
+  sync(nowMs: number): void {
+    const ctx = this.engine.ctx as TimestampContext | null
+    if (!ctx) return
+    let raw: number
+    const stamp = typeof ctx.getOutputTimestamp === 'function' ? ctx.getOutputTimestamp() : null
+    if (stamp && stamp.contextTime && stamp.performanceTime) {
+      raw = stamp.contextTime - stamp.performanceTime / 1000
+    } else {
+      raw = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0) - nowMs / 1000
+    }
+    // Jitter is smoothed away; a real jump (a stall, a route change) is taken at once.
+    if (!Number.isFinite(this.offset) || Math.abs(raw - this.offset) > 0.05) this.offset = raw
+    else this.offset += (raw - this.offset) * 0.03
+  }
+
+  /** The audible context time at a performance.now()-style timestamp. */
+  contextTimeAt(ms: number): number {
+    if (!Number.isFinite(this.offset)) this.sync(performance.now())
+    return ms / 1000 + this.offset
+  }
+}
+
 export class SongPlayer {
   readonly duration: number
   playing = false
@@ -24,8 +62,7 @@ export class SongPlayer {
   private anchorCtx = 0
   private anchorSong = 0
   private pausedAt = 0
-  /** Audio-context seconds minus performance.now() seconds, smoothed. */
-  private offset = Number.NaN
+  private readonly clock: AudioClock
 
   constructor(
     private readonly engine: AudioEngine,
@@ -33,6 +70,7 @@ export class SongPlayer {
     readonly rate = 1,
   ) {
     const ctx = engine.ctx!
+    this.clock = new AudioClock(engine)
     // Song time is audio time: a slowed song still runs 0 → duration, just slower.
     this.duration = Math.max(0, ...stems.map((s) => s.buffer.duration))
     this.gains = stems.map(() => {
@@ -63,8 +101,8 @@ export class SongPlayer {
       } else src.start(when - from / this.rate, 0)
       this.sources.push(src)
     })
-    this.offset = Number.NaN
-    this.sync(performance.now())
+    this.clock.reset()
+    this.clock.sync(performance.now())
     this.playing = true
   }
 
@@ -82,31 +120,15 @@ export class SongPlayer {
     for (const gain of this.gains) gain.disconnect()
   }
 
-  /**
-   * Re-reads the hardware clock; call once per frame. The output timestamp is
-   * the moment a sample actually leaves the speaker, so the song time follows
-   * what the player hears, latency included.
-   */
+  /** Re-reads the hardware clock; call once per frame. */
   sync(nowMs: number): void {
-    const ctx = this.engine.ctx as TimestampContext | null
-    if (!ctx) return
-    let raw: number
-    const stamp = typeof ctx.getOutputTimestamp === 'function' ? ctx.getOutputTimestamp() : null
-    if (stamp && stamp.contextTime && stamp.performanceTime) {
-      raw = stamp.contextTime - stamp.performanceTime / 1000
-    } else {
-      raw = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0) - nowMs / 1000
-    }
-    // Jitter is smoothed away; a real jump (a stall, a route change) is taken at once.
-    if (!Number.isFinite(this.offset) || Math.abs(raw - this.offset) > 0.05) this.offset = raw
-    else this.offset += (raw - this.offset) * 0.03
+    this.clock.sync(nowMs)
   }
 
   /** Song time, in seconds, at a performance.now()-style timestamp. */
   timeAt(ms: number): number {
     if (!this.playing) return this.pausedAt
-    const ctxTime = ms / 1000 + this.offset
-    return this.anchorSong + (ctxTime - this.anchorCtx) * this.rate
+    return this.anchorSong + (this.clock.contextTimeAt(ms) - this.anchorCtx) * this.rate
   }
 
   /** Mutes or restores the charted instrument's stem. */

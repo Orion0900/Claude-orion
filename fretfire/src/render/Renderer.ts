@@ -304,14 +304,20 @@ export class Renderer {
     g.fillStyle = strike
     g.fillRect(xAt(L, -edge, 0), y0 - 6, xAt(L, edge, 0) - xAt(L, -edge, 0), 12)
 
-    // Fog over the far end so notes emerge out of the dark.
-    const fogTop = yAt(L, 1) - 4
-    const fogBottom = yAt(L, 0.72)
+    // Fog over the far end so notes emerge out of the dark, shaped to the highway.
+    const fogTop = yAt(L, 1)
+    const fogBottom = yAt(L, 0.7)
     const fog = g.createLinearGradient(0, fogTop, 0, fogBottom)
-    fog.addColorStop(0, star ? 'rgba(10,28,56,1)' : 'rgba(26,12,48,1)')
+    fog.addColorStop(0, star ? 'rgba(10,28,56,0.95)' : 'rgba(24,11,44,0.95)')
     fog.addColorStop(1, 'rgba(0,0,0,0)')
     g.fillStyle = fog
-    g.fillRect(xAt(L, -edge - 0.3, 1), fogTop, xAt(L, edge + 0.3, 1) - xAt(L, -edge - 0.3, 1), fogBottom - fogTop)
+    g.beginPath()
+    g.moveTo(xAt(L, -edge, 1), fogTop)
+    g.lineTo(xAt(L, edge, 1), fogTop)
+    g.lineTo(xAt(L, edge, 0.7), fogBottom)
+    g.lineTo(xAt(L, -edge, 0.7), fogBottom)
+    g.closePath()
+    g.fill()
     return c
   }
 
@@ -659,10 +665,14 @@ export class Renderer {
     }
   }
 
+  /** Radius of the two round HUD badges; the star button is sized to match. */
+  badgeRadius(): number {
+    return Math.min(36, this.layout.hud.width * 0.34)
+  }
+
   private drawMultiplier(hud: HudState, x: number, y: number): void {
     const g = this.g
-    const L = this.layout
-    const r = Math.min(34, L.hud.width * 0.3)
+    const r = this.badgeRadius()
     const base = Math.min(4, Math.max(1, hud.starActive ? hud.multiplier / 2 : hud.multiplier))
     const color = hud.starActive ? STAR_COLOR : MULT_COLORS[base]
     g.fillStyle = 'rgba(8,6,16,0.75)'
@@ -702,32 +712,70 @@ export class Renderer {
   private drawStarMeter(hud: HudState, x: number, y: number, now: number): void {
     const g = this.g
     const L = this.layout
-    const w = 16
-    const h = Math.min(120, L.lane * 1.5)
-    const top = y - h / 2
-    g.fillStyle = 'rgba(8,6,16,0.75)'
-    roundRect(g, x - w / 2 - 4, top - 4, w + 8, h + 8, 10)
-    g.fill()
+    const r = this.badgeRadius()
     const level = Math.min(1, Math.max(0, hud.starMeter))
-    const pulse = hud.starReady ? 0.6 + 0.4 * Math.sin(now / 120) : 1
-    const fill = g.createLinearGradient(0, top + h, 0, top)
-    fill.addColorStop(0, '#2fb8ff')
-    fill.addColorStop(1, '#bffbff')
-    g.fillStyle = fill
-    g.globalAlpha = pulse
-    roundRect(g, x - w / 2, top + h * (1 - level), w, h * level, 6)
+    const lit = hud.starReady || hud.starActive
+    const pulse = hud.starReady ? 0.5 + 0.5 * Math.sin(now / 130) : 0
+    g.fillStyle = 'rgba(8,6,16,0.75)'
+    g.beginPath()
+    g.arc(x, y, r + 5, 0, Math.PI * 2)
     g.fill()
-    g.globalAlpha = 1
-    g.fillStyle = 'rgba(255,255,255,0.35)'
-    for (const mark of [0.25, 0.5, 0.75]) g.fillRect(x - w / 2, top + h * (1 - mark), w, mark === 0.5 ? 2 : 1)
+    if (lit) {
+      const glow = g.createRadialGradient(x, y, r * 0.2, x, y, r * 1.6)
+      glow.addColorStop(0, `rgba(143,247,255,${0.25 + pulse * 0.25})`)
+      glow.addColorStop(1, 'rgba(143,247,255,0)')
+      g.fillStyle = glow
+      g.beginPath()
+      g.arc(x, y, r * 1.6, 0, Math.PI * 2)
+      g.fill()
+    }
+    // Four quarters, one per phrase's worth of star power; the fill sweeps round.
+    g.lineWidth = 5
+    for (let i = 0; i < 4; i++) {
+      const a0 = -Math.PI / 2 + (i * Math.PI) / 2 + 0.07
+      const a1 = a0 + Math.PI / 2 - 0.14
+      g.strokeStyle = 'rgba(255,255,255,0.12)'
+      g.beginPath()
+      g.arc(x, y, r, a0, a1)
+      g.stroke()
+      const part = Math.min(1, Math.max(0, level * 4 - i))
+      if (part > 0) {
+        g.strokeStyle = hud.starActive ? '#ffffff' : STAR_COLOR
+        g.beginPath()
+        g.arc(x, y, r, a0, a0 + (a1 - a0) * part)
+        g.stroke()
+      }
+    }
+    // Lightning bolt.
+    const k = r * 0.62
+    g.beginPath()
+    const bolt: [number, number][] = [
+      [0.18, -1],
+      [-0.5, 0.12],
+      [-0.04, 0.12],
+      [-0.24, 1],
+      [0.5, -0.2],
+      [0.04, -0.2],
+    ]
+    bolt.forEach(([bx, by], i) => (i ? g.lineTo(x + bx * k, y + by * k) : g.moveTo(x + bx * k, y + by * k)))
+    g.closePath()
+    g.fillStyle = lit ? '#ffffff' : 'rgba(143,247,255,0.35)'
+    if (lit) {
+      g.shadowColor = STAR_COLOR
+      g.shadowBlur = 14
+    }
+    g.fill()
+    g.shadowBlur = 0
+
     g.textAlign = 'center'
-    g.font = `800 12px ${FONT}`
-    g.fillStyle = hud.starReady || hud.starActive ? STAR_COLOR : 'rgba(255,255,255,0.55)'
-    g.fillText(hud.starActive ? 'ACTIVE' : hud.starReady ? 'READY' : 'STAR', x, top + h + 20)
+    g.textBaseline = 'alphabetic'
+    g.font = `800 ${Math.round(r * 0.36)}px ${FONT}`
+    g.fillStyle = lit ? STAR_COLOR : 'rgba(255,255,255,0.55)'
+    g.fillText(hud.starActive ? 'ACTIVE' : hud.starReady ? 'READY' : 'STAR POWER', x, y + r + 26)
 
     if (hud.rock !== null) {
-      const rw = Math.min(80, L.hud.width * 0.8)
-      const ry = top + h + 34
+      const rw = Math.min(84, L.hud.width * 0.8)
+      const ry = y + r + 40
       const grad = g.createLinearGradient(x - rw / 2, 0, x + rw / 2, 0)
       grad.addColorStop(0, '#ff3b4f')
       grad.addColorStop(0.5, '#ffd43d')
@@ -738,9 +786,9 @@ export class Renderer {
       g.fillStyle = '#ffffff'
       const nx = x - rw / 2 + rw * hud.rock
       g.beginPath()
-      g.moveTo(nx, ry - 3)
-      g.lineTo(nx - 5, ry - 10)
-      g.lineTo(nx + 5, ry - 10)
+      g.moveTo(nx, ry + 9)
+      g.lineTo(nx - 5, ry + 16)
+      g.lineTo(nx + 5, ry + 16)
       g.fill()
     }
   }
