@@ -394,6 +394,8 @@ export function MapView({
     return (
       <div
         ref={frameRef}
+        role="main"
+        aria-label="Map"
         className={navigating ? 'map in-run' : 'map'}
         style={
           navigating

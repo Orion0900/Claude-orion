@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { discardActiveRun } from '../lib/activeRun'
 
 interface Props {
   /** Whether a run in progress was saved and can be picked back up. */
@@ -41,6 +42,19 @@ export class ErrorBoundary extends Component<Props, State> {
         <button type="button" className="btn" onClick={() => window.location.reload()}>
           {resumable ? 'Back to my run' : 'Reload'}
         </button>
+        {resumable ? (
+          // If the run itself is what keeps failing, this is the way out.
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => {
+              discardActiveRun()
+              window.location.reload()
+            }}
+          >
+            End that run and start fresh
+          </button>
+        ) : null}
       </div>
     )
   }
