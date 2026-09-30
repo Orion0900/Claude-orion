@@ -25,6 +25,11 @@ end at your door.
 > Megabonk: auto-firing weapons, slides and bunny hops, chests, shrines,
 > bosses and a final swarm, all generated in code. Ships at `/bonkrush/`. See
 > [bonkrush/README.md](bonkrush/README.md).
+> [Tidebound](tidebound/) — a handheld-style monster-taming RPG across a
+> chain of tropical islands: 43 original beasts to catch, turn-based battles,
+> three Wardens, surfing, a pirate crew and a Champion, with every sprite and
+> song generated in code. Ships at `/tidebound/`. See
+> [tidebound/README.md](tidebound/README.md).
 > [Fretfire](fretfire/) — a five-fret rhythm game for the iPhone in the spirit
 > of Clone Hero: tap the notes, hold the sustains, deploy star power. Four
 > original songs built in, and it plays your own `.chart`, `.mid` and `.sng`

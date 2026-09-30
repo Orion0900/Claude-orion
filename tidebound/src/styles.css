@@ -1,0 +1,251 @@
+/* The page is a handheld: a dark shell, the screen, and on touch devices the buttons. */
+:root {
+  --shell: #10182c;
+  --shell-hi: #1c2846;
+  --btn: #2a3a64;
+  --btn-hi: #3c5290;
+  --btn-a: #d8485c;
+  --btn-b: #e89a38;
+  --label: #9fb0d8;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--shell);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.lcd {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #000;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 3px #060a14,
+    0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* ─── Touch pad ─────────────────────────────────────────────── */
+
+.pad {
+  display: none;
+}
+
+.touch .pad {
+  display: block;
+}
+
+.touch.portrait {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: calc(env(safe-area-inset-top) + 12px);
+}
+
+.touch.portrait .pad {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  flex: 1;
+  margin-top: 8px;
+}
+
+.touch.landscape .pad {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dpad,
+.face,
+.meta {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.touch.portrait .dpad {
+  left: 6%;
+  top: 14%;
+}
+.touch.portrait .face {
+  right: 5%;
+  top: 16%;
+}
+.touch.portrait .meta {
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+}
+
+/* Sideways the controls fit in the columns beside the screen, with SELECT
+   and START tucked into the bottom corners so nothing covers the game. */
+.touch.landscape .dpad {
+  left: calc(env(safe-area-inset-left) + 14px);
+  top: 50%;
+  width: 128px;
+  height: 128px;
+  transform: translateY(-55%);
+}
+.touch.landscape .dpad-cross {
+  background-size:
+    43px 100%,
+    100% 43px;
+}
+.touch.landscape .face {
+  right: calc(env(safe-area-inset-right) + 12px);
+  top: 50%;
+  width: 140px;
+  height: 118px;
+  transform: translateY(-60%);
+}
+.touch.landscape .btn {
+  width: 58px;
+  height: 58px;
+  font-size: 19px;
+}
+.touch.landscape .meta {
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  justify-content: space-between;
+  padding: 0 calc(env(safe-area-inset-right) + 12px) 0 calc(env(safe-area-inset-left) + 12px);
+  pointer-events: none;
+}
+.touch.landscape .pill {
+  pointer-events: auto;
+  padding: 6px 12px;
+  font-size: 10px;
+}
+
+.dpad {
+  width: 150px;
+  height: 150px;
+  touch-action: none;
+}
+
+.dpad-cross {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+  border-radius: 10px;
+  filter: drop-shadow(0 4px 0 #080c18);
+}
+
+.dpad-cross::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: var(--shell-hi);
+}
+
+.dpad-cross[data-dir='up'] {
+  background:
+    linear-gradient(var(--btn-hi), var(--btn-hi)) center top / 50px 50px no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+}
+.dpad-cross[data-dir='down'] {
+  background:
+    linear-gradient(var(--btn-hi), var(--btn-hi)) center bottom / 50px 50px no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+}
+.dpad-cross[data-dir='left'] {
+  background:
+    linear-gradient(var(--btn-hi), var(--btn-hi)) left center / 50px 50px no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+}
+.dpad-cross[data-dir='right'] {
+  background:
+    linear-gradient(var(--btn-hi), var(--btn-hi)) right center / 50px 50px no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+}
+
+.face {
+  width: 170px;
+  height: 130px;
+}
+
+.btn {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 22px;
+  box-shadow: 0 5px 0 #080c18;
+  touch-action: none;
+}
+
+.btn-a {
+  right: 0;
+  top: 0;
+  background: var(--btn-a);
+}
+.btn-b {
+  left: 0;
+  bottom: 0;
+  background: var(--btn-b);
+}
+
+.btn.on {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #080c18;
+  filter: brightness(1.15);
+}
+
+.meta {
+  display: flex;
+  gap: 22px;
+}
+
+.pill {
+  padding: 8px 16px;
+  border-radius: 14px;
+  border: none;
+  background: var(--btn);
+  color: var(--label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 3px 0 #080c18;
+  touch-action: none;
+}
+
+.pill.on {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #080c18;
+  filter: brightness(1.2);
+}
