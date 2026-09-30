@@ -65,14 +65,15 @@ export function midiSustainCutoff(resolution: number): number {
 export function ticksInSpans(ticks: Iterable<number>, spans: TickSpan[]): Set<number> {
   const sorted = [...spans].sort((a, b) => a.tick - b.tick)
   const inside = new Set<number>()
-  for (const tick of ticks) {
-    for (const span of sorted) {
-      if (span.tick > tick) break
-      if (tick < span.tick + Math.max(1, span.length)) {
-        inside.add(tick)
-        break
-      }
+  // Walk both in order, tracking the furthest end of every span begun so far.
+  let next = 0
+  let end = -Infinity
+  for (const tick of [...ticks].sort((a, b) => a - b)) {
+    while (next < sorted.length && sorted[next].tick <= tick) {
+      end = Math.max(end, sorted[next].tick + Math.max(1, sorted[next].length))
+      next++
     }
+    if (tick < end) inside.add(tick)
   }
   return inside
 }

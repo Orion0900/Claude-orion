@@ -20,8 +20,12 @@ export interface SongPackage {
   addedAt: number
 }
 
+/** The songs an import produced, and why anything else was turned away. */
 export interface ImportResult {
+  /** Empty when an `onSong` callback took the songs as they came. */
   songs: SongPackage[]
+  /** How many songs were added, handed over or not. */
+  added: number
   errors: { source: string; reason: string }[]
 }
 
@@ -31,13 +35,28 @@ export const AUDIO_EXTENSIONS: string[] = ['ogg', 'opus', 'mp3', 'wav', 'm4a', '
 /** Chart files in order of preference. */
 const CHART_FILES = ['notes.mid', 'notes.chart']
 const ART_FILES = ['album.png', 'album.jpg', 'album.jpeg']
+/** Types for files that come out of archives untyped, so object URLs play and show everywhere. */
+const MIME_TYPES: Record<string, string> = {
+  ogg: 'audio/ogg',
+  opus: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+  webm: 'audio/webm',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+}
 /** How deep zips inside zips are opened. */
 const MAX_ZIP_DEPTH = 3
 const UNTITLED = 'Untitled song'
 
 const UNSUPPORTED_ARCHIVE = 'Extract .rar and .7z archives first, or re-save them as .zip'
 const NO_CHART = 'No notes.chart or notes.mid found'
-const NO_CHART_LOOSE = 'No notes.chart or notes.mid found. Pick the chart together with its audio, or import a .zip or .sng'
+const NO_CHART_LOOSE =
+  'No notes.chart or notes.mid found. Pick the chart together with its audio, or import a .zip or .sng'
 const NOT_A_SONG = "Not a song. Import a .zip or .sng, or a song's notes.chart or notes.mid together with its audio"
 const MANY_SONGS = 'These files hold more than one song. Import one song at a time, or put the song folders in a .zip'
 const NO_PARTS = "No guitar, bass, rhythm or keys part to play (drum-only charts aren't supported)"
@@ -62,7 +81,12 @@ interface Candidate {
  * without folder paths (iOS) are one song; with paths (a desktop folder
  * picker) each folder is one. Every song is parsed once to check it plays.
  */
-export async function importFiles(files: File[], onProgress?: (message: string) => void): Promise<ImportResult> {
+export async function importFiles(
+  files: File[],
+  onProgress?: (message: string) => void,
+  /** Takes each song as soon as it's ready, so a big pack never sits in memory whole. */
+  onSong?: (song: SongPackage) => Promise<void>,
+): Promise<ImportResult> {
   const progress = (message: string) => onProgress?.(message)
   const errors: ImportError[] = []
   const candidates: Candidate[] = []
@@ -97,12 +121,13 @@ export async function importFiles(files: File[], onProgress?: (message: string) 
       const song = await buildSong(candidate)
       if (seen.has(song.id)) continue
       seen.add(song.id)
-      songs.push(song)
+      if (onSong) await onSong(song)
+      else songs.push(song)
     } catch (error) {
       errors.push({ source: candidate.source, reason: reasonOf(error) })
     }
   }
-  return { songs, errors }
+  return { songs, added: seen.size, errors }
 }
 
 /** Parses a saved song's chart with its song.ini settings. */
@@ -207,7 +232,9 @@ function scanLoose(files: File[], onlyLoose: boolean, candidates: Candidate[], e
   const charts = files.filter((file) => CHART_FILES.includes(file.name.toLowerCase()))
   if (!charts.length) {
     const songLike = files.some((file) => isSongFile(file.name.toLowerCase()))
-    if (songLike || onlyLoose) errors.push({ source: describeFiles(files), reason: songLike ? NO_CHART_LOOSE : NOT_A_SONG })
+    if (songLike || onlyLoose) {
+      errors.push({ source: describeFiles(files), reason: songLike ? NO_CHART_LOOSE : NOT_A_SONG })
+    }
     return
   }
   const copies = (name: string) => charts.filter((file) => file.name.toLowerCase() === name).length
@@ -259,7 +286,7 @@ async function buildSong(candidate: Candidate): Promise<SongPackage> {
 
     const files: Record<string, Blob> = { [chartFile]: chartBlob }
     for (const [name, load] of candidate.files) {
-      if (!CHART_FILES.includes(name)) files[name] = await load()
+      if (!CHART_FILES.includes(name)) files[name] = withType(await load(), name)
     }
     return {
       id: songId(bytes, meta.name, meta.artist),
@@ -329,8 +356,14 @@ function isSongFile(name: string): boolean {
   return CHART_FILES.includes(name) || name === 'song.ini' || ART_FILES.includes(name) || isAudio(name)
 }
 
+/** Audio stems by extension. Clone Hero's background video is always `video.*`, even as .webm. */
 function isAudio(name: string): boolean {
-  return !name.startsWith('._') && AUDIO_EXTENSIONS.includes(extension(name))
+  return !name.startsWith('._') && !name.startsWith('video.') && AUDIO_EXTENSIONS.includes(extension(name))
+}
+
+function withType(blob: Blob, name: string): Blob {
+  const type = MIME_TYPES[extension(name)]
+  return blob.type || !type ? blob : new Blob([blob], { type })
 }
 
 function extension(name: string): string {

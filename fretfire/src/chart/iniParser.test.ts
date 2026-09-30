@@ -2,7 +2,7 @@ import { metaFromIni, parseIni, stripRichText } from './iniParser'
 
 describe('parseIni', () => {
   it('reads the [song] section with lowercase keys and trimmed values', () => {
-    const text = '﻿[Song]\r\nName = My Song \r\nARTIST=The Band\r\n\r\n[other]\r\nname = Nope\r\n'
+    const text = '\uFEFF[Song]\r\nName = My Song \r\nARTIST=The Band\r\n\r\n[other]\r\nname = Nope\r\n'
     expect(parseIni(text)).toEqual({ name: 'My Song', artist: 'The Band' })
   })
 
@@ -17,6 +17,7 @@ describe('parseIni', () => {
 
   it('reads top-level keys when there is no section header', () => {
     expect(parseIni('name=Loose\nartist = Someone')).toEqual({ name: 'Loose', artist: 'Someone' })
+    expect(parseIni('name = Stray\n[song]\nartist = Someone')).toEqual({ artist: 'Someone' })
   })
 
   it('keeps everything after the first equals sign', () => {

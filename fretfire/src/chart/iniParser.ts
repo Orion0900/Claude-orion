@@ -2,7 +2,7 @@ import type { Instrument, SongMeta } from './types'
 
 /**
  * Reads the `[song]` section of a song.ini: lowercase keys, trimmed values,
- * the last of any duplicate key winning. A file with no `[song]` header is
+ * the last of any duplicate key winning. A file without a `[song]` header is
  * read from its top-level keys.
  */
 export function parseIni(text: string): Record<string, string> {
@@ -10,7 +10,7 @@ export function parseIni(text: string): Record<string, string> {
   const song: Record<string, string> = {}
   let hasSong = false
   let target: Record<string, string> | undefined = topLevel
-  for (const raw of text.replace(/^﻿/, '').split(/\r\n|\r|\n/)) {
+  for (const raw of text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith(';') || line.startsWith('#') || line.startsWith('//')) continue
     if (line.startsWith('[')) {
@@ -27,7 +27,7 @@ export function parseIni(text: string): Record<string, string> {
     const key = line.slice(0, eq).trim().toLowerCase()
     if (key) target[key] = line.slice(eq + 1).trim()
   }
-  return hasSong ? { ...topLevel, ...song } : topLevel
+  return hasSong ? song : topLevel
 }
 
 const INTENSITY_KEYS: [string, Instrument][] = [
@@ -84,8 +84,14 @@ export function metaFromIni(values: Record<string, string>): Partial<SongMeta> {
 }
 
 /** Unity / TextMeshPro rich-text tags that Clone Hero charters put in names. */
-const RICH_TEXT_TAG =
-  /<\/?(?:align|allcaps|alpha|b|color|cspace|font|font-weight|gradient|i|indent|line-height|line-indent|link|lowercase|margin|mark|material|mspace|nobr|noparse|page|pos|quad|rotate|s|size|smallcaps|space|sprite|strikethrough|style|sub|sup|u|underline|uppercase|voffset|width)(?:[\s=][^<>]*)?>|<#[0-9a-f]{3,8}>/gi
+const RICH_TEXT_TAGS = [
+  'align', 'allcaps', 'alpha', 'b', 'color', 'cspace', 'font', 'font-weight', 'gradient', 'i', 'indent',
+  'line-height', 'line-indent', 'link', 'lowercase', 'margin', 'mark', 'material', 'mspace', 'nobr', 'noparse',
+  'page', 'pos', 'quad', 'rotate', 's', 'size', 'smallcaps', 'space', 'sprite', 'strikethrough', 'style', 'sub',
+  'sup', 'u', 'underline', 'uppercase', 'voffset', 'width',
+]
+/** An opening or closing tag, with or without a value (`<size=120%>`), or a `<#ff0000>` color. */
+const RICH_TEXT_TAG = new RegExp(`</?(?:${RICH_TEXT_TAGS.join('|')})(?:[\\s=][^<>]*)?>|<#[0-9a-f]{3,8}>`, 'gi')
 
 /** Removes Clone Hero rich-text markup like `<color=#ff0000>` from a display string. */
 export function stripRichText(text: string): string {

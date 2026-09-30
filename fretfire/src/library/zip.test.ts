@@ -1,5 +1,12 @@
-import { crc32, deflateRawSync } from 'node:zlib'
 import { openZip } from './zip'
+
+// The project is typed for browsers (no @types/node), so node:zlib gets a hand-written type here.
+interface Zlib {
+  deflateRawSync(data: Uint8Array): Uint8Array
+  crc32(data: Uint8Array): number
+}
+const zlibModule = 'node:zlib'
+const { crc32, deflateRawSync } = (await import(/* @vite-ignore */ zlibModule)) as Zlib
 
 interface ZipInput {
   name: string
@@ -22,7 +29,7 @@ interface ZipOptions {
 const enc = (text: string) => new TextEncoder().encode(text)
 
 /** A small ZIP writer: stored or deflated entries, optional ZIP64 records, comment and prefix. */
-function makeZip(files: ZipInput[], options: ZipOptions = {}): Uint8Array {
+function makeZip(files: ZipInput[], options: ZipOptions = {}): Uint8Array<ArrayBuffer> {
   const { comment = '', zip64 = false, prefix = 0, localExtra = false } = options
   const parts: Uint8Array[] = [new Uint8Array(prefix).fill(0x41)]
   let length = prefix
@@ -152,7 +159,7 @@ const SAMPLE: ZipInput[] = [
   { name: 'Pack/.DS_Store', data: 'finder junk', method: 0 },
 ]
 
-async function contents(zip: Uint8Array): Promise<Record<string, string>> {
+async function contents(zip: Uint8Array<ArrayBuffer>): Promise<Record<string, string>> {
   const entries = await openZip(new Blob([zip]))
   const out: Record<string, string> = {}
   for (const entry of entries) out[entry.name] = await (await entry.blob()).text()

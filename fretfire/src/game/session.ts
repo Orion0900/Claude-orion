@@ -329,6 +329,12 @@ export class PlaySession {
     return this.down[lane] > 0
   }
 
+  /** Should this note still look like a star? Not once a miss has broken its phrase. */
+  starLive(index: number): boolean {
+    const phrase = this.phraseOf[index]
+    return phrase >= 0 && !this.phraseBroken[phrase]
+  }
+
   private tapLane(lane: number, time: number): void {
     const { window } = this.options
     const notes = this.notes

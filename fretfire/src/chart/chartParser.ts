@@ -15,6 +15,7 @@ import {
   type Track,
 } from './types'
 
+/** song.ini settings that change how a .chart plays. */
 export interface ChartParseOptions {
   /** song.ini hopo_frequency, in ticks. */
   hopoFrequency?: number
@@ -64,7 +65,7 @@ export function parseChartText(text: string, options: ChartParseOptions = {}): P
 
   let kind: SectionKind = 'skip'
   let track: PendingTrack | undefined
-  for (const raw of text.replace(/^﻿/, '').split(/\r\n|\r|\n/)) {
+  for (const raw of text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/)) {
     const line = raw.trim()
     if (!line || line === '{' || line === '}') continue
     if (line.startsWith('[')) {
@@ -83,7 +84,7 @@ export function parseChartText(text: string, options: ChartParseOptions = {}): P
           const key = `${instrument}/${difficulty}`
           track = tracks.get(key)
           if (!track) {
-            track = { instrument, difficulty, gems: [], forces: new Map(), taps: new Set(), starPhrases: [], soloMarks: [] }
+            track = newTrack(instrument, difficulty)
             tracks.set(key, track)
           }
           kind = 'track'
@@ -148,7 +149,8 @@ export function parseChartText(text: string, options: ChartParseOptions = {}): P
   const resolution = Number(song.resolution)
   const songOffset = parseFloat(song.offset ?? '')
   const offset = (Number.isFinite(songOffset) ? songOffset : 0) + (options.delay ?? 0)
-  const tempo = new TempoMap(Number.isFinite(resolution) && resolution > 0 ? resolution : 192, tempos, offset, signatures)
+  // TempoMap falls back to 192 ticks per beat for a missing or broken resolution.
+  const tempo = new TempoMap(resolution, tempos, offset, signatures)
   const buildOptions = {
     hopoThreshold: options.hopoFrequency ?? chartHopoThreshold(tempo.resolution),
     sustainCutoff: 0,
@@ -187,6 +189,10 @@ export function parseChartText(text: string, options: ChartParseOptions = {}): P
     tracks: built,
   }
   return { chart, meta: songMeta(song) }
+}
+
+function newTrack(instrument: Instrument, difficulty: Difficulty): PendingTrack {
+  return { instrument, difficulty, gems: [], forces: new Map(), taps: new Set(), starPhrases: [], soloMarks: [] }
 }
 
 /** Pairs solo / soloend events into spans; soloend is inclusive, and an unclosed solo runs to the last note. */

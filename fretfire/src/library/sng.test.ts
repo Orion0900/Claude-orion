@@ -10,7 +10,7 @@ interface SngFile {
 }
 
 /** A small .sng writer following github.com/mdsitton/SngFileFormat. */
-function makeSng(meta: [string, string][], files: SngFile[]): Uint8Array {
+function makeSng(meta: [string, string][], files: SngFile[]): Uint8Array<ArrayBuffer> {
   const mask = Array.from({ length: 16 }, (_, i) => (i * 37 + 11) & 255)
   const bytes: number[] = []
   const u32 = (list: number[], n: number) => list.push(n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255)
@@ -101,7 +101,11 @@ describe('openSng', () => {
   })
 
   it('reads a header region bigger than its first read', async () => {
-    const sng = makeSng([['loading_phrase', 'x'.repeat(100_000)], ['name', 'Long']], [{ name: 'song.ogg', data: 'ogg' }])
+    const pairs: [string, string][] = [
+      ['loading_phrase', 'x'.repeat(100_000)],
+      ['name', 'Long'],
+    ]
+    const sng = makeSng(pairs, [{ name: 'song.ogg', data: 'ogg' }])
     const { meta, entries } = await openSng(new Blob([sng]))
     expect(meta.name).toBe('Long')
     expect(meta.loading_phrase).toHaveLength(100_000)
@@ -118,7 +122,8 @@ describe('openSng', () => {
   })
 
   it('rejects files that are not .sng containers or are cut short', async () => {
-    await expect(openSng(new Blob(['PK\u0003\u0004 not an sng at all, sorry']))).rejects.toThrow('This is not a .sng file')
+    const zip = new Blob(['PK\u0003\u0004 not an sng at all, sorry'])
+    await expect(openSng(zip)).rejects.toThrow('This is not a .sng file')
     const sng = makeSng([['name', 'x'.repeat(1000)]], [{ name: 'song.ogg', data: 'ogg' }])
     await expect(openSng(new Blob([sng.subarray(0, 500)]))).rejects.toThrow('This .sng file is damaged')
   })

@@ -1,11 +1,19 @@
-import { crc32, deflateRawSync } from 'node:zlib'
 import { AUDIO_EXTENSIONS, importFiles, loadChart, type SongPackage } from './importer'
 
+// The project is typed for browsers (no @types/node), so node:zlib gets a hand-written type here.
+interface Zlib {
+  deflateRawSync(data: Uint8Array): Uint8Array
+  crc32(data: Uint8Array): number
+}
+const zlibModule = 'node:zlib'
+const { crc32, deflateRawSync } = (await import(/* @vite-ignore */ zlibModule)) as Zlib
+
 const enc = (text: string) => new TextEncoder().encode(text)
-const bytesOf = (data: Uint8Array | string) => (typeof data === 'string' ? enc(data) : data)
+type Data = Uint8Array<ArrayBuffer> | string
+const bytesOf = (data: Data) => (typeof data === 'string' ? enc(data) : data)
 
 /** A minimal ZIP writer: charts are deflated, everything else stored. */
-function makeZip(files: Record<string, Uint8Array | string>): Uint8Array {
+function makeZip(files: Record<string, Data>): Uint8Array<ArrayBuffer> {
   const out: number[] = []
   const central: number[] = []
   const u16 = (list: number[], n: number) => list.push(n & 255, (n >>> 8) & 255)
@@ -54,7 +62,7 @@ function makeZip(files: Record<string, Uint8Array | string>): Uint8Array {
 }
 
 /** A minimal notes.mid: 120 BPM at 480 ticks per beat, one track per part. */
-function makeMidi(parts: Record<string, [tick: number, key: number, length: number][]>): Uint8Array {
+function makeMidi(parts: Record<string, [tick: number, key: number, length: number][]>): Uint8Array<ArrayBuffer> {
   const vlq = (n: number) => {
     const out = [n & 0x7f]
     for (n >>= 7; n > 0; n >>= 7) out.unshift((n & 0x7f) | 0x80)
@@ -68,7 +76,9 @@ function makeMidi(parts: Record<string, [tick: number, key: number, length: numb
       last = tick
     }
     body.push(0, 0xff, 0x2f, 0)
-    return [...enc('MTrk'), (body.length >>> 24) & 255, (body.length >>> 16) & 255, (body.length >>> 8) & 255, body.length & 255, ...body]
+    const n = body.length
+    const length = [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]
+    return [...enc('MTrk'), ...length, ...body]
   }
   const tracks = [track('tempo', [[0, [0xff, 0x51, 3, 0x07, 0xa1, 0x20]]])]
   for (const [name, notes] of Object.entries(parts)) {
@@ -81,7 +91,7 @@ function makeMidi(parts: Record<string, [tick: number, key: number, length: numb
 }
 
 /** A minimal .sng writer. */
-function makeSng(meta: Record<string, string>, files: Record<string, Uint8Array | string>): Uint8Array {
+function makeSng(meta: Record<string, string>, files: Record<string, Data>): Uint8Array<ArrayBuffer> {
   const mask = Array.from({ length: 16 }, (_, i) => (i * 29 + 3) & 255)
   const u32 = (list: number[], n: number) => list.push(n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255)
   const u64 = (list: number[], n: number) => {
@@ -152,7 +162,7 @@ const GUITAR_MIDI = makeMidi({
   'PART KEYS': [[960, 72, 60]],
 })
 
-const file = (name: string, data: Uint8Array | string = 'x', path?: string) => {
+const file = (name: string, data: Data = 'x', path?: string) => {
   const f = new File([bytesOf(data)], name)
   if (path) Object.defineProperty(f, 'webkitRelativePath', { value: path })
   return f
@@ -165,6 +175,7 @@ const PACK = makeZip({
   'Pack/Artist - Song A/Album.PNG': 'PNG',
   'Pack/Artist - Song A/readme.txt': 'hello',
   'Pack/Artist - Song A/background.jpg': 'JPG',
+  'Pack/Artist - Song A/video.webm': 'background video',
   'Pack/Deep/Nested/Song B/notes.mid': GUITAR_MIDI,
   'Pack/Deep/Nested/Song B/guitar.opus': 'Opus',
   '__MACOSX/Pack/Deep/Nested/Song B/._notes.mid': 'fork',
@@ -193,6 +204,8 @@ describe('importFiles', () => {
     // No song_length: the song ends with the last note (tick 384 at 120 BPM, after the 0.5 s delay).
     expect(a.meta.length).toBeCloseTo(1.5)
     expect(await a.files['song.ogg'].text()).toBe('OggS')
+    expect(a.files['song.ogg'].type).toBe('audio/ogg')
+    expect(a.files['album.png'].type).toBe('image/png')
 
     expect(b.chartFile).toBe('notes.mid')
     expect(Object.keys(b.files).sort()).toEqual(['guitar.opus', 'notes.mid'])
@@ -236,11 +249,12 @@ describe('importFiles', () => {
   })
 
   it('prefers notes.mid, falling back to notes.chart when the MIDI has nothing to play', async () => {
-    const both = await importFiles([file('notes.chart', chartText('C', 'A')), file('notes.mid', GUITAR_MIDI), file('song.ogg')])
+    const chart = file('notes.chart', chartText('C', 'A'))
+    const both = await importFiles([chart, file('notes.mid', GUITAR_MIDI), file('song.ogg')])
     expect(both.songs[0].chartFile).toBe('notes.mid')
     expect(Object.keys(both.songs[0].files)).not.toContain('notes.chart')
     const drumMidi = makeMidi({ 'PART DRUMS': [[0, 96, 60]] })
-    const fallback = await importFiles([file('notes.chart', chartText('C', 'A')), file('notes.mid', drumMidi), file('song.ogg')])
+    const fallback = await importFiles([chart, file('notes.mid', drumMidi), file('song.ogg')])
     expect(fallback.songs[0].chartFile).toBe('notes.chart')
   })
 

@@ -22,6 +22,7 @@ import {
   type Track,
 } from './types'
 
+/** song.ini settings that change how a notes.mid plays. */
 export interface MidiParseOptions {
   /** song.ini hopo_frequency, in ticks. */
   hopoFrequency?: number
@@ -196,10 +197,10 @@ function readTrack(
         pos += length
         if (type === 0x2f) break
         if (type === 0x03) {
-          if (!hasName) track.name = decodeText(data)
+          if (!hasName) track.name = midiText(data)
           hasName = true
         } else if (type === 0x01 || type === 0x05 || type === 0x06 || type === 0x07) {
-          track.texts.push({ tick, text: decodeText(data) })
+          track.texts.push({ tick, text: midiText(data) })
         } else if (type === 0x51 && length >= 3) {
           const micros = (data[0] << 16) | (data[1] << 8) | data[2]
           if (micros > 0) tempos.push({ tick, bpm: 60_000_000 / micros })
@@ -321,6 +322,11 @@ function applyOpenSpans(gems: RawGem[], spans: TickSpan[]): RawGem[] {
   }
   for (const [tick, length] of longest) out.push({ tick, lane: OPEN_LANE, length })
   return out
+}
+
+/** Text from a meta event; some tools pad it with NUL bytes. */
+function midiText(data: Uint8Array): string {
+  return decodeText(data).replace(/\0/g, '')
 }
 
 function fourCC(bytes: Uint8Array, at: number): string {

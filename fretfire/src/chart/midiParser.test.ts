@@ -16,7 +16,10 @@ function vlq(n: number): number[] {
   for (n = Math.floor(n / 128); n > 0; n = Math.floor(n / 128)) out.unshift((n & 0x7f) | 0x80)
   return out
 }
-const meta = (tick: number, type: number, data: number[]): Ev => ({ tick, bytes: [0xff, type, ...vlq(data.length), ...data] })
+const meta = (tick: number, type: number, data: number[]): Ev => ({
+  tick,
+  bytes: [0xff, type, ...vlq(data.length), ...data],
+})
 const trackName = (text: string) => meta(0, 0x03, ascii(text))
 const text = (tick: number, value: string, type = 0x01) => meta(tick, type, ascii(value))
 const tempo = (tick: number, bpm: number) => {
@@ -47,7 +50,13 @@ const rawTrack = (body: number[]) => [...ascii('MTrk'), ...u32(body.length), ...
 const midiFile = (tracks: number[][], division = 480) =>
   new Uint8Array([...ascii('MThd'), ...u32(6), ...u16(1), ...u16(tracks.length), ...u16(division), ...tracks.flat()])
 
-const conductor = encodeTrack([trackName('Song Title'), tempo(0, 120), timeSig(0, 4, 2), tempo(1920, 60), timeSig(1920, 3, 3)])
+const conductor = encodeTrack([
+  trackName('Song Title'),
+  tempo(0, 120),
+  timeSig(0, 4, 2),
+  tempo(1920, 60),
+  timeSig(1920, 3, 3),
+])
 
 const guitar = encodeTrack([
   trackName('PART GUITAR'),
@@ -66,7 +75,7 @@ const guitar = encodeTrack([
   text(0, '[idle]'),
 ])
 
-const bass = encodeTrack([trackName('part bass '), ...note(0, 60, 100), ...note(480, 61, 100)])
+const bass = encodeTrack([meta(0, 0x03, [...ascii('part bass '), 0, 0]), ...note(0, 60, 100), ...note(480, 61, 100)])
 const drums = encodeTrack([trackName('PART DRUMS'), ...note(0, 96, 100)])
 const events = encodeTrack([
   trackName('EVENTS'),

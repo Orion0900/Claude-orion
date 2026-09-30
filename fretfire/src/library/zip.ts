@@ -22,7 +22,10 @@ const MAX_COMMENT = 0xffff
 const EOCD_SIZE = 22
 const LOCATOR_SIZE = 20
 
-/** Lists the files in a ZIP archive. Directories, macOS metadata and encrypted or oddly compressed entries are left out. */
+/**
+ * Lists the files in a ZIP archive. Directories, macOS metadata and encrypted
+ * or oddly compressed entries are left out.
+ */
 export async function openZip(file: Blob): Promise<ArchiveEntry[]> {
   const tailLength = Math.min(file.size, EOCD_SIZE + MAX_COMMENT + LOCATOR_SIZE)
   const tailStart = file.size - tailLength

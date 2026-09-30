@@ -63,7 +63,10 @@ export async function loadSong(id: string): Promise<SongPackage | undefined> {
   const [summary, files] = await transact([SUMMARIES, FILES], 'readonly', (tx) => {
     const summaryRequest = tx.objectStore(SUMMARIES).get(id)
     const filesRequest = tx.objectStore(FILES).get(id)
-    return () => [summaryRequest.result as SummaryRecord | undefined, filesRequest.result as Record<string, Blob> | undefined]
+    return (): [SummaryRecord | undefined, Record<string, Blob> | undefined] => [
+      summaryRequest.result,
+      filesRequest.result,
+    ]
   })
   if (!summary || !files) return undefined
   const { meta, chartFile, addedAt, source } = summary
@@ -155,12 +158,13 @@ async function transact<T>(
   mode: IDBTransactionMode,
   body: (tx: IDBTransaction) => () => T,
 ): Promise<T> {
+  const db = await openDatabase()
   let tx: IDBTransaction
   try {
-    tx = (await openDatabase()).transaction(stores, mode)
-  } catch (error) {
-    if (error instanceof Error && error.message === UNAVAILABLE) throw error
+    tx = db.transaction(stores, mode)
+  } catch {
     // The connection was closed under us (iOS does this to suspended pages): open a fresh one.
+    db.close()
     connection = undefined
     try {
       tx = (await openDatabase()).transaction(stores, mode)

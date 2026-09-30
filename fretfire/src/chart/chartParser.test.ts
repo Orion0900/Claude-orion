@@ -146,7 +146,7 @@ describe('parseChartText', () => {
 
   it('tolerates BOMs, CRLF, tabs, missing braces, unknown sections and junk', () => {
     const text =
-      '﻿[Song]\r\n\tResolution\t=\t480\r\n[Mystery]\r\n{\r\n  0 = N 0 0\r\n}\r\n[ExpertDoubleGuitar]\r\n' +
+      '\uFEFF[Song]\r\n\tResolution\t=\t480\r\n[Mystery]\r\n{\r\n  0 = N 0 0\r\n}\r\n[ExpertDoubleGuitar]\r\n' +
       '0 = N 0 0\r\nnot a line\r\n = N 1 0\r\nabc = N 1 0\r\n480 = N 9 0\r\n480 = N\r\n  960  =  N  2  240  \r\n'
     const { chart } = parseChartText(text)
     expect(chart.resolution).toBe(480)
