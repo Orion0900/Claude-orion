@@ -295,7 +295,11 @@ export class App {
   private async openSong(entry: SongEntry): Promise<void> {
     playSfx(this.engine, 'tick')
     const last = readLast()
-    const { body, close } = this.openSheet('song-sheet', () => this.preview.stop())
+    let artUrl: string | null = null
+    const { body, close } = this.openSheet('song-sheet', () => {
+      this.preview.stop()
+      if (artUrl) URL.revokeObjectURL(artUrl)
+    })
     const art = artTile(entry, 'art big')
     const hero = h(
       'div',
@@ -352,6 +356,7 @@ export class App {
       body.appendChild(remove)
       void albumArt(entry).then((url) => {
         if (!url) return
+        artUrl = url
         art.style.backgroundImage = `url("${url}")`
         art.classList.add('has-image')
         art.textContent = ''
@@ -881,8 +886,13 @@ class Preview {
         const audio = await previewAudio(entry)
         if (!audio || token !== this.token) return
         this.audio = audio
-        audio.currentTime = entry.meta.previewStart
         audio.volume = 0.8
+        // Safari ignores a seek before it knows the length.
+        const seek = () => {
+          audio.currentTime = entry.meta.previewStart
+        }
+        if (audio.readyState >= 1) seek()
+        else audio.addEventListener('loadedmetadata', seek, { once: true })
         await audio.play().catch(() => undefined)
       }
       this.timer = window.setTimeout(() => this.stop(), 30_000)

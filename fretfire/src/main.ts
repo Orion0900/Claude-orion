@@ -10,7 +10,9 @@ app.start()
 ;(window as unknown as { __fretfire: App }).__fretfire = app
 
 // Offline support, registered relative to the page so it works under a sub-path.
-if ('serviceWorker' in navigator && import.meta.env.PROD && window.self === window.top) {
+// Only the installable build has a manifest; single-file and embedded copies skip it.
+const installable = document.querySelector('link[rel="manifest"]') !== null
+if ('serviceWorker' in navigator && import.meta.env.PROD && installable && window.self === window.top) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(new URL('sw.js', document.baseURI), { scope: './' }).catch(() => {
       // Offline play is a bonus; the game works without it.
