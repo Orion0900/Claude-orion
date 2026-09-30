@@ -147,7 +147,7 @@ are no natures and no effort values.
 
 ## Moves
 
-About ninety moves with original names, in `src/data/moves.ts`. Each type
+103 moves with original names, in `src/data/moves.ts`. Each type
 has a weak, a medium and a strong damaging move, and most have a status or
 utility move. Physical and special are chosen per move to fit the flavour.
 Effects include: burn/poison/paralysis/sleep/freeze chances, stat raises and

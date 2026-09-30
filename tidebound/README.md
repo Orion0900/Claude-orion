@@ -41,7 +41,7 @@ gives you the SPRINT SHOES.
   stat stages, burn/poison/paralysis/sleep/freeze, accuracy, priority,
   multi-hit, recoil and drain, switching, experience and levelling, learning
   moves, evolving, catching with shaking orbs, and running away.
-- **About 90 moves**, each with its own animation style.
+- **103 moves** with original names, each with its own animation style.
 - **A whole island chain:** three towns and a city, four routes, a glowing
   cave, a shipwreck, a lagoon village on stilts and Beacon Isle, joined
   seamlessly with no loading screens between outdoor areas.
@@ -52,8 +52,8 @@ gives you the SPRINT SHOES.
   screens, a bag with pockets, Markets, Havens that heal, PC storage,
   surfing, fishing, ledges, trainers who spot you, a trainer card, saving,
   and options for text speed, battle animations, volume and window frames.
-- **Chip-style music:** about thirty original tracks and jingles, and sound
-  effects, synthesised live with WebAudio.
+- **Chip-style music:** 28 original tracks and 9 jingles, plus sound
+  effects and a cry for every beast, synthesised live with WebAudio.
 
 ## Running it
 
