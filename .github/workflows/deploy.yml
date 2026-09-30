@@ -77,6 +77,19 @@ jobs:
           mkdir -p dist/tidebound
           cp -r tidebound/dist/. dist/tidebound/
 
+      - name: Build Fretfire
+        working-directory: fretfire
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Fretfire to the site
+        run: |
+          mkdir -p dist/fretfire
+          cp -r fretfire/dist/. dist/fretfire/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
