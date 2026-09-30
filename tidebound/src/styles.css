@@ -98,18 +98,44 @@ body {
   transform: translateX(-50%);
 }
 
+/* Sideways the controls fit in the columns beside the screen, with SELECT
+   and START tucked into the bottom corners so nothing covers the game. */
 .touch.landscape .dpad {
-  left: calc(env(safe-area-inset-left) + 16px);
-  bottom: 22%;
+  left: calc(env(safe-area-inset-left) + 14px);
+  top: 50%;
+  width: 128px;
+  height: 128px;
+  transform: translateY(-55%);
+}
+.touch.landscape .dpad-cross {
+  background-size:
+    43px 100%,
+    100% 43px;
 }
 .touch.landscape .face {
-  right: calc(env(safe-area-inset-right) + 14px);
-  bottom: 24%;
+  right: calc(env(safe-area-inset-right) + 12px);
+  top: 50%;
+  width: 140px;
+  height: 118px;
+  transform: translateY(-60%);
+}
+.touch.landscape .btn {
+  width: 58px;
+  height: 58px;
+  font-size: 19px;
 }
 .touch.landscape .meta {
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 6px);
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  justify-content: space-between;
+  padding: 0 calc(env(safe-area-inset-right) + 12px) 0 calc(env(safe-area-inset-left) + 12px);
+  pointer-events: none;
+}
+.touch.landscape .pill {
+  pointer-events: auto;
+  padding: 6px 12px;
+  font-size: 10px;
 }
 
 .dpad {

@@ -40,12 +40,16 @@ export class Screen {
     let availW = vw
     let availH = vh
     if (this.pad) {
+      // Upright: the buttons live below. Sideways: a column either side.
       if (portrait) availH = vh * 0.58
-      else availW = vw - 2 * Math.min(190, vw * 0.22)
+      else availW = vw - 2 * Math.min(210, Math.max(160, vw * 0.2))
     }
     const fit = Math.min(availW / SCREEN_W, availH / SCREEN_H)
-    // Whole-number scales keep every pixel the same size; below 2× take what fits.
-    const scale = fit >= 2 ? Math.floor(fit) : Math.max(1, fit)
+    // On ordinary screens whole-number scales keep every pixel the same size.
+    // High-density screens have pixels to spare, so a fractional scale stays
+    // crisp there and the game can use all the room it has.
+    const dpr = window.devicePixelRatio || 1
+    const scale = dpr >= 2 || fit < 2 ? fit : Math.floor(fit)
     this.canvas.style.width = `${Math.floor(SCREEN_W * scale)}px`
     this.canvas.style.height = `${Math.floor(SCREEN_H * scale)}px`
   }
