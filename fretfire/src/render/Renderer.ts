@@ -83,6 +83,8 @@ export class Renderer {
   readonly canvas: HTMLCanvasElement
   layout!: Layout
   reducedEffects = false
+  /** Off for the title screen's demo. */
+  showHud = true
   private readonly g: CanvasRenderingContext2D
   private dpr = 1
   private sprites!: Sprites
@@ -182,7 +184,7 @@ export class Renderer {
     this.drawGems(s)
     this.drawFrets(s, dt)
     this.drawParticles(dt)
-    this.drawHud(s, now)
+    if (this.showHud) this.drawHud(s, now)
   }
 
   private paintStage(star: boolean): HTMLCanvasElement {

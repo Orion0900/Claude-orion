@@ -2,6 +2,8 @@ import { emptyMeta, type Chart, type SongMeta } from '../chart/types'
 import { arrange } from './arrange'
 import { chartFromScore } from './autochart'
 import { SongRenderer, type RenderedSong } from './render'
+// Inlined as a blob, so the build is one script that runs from any folder or host.
+import RenderWorker from './renderWorker?worker&inline'
 import { BUILTIN_SONGS } from './songs'
 import type { SongDef } from './types'
 
@@ -88,7 +90,7 @@ function renderInWorker(def: SongDef, progress: (f: number) => void): Promise<Re
   return new Promise((resolve, reject) => {
     let worker: Worker
     try {
-      worker = new Worker(new URL('./renderWorker.ts', import.meta.url), { type: 'module' })
+      worker = new RenderWorker()
     } catch (error) {
       reject(error)
       return

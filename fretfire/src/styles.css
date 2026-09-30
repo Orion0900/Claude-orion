@@ -225,47 +225,17 @@ label {
 
 .title-stage {
   position: absolute;
-  left: 50%;
-  bottom: -10%;
-  width: min(92vw, 520px);
-  height: 120%;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  transform: translateX(-50%) perspective(420px) rotateX(52deg);
-  transform-origin: 50% 100%;
-  opacity: 0.55;
+  inset: 0;
   pointer-events: none;
-  mask-image: linear-gradient(180deg, transparent 0%, #000 40%, #000 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 40%, #000 100%);
 }
 
-.title-lane {
-  position: relative;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(40, 20, 80, 0.15), rgba(40, 20, 80, 0.55));
-}
-
-.title-lane:last-child {
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.title-lane .gem {
+.title-stage::after {
+  content: '';
   position: absolute;
-  left: 50%;
-  top: 0;
-  width: 58%;
-  aspect-ratio: 1.7;
-  margin-left: -29%;
-  animation: gem-fall 2.7s linear infinite;
-}
-
-@keyframes gem-fall {
-  from {
-    transform: translateY(-120%);
-  }
-  to {
-    transform: translateY(1400%);
-  }
+  inset: 0;
+  background:
+    radial-gradient(80% 45% at 50% 42%, rgba(7, 6, 13, 0.82), rgba(7, 6, 13, 0.35) 70%),
+    linear-gradient(180deg, rgba(7, 6, 13, 0.2), rgba(7, 6, 13, 0.55));
 }
 
 .gem {
@@ -1363,7 +1333,6 @@ input[type='range']::-moz-range-thumb {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-lane .gem,
   .loading-gems .gem {
     animation: none;
   }

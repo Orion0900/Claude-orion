@@ -106,3 +106,26 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
+
+  fretfire:
+    name: Fretfire typecheck, build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fretfire
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fretfire/package-lock.json
+
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Typecheck and build
+        run: npm run build
+      - name: Unit tests
+        run: npm test

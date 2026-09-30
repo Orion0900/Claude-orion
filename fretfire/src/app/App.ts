@@ -12,6 +12,7 @@ import {
   type Instrument,
 } from '../chart/types'
 import { Game } from '../game/Game'
+import { AttractMode } from './attract'
 import { eventTime } from '../game/input'
 import { soloGrade, type Results } from '../game/session'
 import { requestPersistence, saveSong } from '../library/db'
@@ -189,16 +190,12 @@ export class App {
       playSfx(this.engine, 'select')
       void this.showSongs()
     })
-    const lanes = h('div', { class: 'title-stage', attrs: { 'aria-hidden': 'true' } })
-    for (let i = 0; i < 5; i++) {
-      const lane = h('div', { class: `title-lane l${i}` })
-      for (let k = 0; k < 3; k++) lane.appendChild(h('span', { class: `gem g${i}`, style: { animationDelay: `${-(i * 0.37 + k * 0.9)}s` } }))
-      lanes.appendChild(lane)
-    }
+    const stage = h('div', { class: 'title-stage', attrs: { 'aria-hidden': 'true' } })
+    const demo = matchMedia('(prefers-reduced-motion: reduce)').matches ? null : new AttractMode(stage)
     const el = h(
       'section',
       { class: 'screen title-screen' },
-      lanes,
+      stage,
       h(
         'div',
         { class: 'title-content' },
@@ -214,13 +211,14 @@ export class App {
       ),
       h('p', { class: 'title-foot', text: 'Four original songs built in. Import your own .chart, .mid or .sng songs.' }),
     )
-    this.setScreen({ el })
+    this.setScreen({ el, destroy: () => demo?.stop() })
+    demo?.begin()
   }
 
   // ── song list ────────────────────────────────────────────────────────
 
-  async showSongs(focusId?: string): Promise<void> {
-    this.closeSheet()
+  async showSongs(focusId?: string, keepSheet = false): Promise<void> {
+    if (!keepSheet) this.closeSheet()
     const list = h('div', { class: 'song-list', attrs: { role: 'list' } })
     const search = h('input', {
       class: 'search-input',
@@ -797,7 +795,7 @@ export class App {
               ? 'Nothing was added.'
               : 'No songs found in those files.'
         for (const e of result.errors) log.appendChild(h('li', {}, h('strong', { text: e.source }), ' ', e.reason))
-        if (result.added > 0 && this.screen?.el.classList.contains('songs-screen')) void this.showSongs()
+        if (result.added > 0 && this.screen?.el.classList.contains('songs-screen')) void this.showSongs(undefined, true)
       } catch (error) {
         status.textContent = error instanceof Error ? error.message : String(error)
       } finally {

@@ -66,6 +66,8 @@ export class Game {
   private solo: { hit: number; total: number } | null = null
   private destroyed = false
   private readonly bot: Bot | null
+  /** Smoothed milliseconds spent drawing each frame, for the browser checks. */
+  private frameCost = 0
 
   constructor(
     host: HTMLElement,
@@ -200,7 +202,7 @@ export class Game {
 
   /** Lets tests and the bot see inside. */
   get debug() {
-    return { session: this.session, player: this.player, state: this.state, layout: this.renderer.layout }
+    return { session: this.session, player: this.player, state: this.state, layout: this.renderer.layout, frameCost: this.frameCost }
   }
 
   private readonly sink: InputSink = {
@@ -290,7 +292,9 @@ export class Game {
     if (hud.rock !== null) hud.rock = this.session.rock
     hud.progress = this.endAt > 0 ? Math.max(0, songTime) / this.endAt : 0
     hud.solo = this.solo
+    const t0 = performance.now()
     this.renderer.frame(s, now)
+    this.frameCost += (performance.now() - t0 - this.frameCost) * 0.05
   }
 
   private handleEvents(): void {

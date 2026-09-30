@@ -8,7 +8,7 @@ const rate = process.env.RATE ?? '1.5'
 const scheme = process.env.SCHEME ?? 'tap'
 const landscape = process.env.LANDSCAPE === '1'
 const shots = process.env.SHOTS
-const server = await serve(4191)
+const server = await serve(Number(process.env.PORT ?? 4191))
 const browser = await launch()
 const viewport = landscape ? { width: 844, height: 390 } : IPHONE.viewport
 const context = await browser.newContext({ ...IPHONE, viewport })
