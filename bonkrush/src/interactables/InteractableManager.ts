@@ -137,6 +137,8 @@ interface Shrine extends Thing {
   /** Index among charge shrines (crystal and peg ring), or -1. */
   ring: number
   charge: number
+  /** A charge shrine with enemies inside its ring holds its progress, like the original. */
+  blocked: boolean
   spin: number
   /** Live challenge fight, tracked by uid because enemy objects are pooled. */
   foes: Enemy[] | null
@@ -181,6 +183,7 @@ export class InteractableManager implements InteractableApi {
   private readonly rng: Rng
   private readonly root = new THREE.Group()
   private readonly geometries: THREE.BufferGeometry[] = []
+  private readonly ringFoes: Enemy[] = []
   private readonly materials: THREE.Material[] = []
   private readonly unsubs: Array<() => void> = []
 
@@ -540,6 +543,7 @@ export class InteractableManager implements InteractableApi {
         slot: slots[look]++,
         ring: kind === 'shrineCharge' ? this.chargeShrines.length : -1,
         charge: 0,
+        blocked: false,
         spin: rng.range(0, Math.PI * 2),
         foes: null,
         foeUids: [],
@@ -856,6 +860,9 @@ export class InteractableManager implements InteractableApi {
         dx * dx + dz * dz <= CHARGE_RADIUS * CHARGE_RADIUS &&
         Math.abs(pp.y - shrine.pos.y) < VERTICAL_REACH
       const before = shrine.charge
+      // Enemies standing in the ring hold the charge where it is until they're cleared out.
+      shrine.blocked = inside && this.enemiesInRing(shrine)
+      if (shrine.blocked) continue
       shrine.charge = stepCharge(before, inside, dt, speed)
       if (shrine.charge === before) continue
       this.paintPegs(shrine)
@@ -866,6 +873,12 @@ export class InteractableManager implements InteractableApi {
         break
       }
     }
+  }
+
+  private enemiesInRing(shrine: Shrine): boolean {
+    const found = this.ctx.enemies.queryRadius(shrine.pos, CHARGE_RADIUS, this.ringFoes)
+    for (const e of found) if (e.alive && !e.boss) return true
+    return false
   }
 
   private completeCharge(shrine: Shrine): void {
@@ -1090,13 +1103,16 @@ export class InteractableManager implements InteractableApi {
     }
     attr.needsUpdate = true
 
-    if (this.portalEntered || !player.alive || grow < 1) return
+    if (this.portalEntered || !player.alive) return
     const dx = player.pos.x - portal.pos.x
     const dz = player.pos.z - portal.pos.z
     const dy = player.pos.y - portal.pos.y
     const dist = Math.hypot(dx, dz)
+    // Arms as soon as the player is clear of it — from the moment it appears, so
+    // running straight in right after the boss dies works. Only a player who was
+    // standing on the boss spot has to step out once, so it never swallows them.
     if (dist > PORTAL_REACH) portal.armed = true
-    else if (portal.armed && dist <= PORTAL_RADIUS && dy > -1.5 && dy < 4) this.enterPortal()
+    else if (grow >= 1 && portal.armed && dist <= PORTAL_RADIUS && dy > -1.5 && dy < 4) this.enterPortal()
   }
 
   private enterPortal(): void {
@@ -1139,7 +1155,7 @@ export class InteractableManager implements InteractableApi {
         this.setPrompt('Open chest', focus.free ? undefined : this.chestCost)
         break
       case 'shrineCharge':
-        this.setPrompt(chargeText(focus.charge), undefined, true)
+        this.setPrompt(focus.blocked ? 'Clear the enemies out of the ring!' : chargeText(focus.charge), undefined, true)
         break
       case 'shrineGreed':
         this.setPrompt(`Greed shrine: +${GREED_GOLD} gold, +${Math.round(GREED_DIFFICULTY * 100)}% difficulty`)

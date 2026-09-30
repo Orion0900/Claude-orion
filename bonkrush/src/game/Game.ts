@@ -59,6 +59,8 @@ export class Game implements ShellApi {
   private readonly params = new URLSearchParams(location.search)
   private unsubs: Array<() => void> = []
   private ending = false
+  /** Whether this run's silver and bests are already banked (tab closed, quit or ended). */
+  private settled = false
   /** Whether the game currently holds mouse-look; see syncLook. */
   private lookHeld = false
   private readonly speed = Math.max(1, Math.min(16, Math.floor(Number(this.params.get('speed')) || 1)))
@@ -93,6 +95,7 @@ export class Game implements ShellApi {
     window.addEventListener('resize', this.resize)
     document.addEventListener('visibilitychange', this.onVisibility)
     window.addEventListener('beforeunload', this.onBeforeUnload)
+    window.addEventListener('pagehide', this.onPageHide)
     this.resize()
 
     // Browsers only allow sound after a gesture.
@@ -152,6 +155,7 @@ export class Game implements ShellApi {
     this.teardownRun()
     this.disposeTitleWorld()
     this.ending = false
+    this.settled = false
 
     const seed = Number(this.params.get('seed')) || Math.floor(Math.random() * 2 ** 31)
     const run: RunState = {
@@ -306,8 +310,10 @@ export class Game implements ShellApi {
     await this.ui.openModal({ kind: victory ? 'victory' : 'gameOver' })
   }
 
-  /** Pays silver and records bests for a finished run. */
+  /** Pays silver and records bests for a finished run, once. */
   private settleRun(ctx: MutableContext, victory: boolean): void {
+    if (this.settled) return
+    this.settled = true
     const r = ctx.run
     const cleared = r.stageIndex + (victory ? 1 : 0)
     const earned = silverForRun({ ...r, stageIndex: cleared, silverGain: ctx.progression.stats.silverGain })
@@ -415,7 +421,9 @@ export class Game implements ShellApi {
 
   private frame = (now: number) => {
     requestAnimationFrame(this.frame)
-    const realDt = Math.min(0.25, (now - this.lastFrame) / 1000)
+    // A rAF timestamp can predate the last performance.now() (the first frame after a
+    // long synchronous build does); time never runs backwards in the simulation.
+    const realDt = Math.max(0, Math.min(0.25, (now - this.lastFrame) / 1000))
     this.lastFrame = now
     const dt = Math.min(MAX_DT, realDt)
 
@@ -470,7 +478,8 @@ export class Game implements ShellApi {
     const input = this.input.state
     if (input.pausePressed && !this.ui.modalOpen && !this.ending) void this.ui.openModal({ kind: 'pause' })
 
-    const paused = this.ui.modalOpen || this.ending
+    // Holding Tab for the map and stats pauses the run, like the original.
+    const paused = this.ui.modalOpen || this.ending || input.tabHeld
     if (!paused) {
       this.simTime += dt
       ctx.run.stageTime += dt
@@ -536,6 +545,13 @@ export class Game implements ShellApi {
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
+  }
+
+  /** Closing or reloading the tab mid-run still banks its silver and bests, like quitting does. */
+  private onPageHide = () => {
+    // The page may come back from the back/forward cache and play on, so the run
+    // isn't ended here; settleRun pays out only once per run either way.
+    if (this.run && !this.ending && !this.params.has('bot')) this.settleRun(this.run, false)
   }
 
   /** Ctrl+W can't be blocked, so a live run asks before the tab closes. */

@@ -222,6 +222,8 @@ export interface Enemy {
   slow: number
   burn: number
   burnDps: number
+  /** Who lit the current burn, so its ticks count toward that weapon or item ('burn' if unknown). */
+  burnSource: string
   freeze: number
   /** Seconds since last hit, for the white flash. */
   hitFlash: number
@@ -307,7 +309,8 @@ export interface EnemyApi {
   damage(enemy: Enemy, amount: number, opts: DamageOptions): void
   /** Status effects. */
   applySlow(enemy: Enemy, seconds: number): void
-  applyBurn(enemy: Enemy, dps: number, seconds: number): void
+  /** `source` credits the burn's damage and kills (a weapon id or 'item:<id>'). */
+  applyBurn(enemy: Enemy, dps: number, seconds: number, source?: string): void
   applyFreeze(enemy: Enemy, seconds: number): void
   /** Despawns one enemy silently: no drops, no events (swarm and wave room-making). */
   remove(enemy: Enemy): void

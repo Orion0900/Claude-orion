@@ -28,6 +28,7 @@ export class EnemyEntity implements Enemy {
   slow = 0
   burn = 0
   burnDps = 0
+  burnSource = 'burn'
   freeze = 0
   hitFlash = 99
   t = 0
@@ -131,6 +132,7 @@ export class EnemyEntity implements Enemy {
     this.hp = this.maxHp = 1
     this.elite = this.boss = this.alive = false
     this.slow = this.burn = this.burnDps = this.freeze = 0
+    this.burnSource = 'burn'
     this.hitFlash = 99
     this.t = 0
     this.state = 0

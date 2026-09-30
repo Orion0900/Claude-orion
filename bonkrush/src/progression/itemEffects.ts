@@ -482,7 +482,7 @@ export const ITEM_HOOKS = {
   moldy_cheese: {
     onHit(ctx, enemy, damage, _crit, stacks) {
       if (!enemy.alive || !itemRuntime(ctx).roll(0.12, 1)) return
-      ctx.enemies.applyBurn(enemy, damage * 0.25 * stacks, 3 * ctx.progression.stats.duration)
+      ctx.enemies.applyBurn(enemy, damage * 0.25 * stacks, 3 * ctx.progression.stats.duration, 'item:moldy_cheese')
     },
   },
   burger: {

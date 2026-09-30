@@ -206,7 +206,7 @@ export class WalkerBehavior implements WeaponBehavior {
       kit.hit(this.arm, e, e.pos.x - s.pos.x, e.pos.z - s.pos.z)
       if (!e.alive) continue
       if (this.frost) kit.ctx.enemies.applySlow(e, SLOW * durationStat)
-      else kit.ctx.enemies.applyBurn(e, eff.damage * BURN_SHARE, BURN_TIME * durationStat)
+      else kit.ctx.enemies.applyBurn(e, eff.damage * BURN_SHARE, BURN_TIME * durationStat, this.arm.w.def.id)
     }
     if (s.checks++ % BREAK_EVERY === 0) kit.breakables(s.pos, s.radius)
   }

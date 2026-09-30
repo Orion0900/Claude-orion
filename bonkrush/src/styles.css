@@ -1115,6 +1115,7 @@ body {
   left: 0;
   right: 0;
   top: 24%;
+  transition: top 0.25s ease;
   z-index: 15;
   display: flex;
   justify-content: center;
@@ -3034,7 +3035,7 @@ body {
 
   .lvl-cap {
     top: 2px;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .lvl-num {
@@ -3100,13 +3101,13 @@ body {
   }
 
   .stage-name {
-    font-size: 8.5px;
-    letter-spacing: 0.06em;
+    font-size: 10px;
+    letter-spacing: 0.04em;
     white-space: nowrap;
   }
 
   .objective {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .bossbar {
@@ -3388,7 +3389,7 @@ body {
 
   .lvl-cap {
     top: 3px;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .lvl-num {
@@ -3811,5 +3812,35 @@ body {
   .objective.portal,
   .char-card.selected .char-art > * {
     animation: none !important;
+  }
+}
+
+/* A banner shown while a boss is up drops below the boss bar instead of covering it. */
+.ui-root:has(.bossbar.show) .banners {
+  top: 32%;
+}
+
+@media (max-width: 640px) {
+  /* Portrait phones: clear the pause button on the left edge. */
+  .banners {
+    top: 30%;
+  }
+
+  .ui-root:has(.bossbar.show) .banners {
+    top: 36%;
+  }
+}
+
+@media (max-height: 500px) {
+  /* Landscape phones: tall panels scroll, so their main buttons stay pinned in reach. */
+  .settings-panel .modal-actions,
+  .modal-gameover .modal-actions,
+  .modal-victory .modal-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    width: 100%;
+    padding: 10px 0 calc(8px + var(--sab));
+    background: linear-gradient(to top, rgba(20, 16, 42, 0.96) 70%, rgba(20, 16, 42, 0));
   }
 }

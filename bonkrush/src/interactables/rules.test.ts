@@ -55,6 +55,12 @@ describe('charge shrines', () => {
     expect(stepCharge(0.1, false, 1)).toBe(0)
   })
 
+  it('never move on a zero or negative time step (a stray negative frame once filled every shrine)', () => {
+    expect(stepCharge(0, false, -1.9)).toBe(0)
+    expect(stepCharge(0.4, true, 0)).toBe(0.4)
+    expect(stepCharge(0.4, false, Number.NaN)).toBe(0.4)
+  })
+
   it('charge faster with the Wrench', () => {
     expect(chargeSpeed(0)).toBe(1)
     expect(chargeSpeed(1)).toBeCloseTo(1.2)

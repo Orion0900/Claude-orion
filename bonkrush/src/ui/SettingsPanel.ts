@@ -151,7 +151,7 @@ export class SettingsPanel {
     el(
       'div',
       'settings-note',
-      inRun ? 'Shadows and resolution change now; the rest applies fully on the next run.' : 'Low suits phones and older laptops.',
+      inRun ? 'Shadows and resolution change now; smoothing (antialiasing) after a reload.' : 'Low suits phones and older laptops.',
       parent,
     )
   }

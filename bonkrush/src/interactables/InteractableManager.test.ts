@@ -395,6 +395,19 @@ describe('altar and portal', () => {
     expect(ctx.scene.getObjectByName('portal')).toBeDefined()
   })
 
+  it('takes a player who runs straight in while it is still opening', () => {
+    const { things, step, player, log } = setup()
+    // Kiting the boss 8 m out when it dies, then straight into the portal before it has finished growing.
+    player.pos.set(18, 0, 110)
+    things.openPortal(new THREE.Vector3(10, 0, 110))
+    step(0.2)
+    player.pos.set(10.2, 0, 110)
+    step(0.2)
+    expect(log.advances).toBe(0)
+    step(1)
+    expect(log.advances).toBe(1)
+  })
+
   it('does not swallow a player standing on it when it opens', () => {
     const { things, step, player, log } = setup()
     player.pos.set(10, 0, 110)
