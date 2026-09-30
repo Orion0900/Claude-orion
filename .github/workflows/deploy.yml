@@ -66,6 +66,17 @@ jobs:
           mkdir -p dist/bonkrush
           cp -r bonkrush/dist/. dist/bonkrush/
 
+      - name: Build Tidebound
+        working-directory: tidebound
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Tidebound to the site
+        run: |
+          mkdir -p dist/tidebound
+          cp -r tidebound/dist/. dist/tidebound/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
