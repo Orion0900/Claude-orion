@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { fromBackup } from '../lib/backup'
 import type { AppState, Totals } from '../lib/challenge'
 import { TASKS } from '../lib/tasks'
+import { useConfirm, type ConfirmRequest } from './Confirm'
 
 /** The four rules, as written. */
 export function RulesList() {
@@ -45,16 +46,18 @@ export function StatTiles({ totals }: { totals: Totals }) {
  */
 export function RestoreButton({
   onRestore,
-  confirmMessage,
+  confirm,
   className,
   children,
 }: {
   onRestore: (state: AppState) => void
-  confirmMessage?: string
+  /** Asked before replacing a run that's already on the phone. */
+  confirm?: ConfirmRequest
   className: string
   children: ReactNode
 }) {
   const [error, setError] = useState<string | null>(null)
+  const [confirmSheet, ask] = useConfirm()
   return (
     <>
       <label className={`${className} file-btn`}>
@@ -69,7 +72,7 @@ export function RestoreButton({
             try {
               const state = fromBackup(await file.text())
               setError(null)
-              if (!confirmMessage || window.confirm(confirmMessage)) onRestore(state)
+              if (!confirm || (await ask(confirm))) onRestore(state)
             } catch (err) {
               setError(err instanceof Error ? err.message : "That file couldn't be read.")
             }
@@ -82,6 +85,7 @@ export function RestoreButton({
           {error}
         </p>
       )}
+      {confirmSheet}
     </>
   )
 }

@@ -4,6 +4,7 @@ import { finishDate, type AppState, type Attempt } from '../lib/challenge'
 import { shortDate } from '../lib/dates'
 import { isInstalled } from '../hooks'
 import { saveFile } from '../services/files'
+import { useConfirm } from './Confirm'
 import { RestoreButton, RulesList } from './Shared'
 
 export function SettingsView({
@@ -18,18 +19,29 @@ export function SettingsView({
   onReplace: (state: AppState) => void
 }) {
   const [message, setMessage] = useState<string | null>(null)
+  const [confirmSheet, ask] = useConfirm()
 
   const backUp = async () => {
     const now = new Date()
     await saveFile(backupFileName(now), toBackup(state, now))
   }
-  const startOver = () => {
-    if (window.confirm('Start over at Day 1? This run ends here and goes into your attempts.')) onEnd()
+  const startOver = async () => {
+    const ok = await ask({
+      title: 'Start over at Day 1?',
+      body: 'This run ends here and goes into your attempts.',
+      action: 'Start over',
+      danger: true,
+    })
+    if (ok) onEnd()
   }
-  const erase = () => {
-    if (window.confirm('Erase every run and every log on this phone? There is no undo.')) {
-      onReplace({ attempt: null, history: [] })
-    }
+  const erase = async () => {
+    const ok = await ask({
+      title: 'Erase everything?',
+      body: 'Every run and every log on this phone goes, and there is no undo.',
+      action: 'Erase everything',
+      danger: true,
+    })
+    if (ok) onReplace({ attempt: null, history: [] })
   }
 
   return (
@@ -71,12 +83,12 @@ export function SettingsView({
           Everything stays on this phone. Back up now and then — it's also how you move a run to a new phone.
         </p>
         <div className="btn-row">
-          <button className="btn" onClick={backUp}>
+          <button className="btn backup-btn" onClick={backUp}>
             Back up
           </button>
           <RestoreButton
             className="btn"
-            confirmMessage="Replace everything on this phone with that backup?"
+            confirm={{ title: 'Restore this backup?', body: 'It replaces everything on this phone.', action: 'Restore' }}
             onRestore={(next) => {
               onReplace(next)
               setMessage('Backup restored.')
@@ -104,6 +116,7 @@ export function SettingsView({
           </p>
         </section>
       )}
+      {confirmSheet}
     </>
   )
 }

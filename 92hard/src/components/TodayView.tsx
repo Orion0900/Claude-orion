@@ -11,6 +11,7 @@ import {
 import { monthDay, shortDate, type DateKey } from '../lib/dates'
 import { TASKS, isDayComplete, tasksDone } from '../lib/tasks'
 import { Confetti } from './Confetti'
+import { useConfirm } from './Confirm'
 import { Icon } from './Icons'
 import { Ring } from './Ring'
 import { RulesList, StatTiles } from './Shared'
@@ -96,8 +97,15 @@ function ActiveDay({ attempt, today, day, onChange }: Props & { day: number }) {
 function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: number }) {
   const date = dateOfDay(attempt, missed)
   const made = streak(attempt, missed)
-  const end = () => {
-    if (window.confirm(`Start over at Day 1? This run ends at ${made} ${made === 1 ? 'day' : 'days'}.`)) onEnd()
+  const [confirmSheet, ask] = useConfirm()
+  const end = async () => {
+    const ok = await ask({
+      title: 'Start over at Day 1?',
+      body: `This run ends at ${made} ${made === 1 ? 'day' : 'days'} and goes into your attempts.`,
+      action: 'Start over',
+      danger: true,
+    })
+    if (ok) onEnd()
   }
   return (
     <section className="missed-view">
@@ -120,6 +128,7 @@ function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: numb
           {made} {made === 1 ? 'day' : 'days'} in a row before it.
         </p>
       )}
+      {confirmSheet}
     </section>
   )
 }

@@ -1265,6 +1265,45 @@ input::-webkit-inner-spin-button {
   margin-top: 14px;
 }
 
+/* ---- Confirm -------------------------------------------------------------- */
+
+.confirm-backdrop {
+  z-index: 25;
+  padding: 0 12px calc(env(safe-area-inset-bottom) + 12px);
+}
+
+.confirm {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 22px 18px 18px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  text-align: center;
+  animation: slide-up 280ms var(--decelerate);
+}
+
+.confirm-title {
+  font: 400 30px/1.05 var(--display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.confirm-body {
+  margin-bottom: 8px;
+  color: var(--dim);
+}
+
+.btn.danger.solid {
+  border: none;
+  background: var(--red);
+  color: #fff;
+}
+
 /* ---- Celebration and warnings -------------------------------------------- */
 
 .cheer {
