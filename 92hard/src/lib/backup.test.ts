@@ -18,7 +18,17 @@ describe('backups', () => {
   it('round-trips the whole run', () => {
     const text = toBackup(state, new Date('2026-10-01T20:00:00Z'))
     expect(fromBackup(text)).toEqual(state)
-    expect(JSON.parse(text)).toMatchObject({ app: '92hard', version: 1, exportedAt: '2026-10-01T20:00:00.000Z' })
+    expect(JSON.parse(text)).toMatchObject({ app: '92hard', version: 2, exportedAt: '2026-10-01T20:00:00.000Z' })
+  })
+
+  it('restores a backup made by the first version', () => {
+    const old = JSON.stringify({
+      app: '92hard',
+      version: 1,
+      attempt: { start: '2026-10-01', carried: 0, logs: { '2026-10-01': { sets: 15, neck: true, vlog: true, makerSchool: true } } },
+      history: [],
+    })
+    expect(fromBackup(old).attempt!.logs['2026-10-01']).toEqual({ ...emptyLog(), sets: 15, split: 'upper', makerSchool: true })
   })
 
   it('turns away files that are not backups', () => {

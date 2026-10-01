@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { DaySheet } from './components/DaySheet'
 import { Icon, type IconName } from './components/Icons'
 import { Confetti } from './components/Confetti'
+import { PlanView } from './components/PlanView'
 import { ProgressView } from './components/ProgressView'
-import { SettingsView } from './components/SettingsView'
 import { StartView } from './components/StartView'
 import { TodayView } from './components/TodayView'
 import type { LogChange } from './components/TaskList'
@@ -13,23 +13,24 @@ import {
   dayState,
   endAttempt,
   getStatus,
-  logFor,
+  isDayDone,
   newAttempt,
   updateLog,
+  weekOf,
+  weekSpan,
   type AppState,
   type Attempt,
 } from './lib/challenge'
 import type { DateKey } from './lib/dates'
 import { loadState, saveState } from './lib/storage'
-import { isDayComplete } from './lib/tasks'
 import { useToday } from './hooks'
 
-type Tab = 'today' | 'progress' | 'settings'
+type Tab = 'today' | 'plan' | 'progress'
 
 const TABS: Array<{ id: Tab; icon: IconName; label: string }> = [
   { id: 'today', icon: 'today', label: 'Today' },
+  { id: 'plan', icon: 'board', label: 'Plan' },
   { id: 'progress', icon: 'grid', label: 'Progress' },
-  { id: 'settings', icon: 'sliders', label: 'Settings' },
 ]
 
 export default function App() {
@@ -69,9 +70,14 @@ export default function App() {
       const next = updateLog(current, date, change)
       latest.current = next
       setState(next)
-      if (!isDayComplete(logFor(before, date)) && next.attempt && isDayComplete(logFor(next.attempt, date))) {
-        setCheer((c) => ({ n: (c?.n ?? 0) + 1, day: dayNumber(before, date) }))
-      }
+      const after = next.attempt
+      if (!after) return
+      // A change finishes its own day, or, through the week's hyperextensions, the week's last day.
+      const day = dayNumber(before, date)
+      const finished = [day, weekSpan(weekOf(day))[1]].filter(
+        (d) => d <= dayNumber(before, today) && !isDayDone(before, d) && isDayDone(after, d),
+      )
+      if (finished.length > 0) setCheer((c) => ({ n: (c?.n ?? 0) + 1, day: Math.max(...finished) }))
     }
 
   const begin = (next: Attempt) => {
@@ -86,7 +92,7 @@ export default function App() {
   const replace = (next: AppState) => {
     setState(next)
     setOpenDate(null)
-    // Erasing, or restoring from the start screen, lands on Today; a restore from Settings stays to say so.
+    // Erasing, or restoring from the start screen, lands on Today; a restore from Progress stays to say so.
     if (!next.attempt || !state.attempt) setTab('today')
   }
   const openDay = (date: DateKey) => {
@@ -109,12 +115,15 @@ export default function App() {
             today={today}
             onChange={changeLog}
             onOpenDay={openDay}
+            onOpenPlan={() => setTab('plan')}
             onEnd={end}
             onStartToday={() => setState((s) => ({ ...s, attempt: newAttempt(today) }))}
           />
         )}
-        {tab === 'progress' && <ProgressView state={state} attempt={attempt} today={today} onOpenDay={openDay} />}
-        {tab === 'settings' && <SettingsView state={state} attempt={attempt} onEnd={end} onReplace={replace} />}
+        {tab === 'plan' && <PlanView today={today} />}
+        {tab === 'progress' && (
+          <ProgressView state={state} attempt={attempt} today={today} onOpenDay={openDay} onEnd={end} onReplace={replace} />
+        )}
       </main>
 
       <nav className="tabbar" aria-label="Sections">
@@ -132,7 +141,7 @@ export default function App() {
       </nav>
 
       {openDate && dayState(attempt, dayNumber(attempt, openDate), today) !== 'future' && (
-        <DaySheet attempt={attempt} date={openDate} onChange={changeLog(openDate)} onClose={closeDay} />
+        <DaySheet attempt={attempt} date={openDate} today={today} onChange={changeLog(openDate)} onClose={closeDay} />
       )}
 
       {cheer && (
@@ -145,7 +154,7 @@ export default function App() {
 
       {!saved && (
         <p className="save-warning" role="alert">
-          This phone isn't saving 92 Hard right now. Back up from Settings before you close it.
+          This phone isn't saving 92 Hard right now. Back up from Progress before you close it.
         </p>
       )}
     </div>

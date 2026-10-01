@@ -1,7 +1,7 @@
 {
   "name": "92 Hard",
   "short_name": "92 Hard",
-  "description": "92 days, four tasks, every day. Miss one and start over at Day 1.",
+  "description": "92 days on the whiteboard's rules, with the routine and the why. Fail = start over.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

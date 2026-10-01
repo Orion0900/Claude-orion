@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CHALLENGE_DAYS, attemptOnDay, finishDate, newAttempt, type AppState, type Attempt } from '../lib/challenge'
 import { addDays, shortDate, type DateKey } from '../lib/dates'
+import { WHY } from '../lib/plan'
 import { isInstalled } from '../hooks'
 import { Icon } from './Icons'
 import { RestoreButton, RulesList } from './Shared'
@@ -13,7 +14,7 @@ const WHEN: Array<[When, string]> = [
   ['already', 'Earlier'],
 ]
 
-/** The commitment: the rules, the start day, and one button. */
+/** The commitment: why, the rules, the start day, and one button. */
 export function StartView({
   state,
   today,
@@ -46,12 +47,11 @@ export function StartView({
           Attempt {attemptNumber}. {best > 0 ? `Your best is ${best} ${best === 1 ? 'day' : 'days'}. Beat it.` : 'Again.'}
         </p>
       ) : (
-        <p className="start-lede">92 days. Four tasks. Every single day.</p>
+        <p className="start-lede">{WHY}</p>
       )}
 
       <div className="card">
         <RulesList />
-        <p className="card-copy strong">Miss one, and you start over at Day 1.</p>
       </div>
 
       <div className="start-when">

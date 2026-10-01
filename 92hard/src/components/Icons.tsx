@@ -24,11 +24,11 @@ const PATHS = {
       <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6" />
     </>
   ),
-  sliders: (
+  // A whiteboard on its stand, with writing on it.
+  board: (
     <>
-      <path d="M4 7h9M19 7h1M4 17h3M13 17h7" />
-      <circle cx="16" cy="7" r="2.6" />
-      <circle cx="10" cy="17" r="2.6" />
+      <rect x="3.5" y="3.5" width="17" height="12.5" rx="2" />
+      <path d="M7.5 7.8h6M7.5 11.6h9M8.5 20.5l3.5-4.5 3.5 4.5" />
     </>
   ),
   close: <path d="M7 7l10 10M17 7L7 17" />,

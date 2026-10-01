@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, dateKey, daysBetween, isDateKey, msUntilMidnight } from './dates'
+import { SATURDAY, addDays, dateKey, daysBetween, isDateKey, msUntilMidnight, weekday } from './dates'
 
 describe('dateKey', () => {
   it('names the local calendar day', () => {
@@ -34,6 +34,15 @@ describe('day arithmetic', () => {
     // US clocks go back on November 1st 2026; the count must not notice.
     expect(daysBetween('2026-10-31', '2026-11-02')).toBe(2)
     expect(addDays('2026-11-01', 1)).toBe('2026-11-02')
+  })
+})
+
+describe('weekday', () => {
+  it('knows the day of the week from the date alone', () => {
+    expect(weekday('2026-10-01')).toBe(4)
+    expect(weekday('2026-10-03')).toBe(SATURDAY)
+    expect(weekday('2026-10-04')).toBe(0)
+    expect(weekday('2026-12-31')).toBe(4)
   })
 })
 

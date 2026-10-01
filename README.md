@@ -35,9 +35,10 @@ end at your door.
 > original songs built in, and it plays your own `.chart`, `.mid` and `.sng`
 > songs. Ships at `/fretfire/`. See [fretfire/README.md](fretfire/README.md).
 > [92 Hard](92hard/) — a 75 Hard-style challenge tracker for the iPhone, made
-> 92 days long with four daily tasks: gym 15 sets + neck or a half marathon,
-> 100 hyperextensions, Maker School and a vlog. Miss one and it's back to
-> Day 1. Ships at `/92hard/`. See [92hard/README.md](92hard/README.md).
+> 92 days long on the rules from the whiteboard: lift 6× a week with 15 sets
+> and neck on uppers, half marathon Saturdays, 100 hyperextensions a week and
+> Maker School every day, with the routine, happiness, the offer and the why.
+> Fail = start over. Ships at `/92hard/`. See [92hard/README.md](92hard/README.md).
 
 ## What it does
 
