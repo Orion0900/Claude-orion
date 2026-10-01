@@ -1,0 +1,17 @@
+{
+  "name": "Sana's CRE Game",
+  "short_name": "Sana's CRE",
+  "description": "Run a commercial real estate private equity firm: raise funds, buy and fix up buildings, survive the cycle.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1522",
+  "theme_color": "#0d1522",
+  "categories": ["games", "finance", "education"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

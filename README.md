@@ -38,6 +38,10 @@ end at your door.
 > 92 days long with four daily tasks: gym 15 sets + neck or a half marathon,
 > 100 hyperextensions, Maker School and a vlog. Miss one and it's back to
 > Day 1. Ships at `/92hard/`. See [92hard/README.md](92hard/README.md).
+> [Sana's CRE Game](sanas-cre-game/) — run a commercial real estate private
+> equity firm: underwrite and bid on deals, renovate and re-lease buildings,
+> survive the cycle, and raise ever-bigger funds through a real waterfall.
+> Ships at `/sanas-cre-game/`. See [sanas-cre-game/README.md](sanas-cre-game/README.md).
 
 ## What it does
 
