@@ -90,6 +90,19 @@ jobs:
           mkdir -p dist/fretfire
           cp -r fretfire/dist/. dist/fretfire/
 
+      - name: Build 92 Hard
+        working-directory: 92hard
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add 92 Hard to the site
+        run: |
+          mkdir -p dist/92hard
+          cp -r 92hard/dist/. dist/92hard/
+
       - name: Build Facet
         working-directory: facet
         env:
