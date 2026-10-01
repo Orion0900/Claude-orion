@@ -1,0 +1,5 @@
+node_modules
+dist
+test-results
+scripts/.canonical_face_model.obj
+tests/.cache

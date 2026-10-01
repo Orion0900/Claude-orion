@@ -34,6 +34,11 @@ end at your door.
 > of Clone Hero: tap the notes, hold the sustains, deploy star power. Four
 > original songs built in, and it plays your own `.chart`, `.mid` and `.sng`
 > songs. Ships at `/fretfire/`. See [fretfire/README.md](fretfire/README.md).
+> [Facet](facet/) — a QOVES-style facial analysis for the phone: thirty
+> measurements of proportion, symmetry and face shape against their ideal
+> ranges, a side-profile analysis and styling ideas, all worked out on the
+> device — photos never leave it. Ships at `/facet/`. See
+> [facet/README.md](facet/README.md).
 
 ## What it does
 

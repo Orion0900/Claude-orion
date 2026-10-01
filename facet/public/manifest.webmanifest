@@ -1,0 +1,17 @@
+{
+  "name": "Facet — facial proportion analysis",
+  "short_name": "Facet",
+  "description": "Facial thirds and fifths, canthal tilt, nose, lips, jaw, symmetry, face shape and side profile, each against its ideal range. Runs on your phone; photos never leave it.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0e",
+  "theme_color": "#0b0b0e",
+  "categories": ["lifestyle", "health", "photo"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
