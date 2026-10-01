@@ -51,6 +51,11 @@ try {
     await page.waitForTimeout(700)
     await shot(page, `05-report-${section.toLowerCase()}`)
   }
+  // The summary card, downloaded where the share sheet isn't available.
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Share summary' }).click()])
+  assert(download.suggestedFilename() === 'facet-summary.png', 'the summary card is drawn and handed over')
+  if (process.env.SHOTS) await download.saveAs(`${process.env.SHOTS}/summary-card.png`)
+
   await page.locator('#m-canthalTilt').getByText('What you can do').click()
   await shot(page, '06-advice')
   assert((await page.locator('#m-canthalTilt .advice-list li').count()) >= 0, 'advice opens under a measurement')

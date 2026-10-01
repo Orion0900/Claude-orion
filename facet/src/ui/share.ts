@@ -39,7 +39,9 @@ export async function summaryCard({ analysis, computed, photoUrl }: { analysis: 
   const oy = area.y + (area.h - box.h * s) / 2
   g.save()
   g.beginPath()
-  g.roundRect(area.x, area.y, area.w, area.h, 28)
+  // roundRect arrived in Safari 16; a square crop will do before that.
+  if (typeof g.roundRect === 'function') g.roundRect(area.x, area.y, area.w, area.h, 28)
+  else g.rect(area.x, area.y, area.w, area.h)
   g.clip()
   g.fillStyle = '#000'
   g.fillRect(area.x, area.y, area.w, area.h)
@@ -51,8 +53,9 @@ export async function summaryCard({ analysis, computed, photoUrl }: { analysis: 
   g.translate(-front.frame.center.x, -front.frame.center.y)
   g.drawImage(img, 0, 0, analysis.front.width, analysis.front.height)
   g.restore()
+  // Dim the whole crop (the clip keeps it inside the frame) so lines read clearly.
   g.fillStyle = 'rgba(0,0,0,0.18)'
-  g.fillRect(box.x, box.y, box.w, box.h)
+  g.fillRect(box.x - box.w, box.y - box.h, box.w * 3, box.h * 3)
   g.strokeStyle = '#d9b77b'
   g.lineWidth = 2.2 / s
   g.setLineDash([10 / s, 8 / s])

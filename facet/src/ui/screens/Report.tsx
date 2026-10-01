@@ -305,7 +305,16 @@ export function Report({ id, section }: { id: string; section?: string }) {
           <h3 style={{ marginBottom: 4 }}>Side to side</h3>
           {front.symmetry.findings.map((f) => {
             const t = FINDING_TEXT[f.id]
-            const amount = f.unit === 'mm' ? `${f.amount.toFixed(1)} mm` : f.unit === '°' ? `${f.amount.toFixed(1)}°` : `${f.amount.toFixed(1)}%`
+            // With millimetres switched off, show a distance as a share of face width instead.
+            const faceW = Math.hypot(front.display.points.zyL.x - front.display.points.zyR.x, front.display.points.zyL.y - front.display.points.zyR.y)
+            const amount =
+              f.unit === 'mm'
+                ? settings.showMm || !front.mmPerPx
+                  ? `${f.amount.toFixed(1)} mm`
+                  : `${((f.amount / front.mmPerPx / faceW) * 100).toFixed(1)}% of face width`
+                : f.unit === '°'
+                  ? `${f.amount.toFixed(1)}°`
+                  : `${f.amount.toFixed(1)}%`
             return (
               <div key={f.id} className="highlight" style={{ alignItems: 'flex-start' }}>
                 <span className="dot" style={{ marginTop: 7, background: f.level === 0 ? 'var(--good)' : f.level === 1 ? 'var(--accent)' : 'var(--warn)' }} />
