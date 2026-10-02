@@ -397,8 +397,9 @@ function moveWords(L: PageLayout, words: TimedWord[], style: CaptionStyle, t: nu
 function wordColor(style: CaptionStyle, word: TimedWord, i: number, ai: number): string {
   const lit = style.highlight === 'color' || style.highlight === 'scale'
   if (lit && i === ai) return style.activeColor
-  if (word.emphasis) return style.emphasisColor
+  // Karaoke words stay filled once sung, keywords included, so nothing flashes back as the next word starts.
   if (lit && i < ai && style.animation === 'karaoke') return style.activeColor
+  if (word.emphasis) return style.emphasisColor
   return style.textColor
 }
 

@@ -11,7 +11,10 @@ function useFake(respond: Responder) {
   return fake
 }
 
-afterEach(() => setClientOptionsForTests({}))
+afterEach(() => {
+  setClientOptionsForTests({})
+  vi.unstubAllEnvs()
+})
 
 const greet = (s: AiSettings, effort: Effort = 'low', signal?: AbortSignal) =>
   ask(s, { effort, system: 'Greet.', user: 'Hello', schema: (z) => z.object({ greeting: z.string() }) }, signal)
@@ -62,6 +65,8 @@ describe('requests', () => {
   })
 
   it('goes straight to the API from the browser with the trimmed key, whatever the environment says', async () => {
+    vi.stubEnv('ANTHROPIC_BASE_URL', 'https://elsewhere.example')
+    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'someone-elses-token')
     const fake = useFake(() => reply({ greeting: 'hi' }))
     await greet(settings())
     const [req] = fake.sent
@@ -124,6 +129,25 @@ describe('errors', () => {
     expect(error.message).toBe(
       "Claude couldn't take this request: Your credit balance is too low to access the Anthropic API.",
     )
+  })
+
+  it('tells the monthly spend cap apart from a rate limit, since waiting will not help', async () => {
+    useFake(() =>
+      apiError(429, 'rate_limit_error', 'You have reached your API usage limits.', {
+        error_code: 'enforced_spend_limit_reached',
+      }),
+    )
+    const error = await failure(greet(settings()))
+    expect(error.kind).toBe('rate')
+    expect(error.message).toContain('monthly spend limit')
+
+    useFake(() => apiError(429, 'rate_limit_error', 'Number of requests has exceeded your rate limit.'))
+    expect((await failure(greet(settings()))).message).toContain('Wait a minute')
+  })
+
+  it('a request too large to send is "too-long"', async () => {
+    useFake(() => apiError(413, 'request_too_large', 'Request exceeds the maximum allowed number of bytes.'))
+    expect((await failure(greet(settings()))).kind).toBe('too-long')
   })
 
   it('a dropped connection is "offline"', async () => {

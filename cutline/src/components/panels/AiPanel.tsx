@@ -30,6 +30,17 @@ type Result =
   | { kind: 'hook'; hooks: string[]; caption: string; hashtags: string[] }
   | { kind: 'clips'; clips: { title: string; reason: string; firstWordId: string; lastWordId: string }[] }
   | { kind: 'translate' }
+  | { kind: 'fix' }
+
+const CONTEXT_KEY = 'cutline.fixContext'
+
+function loadContext(): string {
+  try {
+    return localStorage.getItem(CONTEXT_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
 
 const TARGET_LANGUAGES = [
   'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Dutch', 'Polish', 'Turkish', 'Russian', 'Ukrainian',
@@ -133,9 +144,10 @@ export function AiPanel({ project, update, seek, plan, showToast, onOpenSettings
       else setResult({ kind: 'clips', clips: r })
     })
 
-  const fix = () =>
+  const fix = (context: string) =>
     run('fix', async (signal) => {
-      const r = await fixTranscript(ai, words, project.name, signal)
+      setResult(null)
+      const r = await fixTranscript(ai, words, context, signal)
       const changes = new Map(r.map((c) => [c.wordId, c.text]))
       if (changes.size === 0) {
         showToast('The transcript looks right already')
@@ -242,7 +254,7 @@ export function AiPanel({ project, update, seek, plan, showToast, onOpenSettings
               detail="Names, jargon and punctuation Whisper got wrong"
               busy={busy('fix')}
               disabled={!ready || !!running}
-              onClick={fix}
+              onClick={() => setResult({ kind: 'fix' })}
             />
             {running && (
               <button className="btn ghost small" onClick={() => controller.current?.abort()}>
@@ -354,8 +366,41 @@ export function AiPanel({ project, update, seek, plan, showToast, onOpenSettings
           <p className="hint">Takes a few seconds per minute of video. Editing words later keeps the translation in step.</p>
         </Sheet>
       )}
+      {result?.kind === 'fix' && <FixSheet onClose={() => setResult(null)} onRun={fix} />}
       {plan.duration <= 0 && <p className="hint">Nothing left in the edit — undo or turn some cuts off.</p>}
     </>
+  )
+}
+
+/** Names and jargon make the biggest difference to a transcript fix, so ask for them first. */
+function FixSheet({ onClose, onRun }: { onClose: () => void; onRun: (context: string) => void }) {
+  const [context, setContext] = useState(loadContext)
+  return (
+    <Sheet title="Fix the transcript" onClose={onClose}>
+      <textarea
+        className="field"
+        placeholder="Names, brands or jargon in this video — e.g. Orion, Maker School, 92 Hard, hyperextensions"
+        value={context}
+        onChange={(e) => setContext(e.target.value)}
+        aria-label="Names and jargon"
+      />
+      <p className="hint">Optional, and remembered for next time. Word timings never change; only spellings do.</p>
+      <div className="actions">
+        <button
+          className="btn primary block"
+          onClick={() => {
+            try {
+              localStorage.setItem(CONTEXT_KEY, context.trim())
+            } catch {
+              // Not remembered; still used this time.
+            }
+            onRun(context.trim())
+          }}
+        >
+          <SpellIcon /> Fix it
+        </button>
+      </div>
+    </Sheet>
   )
 }
 

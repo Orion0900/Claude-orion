@@ -55,8 +55,8 @@ export function reply(
   })
 }
 
-export function apiError(status: number, type: string, message: string): Response {
-  return json(status, { type: 'error', error: { type, message }, request_id: 'req_test' })
+export function apiError(status: number, type: string, message: string, details?: Record<string, unknown>): Response {
+  return json(status, { type: 'error', error: { type, message, ...(details ? { details } : {}) }, request_id: 'req_test' })
 }
 
 function json(status: number, body: unknown): Response {

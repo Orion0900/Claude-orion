@@ -18,7 +18,7 @@ Pick two things:
 - emphasis: words to show in the highlight colour, so someone skimming the captions gets the point. Go for the payoff of a sentence, numbers and amounts, names, strong contrasts ("never", "only", "free") and surprising claims. Usually one per sentence and about one word in ten overall, never filler or small function words.
 - emojis: an emoji for a word where a picture adds something, like 💰 on "money", 🤯 on a surprise or ⏰ on "deadline". At most about one every ten words, never two close together, and only emojis anyone would get at a glance.
 
-List each most important first, and name words only by their ref.`
+Order both lists from most to least important, and name words only by their ref.`
 
 /** Most of the words that may be coloured. */
 const EMPHASIS_SHARE = 0.15
@@ -53,7 +53,7 @@ export async function pickHighlights(
     const known = byRef(c.body)
     const emphasis = unique(out.emphasis.map((ref) => ref.trim()))
       .flatMap((ref) => known.get(ref) ?? [])
-      .slice(0, Math.max(1, Math.round(c.body.length * EMPHASIS_SHARE)))
+      .slice(0, Math.ceil(c.body.length * EMPHASIS_SHARE))
     // Taken in Claude's order of importance, so a crowded stretch keeps its best one.
     const emojis: { r: Ref; emoji: string }[] = []
     for (const pick of out.emojis) {
@@ -178,9 +178,13 @@ export async function translateSentences(
 
   await translate(chunk(items, CHUNK_SENTENCES, 3))
   const missing = items.filter((item) => !done.has(item.ref))
-  // Rare, but a gap would leave a caption in the wrong language: ask once more
-  // for just those.
-  if (missing.length) await translate(chunk(missing, CHUNK_SENTENCES, 0))
+  if (missing.length) {
+    // Rare, but a gap would leave a caption in the wrong language, so ask once
+    // more for just those. If that fails, what's already translated stands.
+    await translate(chunk(missing, CHUNK_SENTENCES, 0)).catch((e: unknown) => {
+      if (!(e instanceof AiError)) throw e
+    })
+  }
   return items.flatMap((item) => {
     const text = done.get(item.ref)
     return text ? [{ id: item.id, text }] : []
@@ -498,10 +502,10 @@ function segments(refs: Ref[]): Segment[] {
   return segs
 }
 
-// One emoji: a pictograph with any variation selector, skin tone, tag or
-// joined pictographs (👍🏽, 👩‍💻, 🏴󠁧󠁢󠁳󠁣󠁴󠁿), a flag, or a keycap.
+// One emoji: a pictograph with any variation selector, skin tone, joined
+// pictographs (👍🏽, 👩‍💻) or tags (Scotland's flag), a country flag, or a keycap.
 const EMOJI =
-  /^(?:\p{Regional_Indicator}{2}|[#*0-9]️?⃣|\p{Extended_Pictographic}[️\p{Emoji_Modifier}]*(?:‍\p{Extended_Pictographic}[️\p{Emoji_Modifier}]*)*[\u{E0020}-\u{E007F}]*)$/u
+  /^(?:\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}[\uFE0F\p{Emoji_Modifier}]*(?:\u200D\p{Extended_Pictographic}[\uFE0F\p{Emoji_Modifier}]*)*[\u{E0020}-\u{E007F}]*)$/u
 
 function isEmoji(text: string): boolean {
   return EMOJI.test(text)

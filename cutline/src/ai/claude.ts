@@ -222,7 +222,10 @@ function explain(e: unknown, sdk: Sdk, s: AiSettings, signal?: AbortSignal): Err
     return new AiError('other', `This API key can't use ${label}. Pick another model in Settings.`, cause)
   }
   if (e instanceof sdk.RateLimitError) {
-    return new AiError('rate', "You've hit this API key's rate limit. Wait a minute and try again.", cause)
+    // The monthly spend cap also arrives as a 429, but waiting won't lift it.
+    return spendCapReached(e)
+      ? new AiError('rate', "This API key's account has reached its monthly spend limit. Raise it in the Claude Console to carry on.", cause)
+      : new AiError('rate', "You've hit this API key's rate limit. Wait a minute and try again.", cause)
   }
   if (e instanceof sdk.APIConnectionTimeoutError) {
     return new AiError('offline', 'Claude took too long to answer. Check your connection and try again.', cause)
@@ -236,15 +239,25 @@ function explain(e: unknown, sdk: Sdk, s: AiSettings, signal?: AbortSignal): Err
   if (e instanceof sdk.BadRequestError) {
     return new AiError('other', `Claude couldn't take this request: ${apiMessage(e)}`, cause)
   }
+  if (e instanceof sdk.APIError && e.status === 413) {
+    return new AiError('too-long', 'This video is too long to send to Claude in one go. Try a shorter one.', cause)
+  }
   if (e instanceof sdk.APIError) {
     return new AiError('other', `Claude returned an error: ${apiMessage(e)}`, cause)
   }
   return new AiError('other', 'Something went wrong while talking to Claude.', cause)
 }
 
+interface ErrorBody {
+  error?: { message?: unknown; details?: { error_code?: unknown } }
+}
+
 /** The API's own explanation, such as the account being out of credit. */
 function apiMessage(e: InstanceType<Sdk['APIError']>): string {
-  const body = e.error as { error?: { message?: unknown } } | undefined
-  const message = body?.error?.message
+  const message = (e.error as ErrorBody | undefined)?.error?.message
   return typeof message === 'string' && message ? message : `status ${e.status ?? 'unknown'}`
+}
+
+function spendCapReached(e: InstanceType<Sdk['APIError']>): boolean {
+  return (e.error as ErrorBody | undefined)?.error?.details?.error_code === 'enforced_spend_limit_reached'
 }
