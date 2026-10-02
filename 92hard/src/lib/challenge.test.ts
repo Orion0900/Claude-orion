@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attemptOnDay,
   bestStreak,
   canLog,
+  changeStart,
+  dayNumber,
   dayState,
   dayTasks,
   EMPTY_STATE,
   endAttempt,
+  fillInCarried,
   finishDate,
   getStatus,
   hyperextensionsDue,
@@ -15,6 +17,7 @@ import {
   newAttempt,
   normalizeState,
   restDay,
+  startRange,
   streak,
   summarize,
   totals,
@@ -25,7 +28,7 @@ import {
   type Attempt,
 } from './challenge'
 import { SATURDAY, addDays, weekday, type DateKey } from './dates'
-import { emptyLog, type DayLog } from './tasks'
+import { emptyLog, isBlank, type DayLog } from './tasks'
 
 // A Thursday.
 const START = '2026-10-01'
@@ -148,7 +151,7 @@ describe('hyperextensions', () => {
   })
 
   it('are not owed in a week begun before the app was counting', () => {
-    const attempt = attemptOnDay('2026-10-12', 12)
+    const attempt = newAttempt(START, 11)
     expect(hyperextensionsDue(attempt, 2)).toBe(false)
     expect(ids(attempt, 14)).toEqual(['lift', 'makerSchool'])
     expect(hyperextensionsDue(attempt, 3)).toBe(true)
@@ -198,18 +201,68 @@ describe('finishing', () => {
   })
 })
 
-describe('a run begun before the app', () => {
-  it('starts at the day given, with the days before it counted', () => {
-    const attempt = attemptOnDay('2026-10-12', 12)
-    expect(attempt.start).toBe(START)
-    expect(attempt.carried).toBe(11)
+describe('days counted as done without a log', () => {
+  // Runs saved by earlier versions could start part-way in, with the days before counted.
+  it('count as done', () => {
+    const attempt = newAttempt(START, 11)
     expect(getStatus(attempt, '2026-10-12')).toEqual({ kind: 'active', day: 12 })
     expect(streak(attempt, 12)).toBe(11)
     expect(dayState(attempt, 5, '2026-10-12')).toBe('carried')
   })
-  it('keeps the day in range', () => {
-    expect(attemptOnDay(START, 0).carried).toBe(0)
-    expect(attemptOnDay(START, 500).carried).toBe(91)
+  it('stay in range', () => {
+    expect(newAttempt(START, -3).carried).toBe(0)
+    expect(newAttempt(START, 500).carried).toBe(91)
+  })
+  it('can be filled in instead, from any one of them on', () => {
+    const state: AppState = { attempt: newAttempt(START, 11), history: [] }
+    const opened = fillInCarried(state, 5)
+    expect(opened.attempt!.carried).toBe(4)
+    expect(canLog(opened.attempt!, '2026-10-05', '2026-10-12')).toBe(true)
+    expect(getStatus(opened.attempt, '2026-10-12')).toEqual({ kind: 'missed', day: 12, missed: 5 })
+    expect(fillInCarried(state, 12)).toBe(state)
+    expect(fillInCarried(EMPTY_STATE, 1)).toBe(EMPTY_STATE)
+  })
+})
+
+describe('changing Day 1', () => {
+  it('moves the count and leaves every log on its own day', () => {
+    // Started in the app on the 2nd, having really begun on the 1st.
+    const state: AppState = { attempt: withLog(newAttempt('2026-10-02'), '2026-10-02', lifted), history: [] }
+    const moved = changeStart(state, START).attempt!
+    expect(moved.start).toBe(START)
+    expect(moved.logs['2026-10-02']).toEqual(lifted)
+    expect(dayNumber(moved, '2026-10-02')).toBe(2)
+    expect(finishDate(moved)).toBe('2026-12-31')
+  })
+
+  it('leaves the days before today to fill in', () => {
+    const state: AppState = { attempt: newAttempt('2026-10-02'), history: [] }
+    const moved = changeStart(state, START)
+    expect(getStatus(moved.attempt, '2026-10-02')).toEqual({ kind: 'missed', day: 2, missed: 1 })
+    expect(isBlank(logFor(moved.attempt!, START))).toBe(true)
+    const filled = updateLog(moved, START, () => lifted)
+    expect(getStatus(filled.attempt, '2026-10-02')).toEqual({ kind: 'active', day: 2 })
+  })
+
+  it('opens days that were counted as done', () => {
+    const state: AppState = { attempt: newAttempt(START, 3), history: [] }
+    expect(changeStart(state, START).attempt!.carried).toBe(0)
+  })
+
+  it('stops counting days logged before a later Day 1', () => {
+    const state: AppState = { attempt: doneThrough(3), history: [] }
+    const moved = changeStart(state, '2026-10-03').attempt!
+    expect(totals(moved, '2026-10-03')).toMatchObject({ daysDone: 1, makerSchool: 1 })
+    expect(moved.logs[START]).toEqual(lifted)
+  })
+
+  it('does nothing without a run', () => {
+    expect(changeStart(EMPTY_STATE, START)).toBe(EMPTY_STATE)
+  })
+
+  it('offers dates that keep today within the 92', () => {
+    expect(startRange('2026-10-02')).toEqual(['2026-07-03', '2026-11-01'])
+    expect(dayNumber(newAttempt(startRange('2026-10-02')[0]), '2026-10-02')).toBe(92)
   })
 })
 
@@ -270,7 +323,7 @@ describe('days on the board', () => {
     expect(canLog(attempt, today, today)).toBe(true)
     expect(canLog(attempt, '2026-10-07', today)).toBe(false)
     expect(canLog(attempt, '2026-09-30', today)).toBe(false)
-    expect(canLog(attemptOnDay(today, 6), '2026-10-02', today)).toBe(false)
+    expect(canLog(newAttempt(START, 5), '2026-10-02', today)).toBe(false)
     expect(canLog(attempt, '2027-01-01', '2027-01-05')).toBe(false)
   })
 })
@@ -293,7 +346,7 @@ describe('totals', () => {
   })
 
   it('counts carried days as done without inventing their numbers', () => {
-    expect(totals(attemptOnDay('2026-10-05', 5), '2026-10-05')).toMatchObject({ daysDone: 4, sets: 0 })
+    expect(totals(newAttempt(START, 4), '2026-10-05')).toMatchObject({ daysDone: 4, sets: 0 })
   })
 })
 

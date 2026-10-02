@@ -45,6 +45,13 @@ export function emptyLog(): DayLog {
   return { sets: 0, split: null, rest: false, halfMarathon: false, hyperextensions: 0, makerSchool: false, note: '' }
 }
 
+/** Nothing logged at all: a day still to be filled in, rather than one with something missing. */
+export function isBlank(log: DayLog): boolean {
+  return (
+    log.sets === 0 && log.split === null && !log.rest && !log.halfMarathon && log.hyperextensions === 0 && !log.makerSchool
+  )
+}
+
 /** Fifteen sets, and upper or lower picked. */
 export function liftDone(log: DayLog): boolean {
   return log.sets >= SETS_TARGET && log.split !== null

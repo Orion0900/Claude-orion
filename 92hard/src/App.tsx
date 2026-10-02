@@ -9,9 +9,11 @@ import { TodayView } from './components/TodayView'
 import type { LogChange } from './components/TaskList'
 import {
   canLog,
+  changeStart,
   dayNumber,
   dayState,
   endAttempt,
+  fillInCarried,
   getStatus,
   isDayDone,
   newAttempt,
@@ -100,6 +102,11 @@ export default function App() {
     else setOpenDate(date)
   }
   const closeDay = useCallback(() => setOpenDate(null), [])
+  const moveStart = (start: DateKey) => {
+    setState((s) => changeStart(s, start))
+    setOpenDate(null)
+    setTab('today')
+  }
 
   if (!attempt || status.kind === 'none') {
     return <StartView state={state} today={today} onBegin={begin} onRestore={replace} />
@@ -122,7 +129,15 @@ export default function App() {
         )}
         {tab === 'plan' && <PlanView today={today} />}
         {tab === 'progress' && (
-          <ProgressView state={state} attempt={attempt} today={today} onOpenDay={openDay} onEnd={end} onReplace={replace} />
+          <ProgressView
+            state={state}
+            attempt={attempt}
+            today={today}
+            onOpenDay={openDay}
+            onChangeStart={moveStart}
+            onEnd={end}
+            onReplace={replace}
+          />
         )}
       </main>
 
@@ -141,7 +156,15 @@ export default function App() {
       </nav>
 
       {openDate && dayState(attempt, dayNumber(attempt, openDate), today) !== 'future' && (
-        <DaySheet attempt={attempt} date={openDate} today={today} onChange={changeLog(openDate)} onClose={closeDay} />
+        <DaySheet
+          attempt={attempt}
+          date={openDate}
+          today={today}
+          onChange={changeLog(openDate)}
+          onNavigate={setOpenDate}
+          onFillIn={(day) => setState((s) => fillInCarried(s, day))}
+          onClose={closeDay}
+        />
       )}
 
       {cheer && (

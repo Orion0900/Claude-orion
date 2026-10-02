@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { backupFileName, toBackup } from '../lib/backup'
 import {
   CHALLENGE_DAYS,
@@ -18,6 +18,7 @@ import { isInstalled } from '../hooks'
 import { saveFile } from '../services/files'
 import { useConfirm } from './Confirm'
 import { RestoreButton, StatTiles } from './Shared'
+import { StartDateSheet } from './StartDate'
 
 const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
 
@@ -34,6 +35,7 @@ export function ProgressView({
   attempt,
   today,
   onOpenDay,
+  onChangeStart,
   onEnd,
   onReplace,
 }: {
@@ -41,6 +43,7 @@ export function ProgressView({
   attempt: Attempt
   today: DateKey
   onOpenDay: (date: DateKey) => void
+  onChangeStart: (start: DateKey) => void
   onEnd: () => void
   onReplace: (state: AppState) => void
 }) {
@@ -89,7 +92,7 @@ export function ProgressView({
             <span className="cell future" /> To come
           </li>
         </ul>
-        <p className="fine left">Each row is a week. Tap a day to see or fix its log.</p>
+        <p className="fine left">Each row is a week. Tap a day to fill in or fix its log.</p>
       </section>
 
       <section className="section">
@@ -120,7 +123,14 @@ export function ProgressView({
         {state.history.length > 0 && <p className="fine">Longest run: {days(best)} in a row.</p>}
       </section>
 
-      <RunControls state={state} attempt={attempt} onEnd={onEnd} onReplace={onReplace} />
+      <RunControls
+        state={state}
+        attempt={attempt}
+        today={today}
+        onChangeStart={onChangeStart}
+        onEnd={onEnd}
+        onReplace={onReplace}
+      />
     </>
   )
 }
@@ -168,20 +178,26 @@ function Board({
   )
 }
 
-/** Starting over, backups, and the rarely needed rest. */
+/** Day 1, starting over, backups, and the rarely needed rest. */
 function RunControls({
   state,
   attempt,
+  today,
+  onChangeStart,
   onEnd,
   onReplace,
 }: {
   state: AppState
   attempt: Attempt
+  today: DateKey
+  onChangeStart: (start: DateKey) => void
   onEnd: () => void
   onReplace: (state: AppState) => void
 }) {
   const [message, setMessage] = useState<string | null>(null)
+  const [editingStart, setEditingStart] = useState(false)
   const [confirmSheet, ask] = useConfirm()
+  const closeStart = useCallback(() => setEditingStart(false), [])
 
   const backUp = async () => {
     const now = new Date()
@@ -224,6 +240,9 @@ function RunControls({
             <dd>{state.history.length + 1}</dd>
           </div>
         </dl>
+        <button className="btn" onClick={() => setEditingStart(true)}>
+          Change Day 1
+        </button>
         <button className="btn danger" onClick={startOver}>
           Start over at Day 1
         </button>
@@ -267,6 +286,17 @@ function RunControls({
             signal.
           </p>
         </section>
+      )}
+      {editingStart && (
+        <StartDateSheet
+          attempt={attempt}
+          today={today}
+          onSave={(start) => {
+            setEditingStart(false)
+            onChangeStart(start)
+          }}
+          onClose={closeStart}
+        />
       )}
       {confirmSheet}
     </>
