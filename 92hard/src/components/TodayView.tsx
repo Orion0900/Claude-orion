@@ -1,19 +1,24 @@
 import {
   CHALLENGE_DAYS,
   dateOfDay,
+  dayTasks,
   finishDate,
   logFor,
   streak,
   totals,
+  weekHyperextensions,
+  weekOf,
   type Attempt,
   type Status,
 } from '../lib/challenge'
 import { monthDay, shortDate, type DateKey } from '../lib/dates'
-import { TASKS, isDayComplete, tasksDone } from '../lib/tasks'
+import { WHY } from '../lib/plan'
+import { HYPEREXTENSIONS_PER_WEEK, SETS_TARGET, type TaskId } from '../lib/tasks'
 import { Confetti } from './Confetti'
 import { useConfirm } from './Confirm'
 import { Icon } from './Icons'
 import { Ring } from './Ring'
+import { RoutineNow } from './Routine'
 import { RulesList, StatTiles } from './Shared'
 import { TaskList, type LogChange } from './TaskList'
 
@@ -23,6 +28,7 @@ interface Props {
   today: DateKey
   onChange: (date: DateKey) => LogChange
   onOpenDay: (date: DateKey) => void
+  onOpenPlan: () => void
   /** Ends this run and goes back to the start screen. */
   onEnd: () => void
   onStartToday: () => void
@@ -46,10 +52,10 @@ export function TodayView(props: Props) {
   )
 }
 
-function ActiveDay({ attempt, today, day, onChange }: Props & { day: number }) {
-  const log = logFor(attempt, today)
-  const done = tasksDone(log)
-  const complete = isDayComplete(log)
+function ActiveDay({ attempt, today, day, onChange, onOpenPlan }: Props & { day: number }) {
+  const tasks = dayTasks(attempt, day)
+  const done = tasks.filter((task) => task.done).length
+  const complete = done === tasks.length
   const daysDone = streak(attempt, day)
   return (
     <>
@@ -59,7 +65,7 @@ function ActiveDay({ attempt, today, day, onChange }: Props & { day: number }) {
           <span className="hero-number">{day}</span>
           <span className="hero-of">of {CHALLENGE_DAYS}</span>
         </div>
-        <Ring done={done} total={TASKS.length}>
+        <Ring done={done} total={tasks.length}>
           {complete ? (
             <span className="ring-done">
               <Icon name="check" size={44} />
@@ -67,7 +73,7 @@ function ActiveDay({ attempt, today, day, onChange }: Props & { day: number }) {
           ) : (
             <>
               <span className="ring-num">
-                {done}/{TASKS.length}
+                {done}/{tasks.length}
               </span>
               <span className="ring-label">today</span>
             </>
@@ -89,14 +95,36 @@ function ActiveDay({ attempt, today, day, onChange }: Props & { day: number }) {
           <span>Finish {monthDay(finishDate(attempt))}</span>
         </p>
       </div>
-      <TaskList key={today} log={log} onChange={onChange(today)} />
+      <RoutineNow today={today} onOpen={onOpenPlan} />
+      <TaskList key={today} attempt={attempt} date={today} today={today} onChange={onChange(today)} />
+      <p className="why-foot">{WHY}</p>
     </>
   )
+}
+
+/** What a day that wasn't done was missing, in a few words. */
+function missing(attempt: Attempt, day: number, id: TaskId): string {
+  const log = logFor(attempt, dateOfDay(attempt, day))
+  switch (id) {
+    case 'lift':
+      if (log.rest) return 'A second rest day in one week'
+      if (log.sets >= SETS_TARGET) return 'Lift not marked upper or lower'
+      return log.sets > 0 ? `Lift stopped at ${log.sets} of ${SETS_TARGET} sets` : 'No lift, no rest day'
+    case 'halfMarathon':
+      return 'No half marathon'
+    case 'hyperextensions': {
+      const week = weekOf(day)
+      return `Week ${week} ended at ${weekHyperextensions(attempt, week)} of ${HYPEREXTENSIONS_PER_WEEK} hyperextensions`
+    }
+    case 'makerSchool':
+      return 'No Maker School'
+  }
 }
 
 function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: number }) {
   const date = dateOfDay(attempt, missed)
   const made = streak(attempt, missed)
+  const gaps = dayTasks(attempt, missed).filter((task) => !task.done)
   const [confirmSheet, ask] = useConfirm()
   const end = async () => {
     const ok = await ask({
@@ -113,9 +141,13 @@ function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: numb
         <Icon name="x" size={44} />
       </span>
       <h1 className="missed-title">Day {missed} isn't done</h1>
+      <ul className="missing" aria-label={`What ${shortDate(date)} was missing`}>
+        {gaps.map((task) => (
+          <li key={task.id}>{missing(attempt, missed, task.id)}</li>
+        ))}
+      </ul>
       <p className="missed-copy">
-        {shortDate(date)} wasn't checked off. If you did all four and forgot to tick them, log it now. If you didn't,
-        92 Hard starts over.
+        {shortDate(date)}. Did it and forgot to tick it? Log it now. If not: Fail = Start Over.
       </p>
       <button className="btn primary" onClick={() => onOpenDay(date)}>
         Log Day {missed}
@@ -164,7 +196,7 @@ function Finished({ attempt, today, onEnd }: Props) {
       </div>
       <h1 className="finished-title">92 Hard. Done.</h1>
       <p className="finished-copy">
-        {monthDay(attempt.start)} to {monthDay(finishDate(attempt))}. Every task, every day.
+        {monthDay(attempt.start)} to {monthDay(finishDate(attempt))}. You went for it.
       </p>
       <StatTiles totals={totals(attempt, today)} />
       <button className="btn primary" onClick={onEnd}>

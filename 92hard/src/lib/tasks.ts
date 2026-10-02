@@ -1,66 +1,53 @@
 /**
- * The four things 92 Hard asks for every day, and exactly what counts as
- * doing each one. Everything else in the app asks this file.
+ * The 92 Hard rules, as written on the whiteboard, and what counts as doing
+ * each one on the day it's logged. Two of them are weekly — one day off
+ * lifting, 100 hyperextensions — so the parts that need the rest of the week
+ * live in challenge.ts.
  */
 
 export const SETS_TARGET = 15
-export const HYPEREXTENSIONS_TARGET = 100
-export const HALF_MARATHON_KM = 21.1
+export const LIFTS_PER_WEEK = 6
+export const HYPEREXTENSIONS_PER_WEEK = 100
+export const HALF_MARATHON_MILES = 13.1
+
+/** The rules, word for word. */
+export const RULES: readonly string[] = [
+  'Lift 6× a week, 15 sets a day',
+  'Half Marathon Saturdays',
+  'Neck on Uppers',
+  '100× Hyperextensions a week',
+  'Maker School 1× a day',
+]
+
+export const FAIL_RULE = 'Fail = Start Over'
+
+/** Neck goes with upper days, so "upper" is only ever picked with neck done. */
+export type Split = 'upper' | 'lower'
 
 export interface DayLog {
-  /** Working sets in the gym. Fifteen of them plus neck does the first task. */
+  /** Working sets. Fifteen of them, upper (with neck) or lower, make a lift. */
   sets: number
-  neck: boolean
-  /** A half marathon does the first task on its own, in place of the gym. */
+  split: Split | null
+  /** The one day a week off lifting: six lifts in seven days. */
+  rest: boolean
+  /** Owed on Saturdays. */
   halfMarathon: boolean
+  /** Counted toward the week's hundred. */
   hyperextensions: number
   makerSchool: boolean
-  vlog: boolean
+  /** From the first version of the app, which had a notes box. Kept so nothing is lost. */
   note: string
 }
 
-export type TaskId = 'training' | 'hyperextensions' | 'makerSchool' | 'vlog'
-
-export interface Task {
-  id: TaskId
-  /** The rule as written, shown wherever the rules are. */
-  rule: string
-}
-
-export const TASKS: readonly Task[] = [
-  { id: 'training', rule: 'Gym 15 sets + neck / half marathon' },
-  { id: 'hyperextensions', rule: '100× Hyperextensions' },
-  { id: 'makerSchool', rule: 'Maker School 1×' },
-  { id: 'vlog', rule: 'Vlog 1×' },
-]
+export type TaskId = 'lift' | 'halfMarathon' | 'hyperextensions' | 'makerSchool'
 
 export function emptyLog(): DayLog {
-  return { sets: 0, neck: false, halfMarathon: false, hyperextensions: 0, makerSchool: false, vlog: false, note: '' }
+  return { sets: 0, split: null, rest: false, halfMarathon: false, hyperextensions: 0, makerSchool: false, note: '' }
 }
 
-export function gymDone(log: DayLog): boolean {
-  return log.sets >= SETS_TARGET && log.neck
-}
-
-export function isTaskDone(log: DayLog, task: TaskId): boolean {
-  switch (task) {
-    case 'training':
-      return gymDone(log) || log.halfMarathon
-    case 'hyperextensions':
-      return log.hyperextensions >= HYPEREXTENSIONS_TARGET
-    case 'makerSchool':
-      return log.makerSchool
-    case 'vlog':
-      return log.vlog
-  }
-}
-
-export function tasksDone(log: DayLog | undefined): number {
-  return log ? TASKS.filter((task) => isTaskDone(log, task.id)).length : 0
-}
-
-export function isDayComplete(log: DayLog | undefined): boolean {
-  return tasksDone(log) === TASKS.length
+/** Fifteen sets, and upper or lower picked. */
+export function liftDone(log: DayLog): boolean {
+  return log.sets >= SETS_TARGET && log.split !== null
 }
 
 /** A count as stored: a whole number, never negative, never absurd. */
@@ -76,11 +63,12 @@ export function normalizeLog(raw: unknown): DayLog {
   const r = raw as Record<string, unknown>
   return {
     sets: cleanCount(r.sets, 999),
-    neck: r.neck === true,
+    // The first version asked for neck every gym day, so a day with it ticked had neck done.
+    split: r.split === 'upper' || r.split === 'lower' ? r.split : r.neck === true ? 'upper' : null,
+    rest: r.rest === true,
     halfMarathon: r.halfMarathon === true,
     hyperextensions: cleanCount(r.hyperextensions),
     makerSchool: r.makerSchool === true,
-    vlog: r.vlog === true,
     note: typeof r.note === 'string' ? r.note.slice(0, 5000) : log.note,
   }
 }

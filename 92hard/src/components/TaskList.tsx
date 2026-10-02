@@ -1,57 +1,68 @@
 import { useState, type ReactNode } from 'react'
 import {
-  HALF_MARATHON_KM,
-  HYPEREXTENSIONS_TARGET,
+  CHALLENGE_DAYS,
+  dateOfDay,
+  dayNumber,
+  hyperextensionsDue,
+  logFor,
+  restDay,
+  weekHyperextensions,
+  weekLifts,
+  weekOf,
+  weekSpan,
+  WEEK,
+  type Attempt,
+} from '../lib/challenge'
+import { SATURDAY, dayName, weekday, type DateKey } from '../lib/dates'
+import {
+  HALF_MARATHON_MILES,
+  HYPEREXTENSIONS_PER_WEEK,
+  LIFTS_PER_WEEK,
   SETS_TARGET,
   cleanCount,
-  isTaskDone,
+  liftDone,
   type DayLog,
+  type Split,
 } from '../lib/tasks'
 import { Icon } from './Icons'
 
 export type LogChange = (change: (log: DayLog) => DayLog) => void
 
-interface CardProps {
-  log: DayLog
+interface Props {
+  attempt: Attempt
+  /** The day these cards log. */
+  date: DateKey
+  today: DateKey
   onChange: LogChange
 }
 
-/** One day's four tasks and its note. Keyed by date, so undo never crosses days. */
-export function TaskList({ log, onChange }: CardProps) {
+/** One day's cards, in the whiteboard's order. Keyed by date, so undo never crosses days. */
+export function TaskList(props: Props) {
+  const { attempt, date, onChange } = props
+  const log = logFor(attempt, date)
   return (
     <div className="tasks">
-      <TrainingCard log={log} onChange={onChange} />
-      <HyperextensionsCard log={log} onChange={onChange} />
+      <LiftCard {...props} />
+      {weekday(date) === SATURDAY && (
+        <ToggleCard
+          title="Half marathon"
+          detail={`${HALF_MARATHON_MILES} miles · Saturdays`}
+          done={log.halfMarathon}
+          onToggle={() => onChange((l) => ({ ...l, halfMarathon: !l.halfMarathon }))}
+        />
+      )}
+      <HyperextensionsCard {...props} />
       <ToggleCard
         title="Maker School"
-        detail="One session"
+        detail="1× a day"
         done={log.makerSchool}
         onToggle={() => onChange((l) => ({ ...l, makerSchool: !l.makerSchool }))}
       />
-      <ToggleCard
-        title="Vlog"
-        detail="One vlog"
-        done={log.vlog}
-        onToggle={() => onChange((l) => ({ ...l, vlog: !l.vlog }))}
-      />
-      <label className="note">
-        <span className="section-label">Notes</span>
-        <textarea
-          value={log.note}
-          onChange={(e) => {
-            const note = e.target.value
-            onChange((l) => ({ ...l, note }))
-          }}
-          placeholder="How did it go?"
-          rows={3}
-          maxLength={5000}
-        />
-      </label>
     </div>
   )
 }
 
-function TaskHead({ done, title, detail, count }: { done: boolean; title: string; detail: string; count?: ReactNode }) {
+function TaskHead({ done, title, detail, count }: { done: boolean; title: string; detail: ReactNode; count?: ReactNode }) {
   return (
     <span className="task-head">
       <span className={done ? 'check on' : 'check'} aria-hidden="true">
@@ -66,26 +77,50 @@ function TaskHead({ done, title, detail, count }: { done: boolean; title: string
   )
 }
 
-/** Gym: fifteen sets plus neck. Or a half marathon, which covers it on its own. */
-function TrainingCard({ log, onChange }: CardProps) {
-  const done = isTaskDone(log, 'training')
-  const changeSets = (next: (sets: number) => number) => onChange((l) => ({ ...l, sets: cleanCount(next(l.sets), 999) }))
+const SPLITS: Array<[Split, string]> = [
+  ['upper', 'Upper + neck'],
+  ['lower', 'Lower'],
+]
 
-  if (log.halfMarathon) {
+/** Fifteen sets, upper with neck or lower. Or the week's one rest day. */
+function LiftCard({ attempt, date, onChange }: Props) {
+  const log = logFor(attempt, date)
+  const day = dayNumber(attempt, date)
+  const week = weekOf(day)
+  const rested = restDay(attempt, week)
+  const [first, last] = weekSpan(week)
+  // "Of 6" only means something in a whole week this app saw all of.
+  const fullWeek = last - first + 1 === WEEK && first > attempt.carried
+  const lifts = weekLifts(attempt, week)
+
+  if (log.rest) {
+    const counts = rested === day
     return (
-      <article className="task done" aria-label="Gym or half marathon">
-        <TaskHead done title="Half marathon" detail={`${HALF_MARATHON_KM} km, in place of the gym`} />
-        <button className="text-btn" onClick={() => onChange((l) => ({ ...l, halfMarathon: false }))}>
-          Undo — back to the gym
+      <article className={counts ? 'task done' : 'task'} aria-label="Lift">
+        <TaskHead
+          done={counts}
+          title="Rest day"
+          detail={counts ? 'Your one day off lifting this week' : `Week ${week}'s rest day was ${dayName(dateOfDay(attempt, rested ?? day))}`}
+        />
+        <button className="text-btn" onClick={() => onChange((l) => ({ ...l, rest: false }))}>
+          Undo — I'm lifting
         </button>
       </article>
     )
   }
 
+  const done = liftDone(log)
+  const changeSets = (next: (sets: number) => number) => onChange((l) => ({ ...l, sets: cleanCount(next(l.sets), 999) }))
+  const asking = log.sets >= SETS_TARGET && !log.split
   const count = log.sets > SETS_TARGET ? `${log.sets} sets` : `${log.sets}/${SETS_TARGET}`
   return (
-    <article className={done ? 'task done' : 'task'} aria-label="Gym or half marathon">
-      <TaskHead done={done} title="Gym" detail="15 sets + neck" count={count} />
+    <article className={done ? 'task done' : 'task'} aria-label="Lift">
+      <TaskHead
+        done={done}
+        title="Lift"
+        detail={asking ? 'Upper or lower?' : `${SETS_TARGET} sets · neck on uppers`}
+        count={count}
+      />
       <div className="pips" role="group" aria-label="Sets">
         {Array.from({ length: SETS_TARGET }, (_, i) => (
           <button
@@ -98,7 +133,7 @@ function TrainingCard({ log, onChange }: CardProps) {
           />
         ))}
       </div>
-      <div className="gym-controls">
+      <div className="lift-controls">
         <button className="icon-btn" aria-label="One set fewer" disabled={log.sets === 0} onClick={() => changeSets((sets) => sets - 1)}>
           <Icon name="minus" />
         </button>
@@ -106,34 +141,55 @@ function TrainingCard({ log, onChange }: CardProps) {
           <Icon name="plus" size={22} />
           Set
         </button>
-        <button
-          className={log.neck ? 'toggle-chip on' : 'toggle-chip'}
-          role="checkbox"
-          aria-checked={log.neck}
-          onClick={() => onChange((l) => ({ ...l, neck: !l.neck }))}
-        >
-          <span className="mini-check" aria-hidden="true">
-            <Icon name="check" size={14} />
-          </span>
-          Neck
-        </button>
       </div>
-      <div className="or" aria-hidden="true">
-        <span>or</span>
+      <div className={asking ? 'split ask' : 'split'} role="radiogroup" aria-label="Upper or lower">
+        {SPLITS.map(([split, label]) => (
+          <button
+            key={split}
+            role="radio"
+            aria-checked={log.split === split}
+            className={log.split === split ? 'on' : ''}
+            // Tapping the chosen one again clears it.
+            onClick={() => onChange((l) => ({ ...l, split: l.split === split ? null : split }))}
+          >
+            <span className="mini-check" aria-hidden="true">
+              <Icon name="check" size={14} />
+            </span>
+            {label}
+          </button>
+        ))}
       </div>
-      <button className="alt-btn" onClick={() => onChange((l) => ({ ...l, halfMarathon: true }))}>
-        Ran a half marathon today
-      </button>
+      <div className="week-line">
+        <span>
+          {fullWeek ? `${lifts} of ${LIFTS_PER_WEEK} lifts this week` : `${lifts} ${lifts === 1 ? 'lift' : 'lifts'} this week`}
+        </span>
+        {rested === null ? (
+          !done && (
+            <button className="rest-btn" onClick={() => onChange((l) => ({ ...l, rest: true }))}>
+              Rest day
+            </button>
+          )
+        ) : (
+          <span>Rested {dayName(dateOfDay(attempt, rested))}</span>
+        )}
+      </div>
     </article>
   )
 }
 
 const STEPS = [10, 15, 20, 25]
 
-function HyperextensionsCard({ log, onChange }: CardProps) {
+/** A hundred a week, logged by the set on whichever days they happen. */
+function HyperextensionsCard({ attempt, date, today, onChange }: Props) {
   const [history, setHistory] = useState<number[]>([])
   const [editing, setEditing] = useState(false)
-  const done = isTaskDone(log, 'hyperextensions')
+  const log = logFor(attempt, date)
+  const day = dayNumber(attempt, date)
+  const week = weekOf(day)
+  const total = weekHyperextensions(attempt, week)
+  const due = hyperextensionsDue(attempt, week)
+  const end = weekSpan(week)[1]
+  const met = total >= HYPEREXTENSIONS_PER_WEEK
   const add = (n: number) => {
     setHistory((h) => [...h, n])
     onChange((l) => ({ ...l, hyperextensions: cleanCount(l.hyperextensions + n) }))
@@ -150,19 +206,31 @@ function HyperextensionsCard({ log, onChange }: CardProps) {
     onChange((l) => ({ ...l, hyperextensions: cleanCount(n) }))
   }
 
+  const detail = !due
+    ? day === CHALLENGE_DAYS
+      ? 'Nothing owed on Day 92'
+      : 'Not counted in a week begun before the app'
+    : `100 a week · ${end === day && date === today ? 'due today' : `due ${dayName(dateOfDay(attempt, end))}`}`
   const count = editing ? (
-    <CountInput value={log.hyperextensions} onDone={set} label="Hyperextensions done" />
+    <span className="count-edit">
+      <small>Today</small>
+      <CountInput value={log.hyperextensions} onDone={set} label="Hyperextensions today" />
+    </span>
   ) : (
-    <button className="count-btn" onClick={() => setEditing(true)} aria-label={`${log.hyperextensions} done. Edit`}>
-      {log.hyperextensions}/{HYPEREXTENSIONS_TARGET}
+    <button
+      className="count-btn"
+      onClick={() => setEditing(true)}
+      aria-label={`${total} of ${HYPEREXTENSIONS_PER_WEEK} this week, ${log.hyperextensions} today. Change today's count`}
+    >
+      {total}/{HYPEREXTENSIONS_PER_WEEK}
     </button>
   )
 
   return (
-    <article className={done ? 'task done' : 'task'} aria-label="Hyperextensions">
-      <TaskHead done={done} title="Hyperextensions" detail="100, split however you like" count={count} />
+    <article className={met ? 'task done' : 'task'} aria-label="Hyperextensions">
+      <TaskHead done={met} title="Hyperextensions" detail={detail} count={count} />
       <div className="bar" aria-hidden="true">
-        <div className="bar-fill" style={{ width: `${Math.min(100, (log.hyperextensions / HYPEREXTENSIONS_TARGET) * 100)}%` }} />
+        <div className="bar-fill" style={{ width: `${Math.min(100, (total / HYPEREXTENSIONS_PER_WEEK) * 100)}%` }} />
       </div>
       <div className="steps">
         {STEPS.map((n) => (

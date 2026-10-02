@@ -28,6 +28,29 @@ export function useToday(): DateKey {
   return today
 }
 
+/** Minutes since local midnight. */
+function minutesNow(): number {
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes()
+}
+
+/** The time now, to the minute, for the routine's "now" and "next". */
+export function useMinutes(): number {
+  const [minutes, setMinutes] = useState(minutesNow)
+
+  useEffect(() => {
+    const refresh = () => setMinutes(minutesNow())
+    const timer = window.setInterval(refresh, 20_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+
+  return minutes
+}
+
 /** True when running from the Home Screen rather than in a browser tab. */
 export function isInstalled(): boolean {
   const standalone = (navigator as Navigator & { standalone?: boolean }).standalone

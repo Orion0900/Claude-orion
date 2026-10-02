@@ -1,12 +1,31 @@
 /**
- * A run at 92 Hard: which day it is, whether a day was missed, and starting
- * over. The rule is the whole point — miss any task on any day and the count
- * goes back to Day 1 — so it lives here, in one place, under test.
+ * A run at 92 Hard: which day it is, what each day asks for, whether one was
+ * missed, and starting over. Fail = Start Over is the whole point, so it
+ * lives here, in one place, under test.
+ *
+ * Weeks are counted from Day 1, so every week has seven days and exactly one
+ * Saturday whichever day the run began. Days 1–7 are Week 1; Day 92 is a week
+ * of one day on its own.
+ *
+ *   - Every day: Maker School, and a lift — or the week's one rest day.
+ *   - Saturdays: a half marathon too.
+ *   - The last day of each week: the week's 100 hyperextensions, added up.
+ *
+ * Six lifts a week falls out of the second line: seven days, one of them off.
  */
-import { addDays, daysBetween, isDateKey, type DateKey } from './dates'
-import { cleanCount, emptyLog, isDayComplete, normalizeLog, type DayLog } from './tasks'
+import { addDays, daysBetween, isDateKey, SATURDAY, weekday, type DateKey } from './dates'
+import {
+  HYPEREXTENSIONS_PER_WEEK,
+  cleanCount,
+  emptyLog,
+  liftDone,
+  normalizeLog,
+  type DayLog,
+  type TaskId,
+} from './tasks'
 
 export const CHALLENGE_DAYS = 92
+export const WEEK = 7
 
 export interface Attempt {
   /** Day 1. */
@@ -43,6 +62,11 @@ export type Status =
 /** How a single day of the run looks from today. */
 export type DayState = 'done' | 'carried' | 'open' | 'missed' | 'future'
 
+export interface TaskState {
+  id: TaskId
+  done: boolean
+}
+
 export function dayNumber(attempt: Attempt, date: DateKey): number {
   return daysBetween(attempt.start, date) + 1
 }
@@ -59,9 +83,60 @@ export function logFor(attempt: Attempt, date: DateKey): DayLog {
   return attempt.logs[date] ?? emptyLog()
 }
 
+/** The week a day falls in: Days 1–7 are Week 1. */
+export function weekOf(day: number): number {
+  return Math.ceil(day / WEEK)
+}
+
+/** A week's first and last day, the last never past Day 92. */
+export function weekSpan(week: number): [number, number] {
+  return [(week - 1) * WEEK + 1, Math.min(week * WEEK, CHALLENGE_DAYS)]
+}
+
+/** Logged days of a week: the ones in the run and not carried. */
+function loggedDays(attempt: Attempt, week: number): number[] {
+  const [first, last] = weekSpan(week)
+  const days: number[] = []
+  for (let d = Math.max(first, attempt.carried + 1); d <= last; d++) days.push(d)
+  return days
+}
+
+/** A week owes its hundred when all seven days are in the run and every one was logged here. */
+export function hyperextensionsDue(attempt: Attempt, week: number): boolean {
+  const [first, last] = weekSpan(week)
+  return last - first + 1 === WEEK && first > attempt.carried
+}
+
+export function weekHyperextensions(attempt: Attempt, week: number): number {
+  return loggedDays(attempt, week).reduce((n, d) => n + (attempt.logs[dateOfDay(attempt, d)]?.hyperextensions ?? 0), 0)
+}
+
+/** The week's rest day: the first day in it taken as one. A second one doesn't count. */
+export function restDay(attempt: Attempt, week: number): number | null {
+  return loggedDays(attempt, week).find((d) => attempt.logs[dateOfDay(attempt, d)]?.rest) ?? null
+}
+
+export function weekLifts(attempt: Attempt, week: number): number {
+  return loggedDays(attempt, week).filter((d) => liftDone(logFor(attempt, dateOfDay(attempt, d)))).length
+}
+
+/** What a day of the run asks for, in the whiteboard's order, and which of it is done. */
+export function dayTasks(attempt: Attempt, day: number): TaskState[] {
+  const date = dateOfDay(attempt, day)
+  const log = logFor(attempt, date)
+  const week = weekOf(day)
+  const tasks: TaskState[] = [{ id: 'lift', done: liftDone(log) || (log.rest && restDay(attempt, week) === day) }]
+  if (weekday(date) === SATURDAY) tasks.push({ id: 'halfMarathon', done: log.halfMarathon })
+  if (day === weekSpan(week)[1] && hyperextensionsDue(attempt, week)) {
+    tasks.push({ id: 'hyperextensions', done: weekHyperextensions(attempt, week) >= HYPEREXTENSIONS_PER_WEEK })
+  }
+  tasks.push({ id: 'makerSchool', done: log.makerSchool })
+  return tasks
+}
+
 export function isDayDone(attempt: Attempt, day: number): boolean {
   if (day < 1 || day > CHALLENGE_DAYS) return false
-  return day <= attempt.carried || isDayComplete(attempt.logs[dateOfDay(attempt, day)])
+  return day <= attempt.carried || dayTasks(attempt, day).every((task) => task.done)
 }
 
 export function getStatus(attempt: Attempt | null, today: DateKey): Status {
@@ -135,28 +210,26 @@ export function updateLog(state: AppState, date: DateKey, change: (log: DayLog) 
 
 export interface Totals {
   daysDone: number
+  lifts: number
   sets: number
-  neck: number
-  halfMarathons: number
   hyperextensions: number
   makerSchool: number
-  vlogs: number
+  halfMarathons: number
 }
 
 /** Everything done so far in this run, today included. */
 export function totals(attempt: Attempt, today: DateKey): Totals {
-  const t: Totals = { daysDone: 0, sets: 0, neck: 0, halfMarathons: 0, hyperextensions: 0, makerSchool: 0, vlogs: 0 }
+  const t: Totals = { daysDone: 0, lifts: 0, sets: 0, hyperextensions: 0, makerSchool: 0, halfMarathons: 0 }
   const last = Math.min(dayNumber(attempt, today), CHALLENGE_DAYS)
   for (let day = 1; day <= last; day++) {
     if (isDayDone(attempt, day)) t.daysDone++
     const log = attempt.logs[dateOfDay(attempt, day)]
     if (!log || day <= attempt.carried) continue
+    if (liftDone(log)) t.lifts++
     t.sets += log.sets
-    if (log.neck) t.neck++
-    if (log.halfMarathon) t.halfMarathons++
     t.hyperextensions += log.hyperextensions
     if (log.makerSchool) t.makerSchool++
-    if (log.vlog) t.vlogs++
+    if (log.halfMarathon) t.halfMarathons++
   }
   return t
 }
