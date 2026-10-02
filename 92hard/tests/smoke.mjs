@@ -15,16 +15,14 @@ const page = await context.newPage()
 const errors = watchErrors(page)
 const shot = async (name, full = false) => shots && page.screenshot({ path: `${shots}/${name}.png`, fullPage: full })
 const text = (selector) => page.locator(selector).first().innerText()
-const tapTimes = async (selector, n) => {
-  for (let i = 0; i < n; i++) await page.locator(selector).first().tap()
-}
 const ring = () => text('.ring-center')
 /** Opens the app on a day and time, as if it had been put away and brought back. */
 const openOn = async (date, time = '12:00:00') => {
   await page.clock.setFixedTime(at(date, time))
   await page.reload()
 }
-const lifted = { sets: 15, split: 'lower', rest: false, halfMarathon: false, hyperextensions: 0, makerSchool: true, note: '' }
+const lifted = { lifted: true, rest: false, halfMarathon: false, hyperextensions: 0, makerSchool: true, vlog: true, note: '' }
+const tickLift = (scope = '') => page.tap(`${scope} [aria-label="Lift"] .task-check`.trim())
 const seedState = (state) => page.evaluate((state) => localStorage.setItem('92hard.state', JSON.stringify(state)), state)
 const seed = (logs) =>
   page.evaluate((logs) => {
@@ -41,26 +39,25 @@ await page.waitForTimeout(300)
 await shot('01-start', true)
 assert.match(await text('.start-dates'), /Oct 1.*Dec 31/)
 assert.match(await text('.start-lede'), /went for it/)
-assert.equal(await page.locator('.start .rules li').count(), 5)
+assert.equal(await page.locator('.start .rules li').count(), 6)
 
 await page.tap('.btn.primary.big')
 await page.waitForSelector('.hero')
 await page.waitForTimeout(300)
 await shot('02-day-1', true)
 assert.equal(await text('.hero-number'), '1')
-// A Thursday asks for a lift and Maker School.
+// A Thursday asks for a lift and Maker School; the vlog joins the rules on the 2nd.
 assert.match(await ring(), /0\/2/)
+assert.equal(await page.locator('.task-toggle >> text=Vlog').count(), 0)
 assert.match(await text('.routine-now'), /Now\s+Maker School\s+till 8:30 AM/i)
 assert.match(await text('.routine-now'), /Next\s+Work\s+9:00 AM/i)
 assert.equal(await page.locator('.task >> text=Half marathon').count(), 0)
 
-// Fifteen sets don't count until upper or lower is picked.
-await tapTimes('.add-set', 15)
+// The lift is one tick.
+await tickLift()
 await page.waitForTimeout(200)
-await shot('03-upper-or-lower')
-assert.match(await text('[aria-label="Lift"] .task-detail'), /Upper or lower/)
-assert.match(await ring(), /0\/2/)
-await page.tap('.split >> text=Upper + neck')
+await shot('03-lift-ticked')
+assert.equal(await page.locator('[aria-label="Lift"] .task-check[aria-checked="true"]').count(), 1)
 assert.match(await ring(), /1\/2/)
 
 // Hyperextensions count toward the week.
@@ -83,7 +80,7 @@ await page.waitForSelector('.why-quote')
 await page.waitForTimeout(300)
 await shot('05-plan', true)
 assert.equal(await text('.why-quote'), '10 yrs from now I want to say I went for it.'.toUpperCase())
-assert.equal(await page.locator('.rules li').count(), 5)
+assert.equal(await page.locator('.rules li').count(), 6)
 assert.match(await text('.fail-rule'), /Fail = Start Over/i)
 assert.match(await text('.routine-group.today'), /M–F/)
 assert.match(await text('.routine'), /Going in at 9 feels okay/)
@@ -101,10 +98,13 @@ await openOn('2026-10-02', '06:20:00')
 await page.tap('.tab >> text=Today')
 await page.waitForSelector('.hero')
 assert.match(await text('.routine-now'), /Next\s+Maker School\s+7:00 AM/i)
-await tapTimes('.add-set', 15)
-await page.tap('.split >> text=Lower')
+assert.match(await ring(), /0\/3/)
+await tickLift()
 await page.tap('.step >> text=+15')
 await page.tap('.task-toggle >> text=Maker School')
+await page.waitForTimeout(200)
+await shot('05b-friday', true)
+await page.tap('.task-toggle >> text=Vlog')
 await page.waitForSelector('.cheer')
 assert.equal(await text('.count-btn'), '40/100')
 
@@ -114,12 +114,13 @@ await page.waitForSelector('.hero')
 await page.waitForTimeout(300)
 await shot('07-saturday', true)
 assert.equal(await text('.hero-number'), '3')
-assert.match(await ring(), /0\/3/)
+assert.match(await ring(), /0\/4/)
 assert.match(await text('.routine-now'), /Next\s+Date Night\s+Tonight/i)
 assert.match(await text('.week-line'), /2 of 6 lifts this week/)
 await page.tap('.rest-btn')
 await page.tap('.task-toggle >> text=Half marathon')
 await page.tap('.task-toggle >> text=Maker School')
+await page.tap('.task-toggle >> text=Vlog')
 await page.waitForSelector('.cheer')
 await page.waitForTimeout(500)
 await shot('08-saturday-done')
@@ -137,28 +138,28 @@ await seed({ '2026-10-04': lifted, '2026-10-05': lifted, '2026-10-06': lifted })
 await openOn('2026-10-07', '18:00:00')
 await page.waitForSelector('.hero')
 assert.equal(await text('.hero-number'), '7')
-assert.match(await ring(), /0\/3/)
+assert.match(await ring(), /0\/4/)
 assert.equal(await text('.count-btn'), '40/100')
 assert.match(await text('[aria-label="Hyperextensions"] .task-detail'), /due today/)
 await page.tap('.step >> text=+25')
 await page.tap('.step >> text=+25')
 await page.tap('.step >> text=+10')
-assert.match(await ring(), /1\/3/)
+assert.match(await ring(), /1\/4/)
 await page.waitForTimeout(300)
 await shot('09-week-end')
-await tapTimes('.add-set', 15)
-await page.tap('.split >> text=Upper + neck')
+await tickLift()
 await page.tap('.task-toggle >> text=Maker School')
+await page.tap('.task-toggle >> text=Vlog')
 await page.waitForSelector('.cheer')
 
-// Thursday the 8th: the lift stops at nine sets and Maker School never gets ticked.
-await seed({ '2026-10-08': { ...lifted, sets: 9, split: null, makerSchool: false } })
+// Thursday the 8th: the vlog gets ticked, but neither the lift nor Maker School does.
+await seed({ '2026-10-08': { ...lifted, lifted: false, makerSchool: false } })
 await openOn('2026-10-09', '08:00:00')
 await page.waitForSelector('.missed-view')
 await page.waitForTimeout(300)
 await shot('10-missed')
 assert.match(await text('.missed-title'), /Day 8 isn't done/i)
-assert.match(await text('.missing'), /Lift stopped at 9 of 15 sets/)
+assert.match(await text('.missing'), /No lift, no rest day/)
 assert.match(await text('.missing'), /No Maker School/)
 
 // It was done, just never ticked: log it late from the sheet.
@@ -168,8 +169,7 @@ await page.waitForTimeout(400)
 await page.tap('.sheet .count-btn')
 await page.fill('.sheet .count-input', '30')
 await page.locator('.sheet .count-input').press('Enter')
-await tapTimes('.sheet .add-set', 6)
-await page.tap('.sheet .split >> text=Lower')
+await tickLift('.sheet')
 await page.tap('.sheet .task-toggle >> text=Maker School')
 await page.waitForTimeout(400)
 await shot('11-sheet-logged')
@@ -182,7 +182,7 @@ assert.equal(await text('.hero-number'), '9')
 // Days 9 to 14 get done but Week 2 ends 40 short of a hundred.
 await seed({
   '2026-10-09': lifted,
-  '2026-10-10': { ...lifted, sets: 0, split: null, rest: true, halfMarathon: true, hyperextensions: 30 },
+  '2026-10-10': { ...lifted, lifted: false, rest: true, halfMarathon: true, hyperextensions: 30 },
   '2026-10-11': lifted,
   '2026-10-12': lifted,
   '2026-10-13': lifted,
@@ -217,9 +217,9 @@ assert.equal(await page.locator('.missed-mark.blank').count(), 1)
 assert.equal(await page.locator('.missing').count(), 0)
 await page.tap('.missed-view .btn.primary')
 await page.waitForSelector('.sheet')
-await tapTimes('.sheet .add-set', 15)
-await page.tap('.sheet .split >> text=Lower')
+await tickLift('.sheet')
 await page.tap('.sheet .task-toggle >> text=Maker School')
+await page.tap('.sheet .task-toggle >> text=Vlog')
 assert.match(await text('.sheet-status'), /All done/)
 assert.equal(await page.locator('.sheet [aria-label="Day after"]').isDisabled(), false)
 await page.tap('.sheet [aria-label="Close"]')
@@ -251,6 +251,7 @@ assert.match(await text('.sheet-status'), /All done/)
 await page.tap('.sheet [aria-label="Day before"]')
 await page.tap('.sheet .rest-btn')
 await page.tap('.sheet .task-toggle >> text=Maker School')
+await page.tap('.sheet .task-toggle >> text=Vlog')
 await page.waitForTimeout(300)
 await shot('17-sheet-filled')
 assert.match(await text('.sheet-status'), /All done/)
@@ -339,7 +340,7 @@ await openOn('2026-10-01', '20:00:00')
 await page.waitForSelector('.hero')
 assert.equal(await text('.hero-number'), '1')
 assert.equal(await page.locator('.hero.complete').count(), 1)
-assert.match(await page.locator('.split button.on').innerText(), /UPPER \+ NECK/)
+assert.equal(await page.locator('[aria-label="Lift"] .task-check[aria-checked="true"]').count(), 1)
 assert.equal(await text('.count-btn'), '45/100')
 
 // A finished run, seeded straight into storage.
@@ -348,8 +349,8 @@ for (let i = 0; i < 92; i++) {
   const date = new Date(Date.UTC(2026, 9, 1 + i))
   const saturday = date.getUTCDay() === 6
   logs[date.toISOString().slice(0, 10)] = saturday
-    ? { ...lifted, sets: 0, split: null, rest: true, halfMarathon: true, hyperextensions: 15 }
-    : { ...lifted, split: i % 2 ? 'upper' : 'lower', hyperextensions: 15 }
+    ? { ...lifted, lifted: false, rest: true, halfMarathon: true, hyperextensions: 15 }
+    : { ...lifted, hyperextensions: 15 }
 }
 await page.evaluate((state) => localStorage.setItem('92hard.state', JSON.stringify(state)), {
   version: 2,

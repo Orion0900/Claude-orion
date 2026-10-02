@@ -5,7 +5,7 @@ import { emptyLog } from './tasks'
 import { loadState, saveState, STORAGE_KEY, type KeyValueStore } from './storage'
 
 const state: AppState = {
-  attempt: { ...newAttempt('2026-10-01'), logs: { '2026-10-01': { ...emptyLog(), sets: 9, note: 'push day' } } },
+  attempt: { ...newAttempt('2026-10-01'), logs: { '2026-10-01': { ...emptyLog(), hyperextensions: 9, note: 'push day' } } },
   history: [{ start: '2026-09-01', end: '2026-09-03', completed: 2, outcome: 'restarted' }],
 }
 
@@ -18,7 +18,7 @@ describe('backups', () => {
   it('round-trips the whole run', () => {
     const text = toBackup(state, new Date('2026-10-01T20:00:00Z'))
     expect(fromBackup(text)).toEqual(state)
-    expect(JSON.parse(text)).toMatchObject({ app: '92hard', version: 2, exportedAt: '2026-10-01T20:00:00.000Z' })
+    expect(JSON.parse(text)).toMatchObject({ app: '92hard', version: 3, exportedAt: '2026-10-01T20:00:00.000Z' })
   })
 
   it('restores a backup made by the first version', () => {
@@ -28,7 +28,7 @@ describe('backups', () => {
       attempt: { start: '2026-10-01', carried: 0, logs: { '2026-10-01': { sets: 15, neck: true, vlog: true, makerSchool: true } } },
       history: [],
     })
-    expect(fromBackup(old).attempt!.logs['2026-10-01']).toEqual({ ...emptyLog(), sets: 15, split: 'upper', makerSchool: true })
+    expect(fromBackup(old).attempt!.logs['2026-10-01']).toEqual({ ...emptyLog(), lifted: true, makerSchool: true, vlog: true })
   })
 
   it('turns away files that are not backups', () => {

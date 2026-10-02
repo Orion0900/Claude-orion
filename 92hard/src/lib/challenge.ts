@@ -7,7 +7,8 @@
  * Saturday whichever day the run began. Days 1–7 are Week 1; Day 92 is a week
  * of one day on its own.
  *
- *   - Every day: Maker School, and a lift — or the week's one rest day.
+ *   - Every day: Maker School, a vlog (from October 2nd, 2026, when it joined
+ *     the rules), and a lift — or the week's one rest day.
  *   - Saturdays: a half marathon too.
  *   - The last day of each week: the week's 100 hyperextensions, added up.
  *
@@ -16,9 +17,9 @@
 import { addDays, daysBetween, isDateKey, SATURDAY, weekday, type DateKey } from './dates'
 import {
   HYPEREXTENSIONS_PER_WEEK,
+  VLOG_FROM,
   cleanCount,
   emptyLog,
-  liftDone,
   normalizeLog,
   type DayLog,
   type TaskId,
@@ -117,7 +118,7 @@ export function restDay(attempt: Attempt, week: number): number | null {
 }
 
 export function weekLifts(attempt: Attempt, week: number): number {
-  return loggedDays(attempt, week).filter((d) => liftDone(logFor(attempt, dateOfDay(attempt, d)))).length
+  return loggedDays(attempt, week).filter((d) => logFor(attempt, dateOfDay(attempt, d)).lifted).length
 }
 
 /** What a day of the run asks for, in the whiteboard's order, and which of it is done. */
@@ -125,12 +126,13 @@ export function dayTasks(attempt: Attempt, day: number): TaskState[] {
   const date = dateOfDay(attempt, day)
   const log = logFor(attempt, date)
   const week = weekOf(day)
-  const tasks: TaskState[] = [{ id: 'lift', done: liftDone(log) || (log.rest && restDay(attempt, week) === day) }]
+  const tasks: TaskState[] = [{ id: 'lift', done: log.lifted || (log.rest && restDay(attempt, week) === day) }]
   if (weekday(date) === SATURDAY) tasks.push({ id: 'halfMarathon', done: log.halfMarathon })
   if (day === weekSpan(week)[1] && hyperextensionsDue(attempt, week)) {
     tasks.push({ id: 'hyperextensions', done: weekHyperextensions(attempt, week) >= HYPEREXTENSIONS_PER_WEEK })
   }
   tasks.push({ id: 'makerSchool', done: log.makerSchool })
+  if (date >= VLOG_FROM) tasks.push({ id: 'vlog', done: log.vlog })
   return tasks
 }
 
@@ -227,24 +229,24 @@ export function updateLog(state: AppState, date: DateKey, change: (log: DayLog) 
 export interface Totals {
   daysDone: number
   lifts: number
-  sets: number
   hyperextensions: number
   makerSchool: number
+  vlogs: number
   halfMarathons: number
 }
 
 /** Everything done so far in this run, today included. */
 export function totals(attempt: Attempt, today: DateKey): Totals {
-  const t: Totals = { daysDone: 0, lifts: 0, sets: 0, hyperextensions: 0, makerSchool: 0, halfMarathons: 0 }
+  const t: Totals = { daysDone: 0, lifts: 0, hyperextensions: 0, makerSchool: 0, vlogs: 0, halfMarathons: 0 }
   const last = Math.min(dayNumber(attempt, today), CHALLENGE_DAYS)
   for (let day = 1; day <= last; day++) {
     if (isDayDone(attempt, day)) t.daysDone++
     const log = attempt.logs[dateOfDay(attempt, day)]
     if (!log || day <= attempt.carried) continue
-    if (liftDone(log)) t.lifts++
-    t.sets += log.sets
+    if (log.lifted) t.lifts++
     t.hyperextensions += log.hyperextensions
     if (log.makerSchool) t.makerSchool++
+    if (log.vlog) t.vlogs++
     if (log.halfMarathon) t.halfMarathons++
   }
   return t

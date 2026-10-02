@@ -1,13 +1,15 @@
 # 92 Hard
 
 A 75 Hard-style challenge, made longer and made yours: the rules, routine and
-reasons from the whiteboard, for 92 days. Fail = Start Over.
+reasons from the whiteboard, plus a daily vlog, for 92 days. Fail = Start
+Over.
 
 1. **Lift 6× a week, 15 sets a day**
 2. **Half Marathon Saturdays**
 3. **Neck on Uppers**
 4. **100× Hyperextensions a week**
 5. **Maker School 1× a day**
+6. **Vlog 1× a day** (from October 2nd, 2026, when it joined the rules)
 
 Start on October 1st and Day 92 lands on December 31st: the whole quarter.
 
@@ -39,14 +41,13 @@ Three tabs: **Today**, **Plan** and **Progress**.
   each thing today asks for. Finish them all and the number turns volt.
 - **Now and next.** The routine for the time of day: "Now: Maker School till
   8:30 AM. Next: Work, 9:00 AM." Tap it for the whole plan.
-- **Lift.** Fifteen pips fill as you tap **+ Set** between sets. Then pick
-  **Upper + neck** or **Lower**: the lift counts with fifteen sets and one of
-  those, so neck is never skipped on an upper day. Six lifts a week means one
-  day off, so the card has a **Rest day** button, and it goes once it's used.
+- **Lift.** One tick once the day's 15 sets are in, neck included on an
+  upper day. Six lifts a week means one day off, so the card has a **Rest
+  day** button, and it goes once it's used.
 - **Half marathon** appears on Saturdays, and only then.
 - **Hyperextensions by the set.** +10, +15, +20 or +25 at a time toward the
   week's 100, with undo. Tap the count to type today's exact number.
-- **Maker School** is one tap.
+- **Maker School** and the **vlog** are one tap each.
 - **The plan.** The whiteboard, word for word: why, the rules, the routine
   with today's part marked, happiness, and the offer.
 - **The rule, enforced.** Open the app after a day that wasn't finished and
@@ -58,8 +59,8 @@ Three tabs: **Today**, **Plan** and **Progress**.
   run. A past day with nothing logged asks to be filled in.
 - **The 92.** All 92 days, a week to a row: done, today, missed, still to
   come. Tap a day to fill in or fix its log.
-- **Totals and attempts.** Lifts, sets, hyperextensions, Maker School
-  sessions and half marathons for the run so far. Every earlier attempt is
+- **Totals and attempts.** Lifts, hyperextensions, Maker School sessions,
+  vlogs and half marathons for the run so far. Every earlier attempt is
   kept with how far it got, and the longest run is the one to beat.
 - **Day 1 is any date.** Yesterday, today, tomorrow, or another date from
   the phone's picker. Started before you had the app? Pick the real Day 1
@@ -76,9 +77,10 @@ Three tabs: **Today**, **Plan** and **Progress**.
 - Weeks are counted from Day 1, so every week has seven days and one
   Saturday, whatever day the run began. With an October 1st start they run
   Thursday to Wednesday. Day 92 is a week of one day on its own.
-- **Every day:** Maker School, and a lift (15 sets, upper with neck or lower)
-  or the week's one rest day. Six lifts a week falls out of that: a second
-  rest day in the same week doesn't count.
+- **Every day:** Maker School, a vlog, and a lift or the week's one rest
+  day. Six lifts a week falls out of that: a second rest day in the same
+  week doesn't count. The vlog is owed from October 2nd, 2026, the day it
+  joined the rules, so days before it aren't asked for one.
 - **Saturdays:** a half marathon too.
 - **The last day of each week:** the week's hyperextensions, added up across
   its days, have to reach 100. Day 92 owes none, and neither does a week the
@@ -121,8 +123,8 @@ An iPhone web app can only show a notification when a server pushes one, and
 Everything stays on the phone, in the app's own storage, and the app asks
 for that storage to be kept. Nothing is sent anywhere. If the phone ever
 refuses to save, the app says so and points at the backup. Runs and backups
-from the first version (which had a vlog and daily hyperextensions) open in
-this one: a gym day with neck ticked reads as an upper day.
+from earlier versions open in this one: a lift logged as fifteen sets reads
+as ticked.
 
 ## Development
 

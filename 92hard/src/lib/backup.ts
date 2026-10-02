@@ -14,7 +14,7 @@ export function backupFileName(now: Date): string {
 }
 
 export function toBackup(state: AppState, now: Date): string {
-  return JSON.stringify({ app: APP, version: 2, exportedAt: now.toISOString(), ...state }, null, 2)
+  return JSON.stringify({ app: APP, version: 3, exportedAt: now.toISOString(), ...state }, null, 2)
 }
 
 /** The state inside a backup file; throws a message fit to show when it isn't one. */
