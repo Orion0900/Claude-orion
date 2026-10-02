@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
-import { dayNumber, logFor, type Attempt } from '../lib/challenge'
+import { dayNumber, dayTasks, type Attempt } from '../lib/challenge'
 import { shortDate, type DateKey } from '../lib/dates'
-import { TASKS, isDayComplete, tasksDone } from '../lib/tasks'
 import { Icon } from './Icons'
 import { TaskList, type LogChange } from './TaskList'
 
@@ -9,18 +8,21 @@ import { TaskList, type LogChange } from './TaskList'
 export function DaySheet({
   attempt,
   date,
+  today,
   onChange,
   onClose,
 }: {
   attempt: Attempt
   date: DateKey
+  today: DateKey
   onChange: LogChange
   onClose: () => void
 }) {
   const day = dayNumber(attempt, date)
   const carried = day <= attempt.carried
-  const log = logFor(attempt, date)
-  const complete = carried || isDayComplete(log)
+  const tasks = dayTasks(attempt, day)
+  const done = tasks.filter((task) => task.done).length
+  const complete = carried || done === tasks.length
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -46,13 +48,9 @@ export function DaySheet({
           </button>
         </header>
         <p className={complete ? 'sheet-status done' : 'sheet-status'}>
-          {carried
-            ? 'Done before 92 Hard was keeping count.'
-            : complete
-              ? 'All four done.'
-              : `${tasksDone(log)} of ${TASKS.length} done.`}
+          {carried ? 'Done before 92 Hard was keeping count.' : complete ? 'All done.' : `${done} of ${tasks.length} done.`}
         </p>
-        {!carried && <TaskList key={date} log={log} onChange={onChange} />}
+        {!carried && <TaskList key={date} attempt={attempt} date={date} today={today} onChange={onChange} />}
       </div>
     </div>
   )
