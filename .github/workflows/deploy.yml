@@ -103,6 +103,19 @@ jobs:
           mkdir -p dist/92hard
           cp -r 92hard/dist/. dist/92hard/
 
+      - name: Build Sana's CRE Game
+        working-directory: sanas-cre-game
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Sana's CRE Game to the site
+        run: |
+          mkdir -p dist/sanas-cre-game
+          cp -r sanas-cre-game/dist/. dist/sanas-cre-game/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
