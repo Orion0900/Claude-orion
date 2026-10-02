@@ -38,6 +38,11 @@ function open(): Promise<IDBDatabase> {
         db.close()
         opening = null
       }
+      // The browser closed the connection itself (iOS does this to apps left
+      // in the background): open a fresh one next time.
+      db.onclose = () => {
+        opening = null
+      }
       resolve(db)
     }
     request.onerror = () => reject(request.error ?? new Error('Could not open storage'))
@@ -64,50 +69,79 @@ function result<T>(request: IDBRequest<T>): Promise<T> {
   })
 }
 
+/**
+ * Runs one transaction, reopening the database once if the connection turns
+ * out to be dead. WebKit can drop it while the app sits in the background
+ * ("Connection to Indexed Database server lost"), and without this every
+ * save after that would fail until a reload.
+ */
+async function withTransaction<T>(
+  stores: string | string[],
+  mode: IDBTransactionMode,
+  run: (tx: IDBTransaction) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const db = await open()
+    try {
+      return await run(db.transaction(stores, mode))
+    } catch (error) {
+      if (attempt > 0 || !isConnectionError(error)) throw error
+      opening = null
+      try {
+        db.close()
+      } catch {
+        // Already gone.
+      }
+    }
+  }
+}
+
+function isConnectionError(error: unknown): boolean {
+  if (!(error instanceof Error) && !(typeof DOMException !== 'undefined' && error instanceof DOMException)) return false
+  const { name, message } = error as Error
+  return name === 'InvalidStateError' || name === 'UnknownError' || /connection|closing|closed/i.test(message)
+}
+
 export async function listProjects(): Promise<unknown[]> {
-  const db = await open()
-  const tx = db.transaction(PROJECTS, 'readonly')
-  return result(tx.objectStore(PROJECTS).getAll())
+  return withTransaction(PROJECTS, 'readonly', (tx) => result(tx.objectStore(PROJECTS).getAll()))
 }
 
 export async function getProject(id: string): Promise<unknown> {
-  const db = await open()
-  return result(db.transaction(PROJECTS, 'readonly').objectStore(PROJECTS).get(id))
+  return withTransaction(PROJECTS, 'readonly', (tx) => result(tx.objectStore(PROJECTS).get(id)))
 }
 
 export async function saveProject(project: Project): Promise<void> {
-  const db = await open()
-  const tx = db.transaction(PROJECTS, 'readwrite')
-  tx.objectStore(PROJECTS).put(project)
-  await done(tx)
+  return withTransaction(PROJECTS, 'readwrite', (tx) => {
+    tx.objectStore(PROJECTS).put(project)
+    return done(tx)
+  })
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const db = await open()
-  const tx = db.transaction([PROJECTS, FILES], 'readwrite')
-  tx.objectStore(PROJECTS).delete(id)
-  const files = tx.objectStore(FILES)
-  for (const kind of ['source', 'music', 'analysis'] as FileKind[]) files.delete(fileKey(id, kind))
-  await done(tx)
+  return withTransaction([PROJECTS, FILES], 'readwrite', (tx) => {
+    tx.objectStore(PROJECTS).delete(id)
+    const files = tx.objectStore(FILES)
+    for (const kind of ['source', 'music', 'analysis'] as FileKind[]) files.delete(fileKey(id, kind))
+    return done(tx)
+  })
 }
 
 export async function putFile(projectId: string, kind: FileKind, value: Blob | StoredAnalysis): Promise<void> {
-  const db = await open()
-  const tx = db.transaction(FILES, 'readwrite')
-  tx.objectStore(FILES).put(value, fileKey(projectId, kind))
-  await done(tx)
+  return withTransaction(FILES, 'readwrite', (tx) => {
+    tx.objectStore(FILES).put(value, fileKey(projectId, kind))
+    return done(tx)
+  })
 }
 
 export async function deleteFile(projectId: string, kind: FileKind): Promise<void> {
-  const db = await open()
-  const tx = db.transaction(FILES, 'readwrite')
-  tx.objectStore(FILES).delete(fileKey(projectId, kind))
-  await done(tx)
+  return withTransaction(FILES, 'readwrite', (tx) => {
+    tx.objectStore(FILES).delete(fileKey(projectId, kind))
+    return done(tx)
+  })
 }
 
 export async function getBlob(projectId: string, kind: 'source' | 'music'): Promise<Blob | null> {
-  const db = await open()
-  const value = await result(db.transaction(FILES, 'readonly').objectStore(FILES).get(fileKey(projectId, kind)))
+  const value = await withTransaction(FILES, 'readonly', (tx) => result(tx.objectStore(FILES).get(fileKey(projectId, kind))))
   return value instanceof Blob ? value : null
 }
 
@@ -130,8 +164,7 @@ export function unpackAnalysis(value: unknown): AudioAnalysis | null {
 }
 
 export async function getAnalysis(projectId: string): Promise<AudioAnalysis | null> {
-  const db = await open()
-  const value = await result(db.transaction(FILES, 'readonly').objectStore(FILES).get(fileKey(projectId, 'analysis')))
+  const value = await withTransaction(FILES, 'readonly', (tx) => result(tx.objectStore(FILES).get(fileKey(projectId, 'analysis'))))
   return unpackAnalysis(value)
 }
 
@@ -159,4 +192,10 @@ export async function storageEstimate(): Promise<{ usage: number; quota: number 
 /** For tests: forget the open connection. */
 export function resetConnection(): void {
   opening = null
+}
+
+/** For tests: close the connection behind the cache's back, the way iOS can. */
+export async function dropConnectionForTests(): Promise<void> {
+  const db = await opening
+  db?.close()
 }

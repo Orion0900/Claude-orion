@@ -12,6 +12,7 @@ import type { UpdateOptions } from './useProject'
 export type JobState =
   | { kind: 'idle' }
   | { kind: 'running'; step: PrepareStep }
+  | { kind: 'stopped' }
   | { kind: 'error'; message: string }
 
 export function useTranscription(
@@ -23,6 +24,9 @@ export function useTranscription(
 ) {
   const [job, setJob] = useState<JobState>({ kind: 'idle' })
   const controller = useRef<AbortController | null>(null)
+  // Set when the person taps Stop, so the auto-start below doesn't simply
+  // begin again the moment the cancelled job hands the project back.
+  const stopped = useRef(false)
   const status = project?.transcript.status
   const projectRef = useRef(project)
   projectRef.current = project
@@ -32,6 +36,7 @@ export function useTranscription(
   const start = useCallback(() => {
     const p = projectRef.current
     if (!p || !source || controller.current) return
+    stopped.current = false
     const ac = new AbortController()
     controller.current = ac
     setJob({ kind: 'running', step: { step: 'audio', fraction: 0 } })
@@ -53,7 +58,7 @@ export function useTranscription(
       .catch((error: unknown) => {
         if (isAbort(error)) {
           update((q) => ({ ...q, transcript: { ...q.transcript, status: 'none' } }), { history: false })
-          setJob({ kind: 'idle' })
+          setJob(stopped.current ? { kind: 'stopped' } : { kind: 'idle' })
           return
         }
         const message = error instanceof Error ? error.message : String(error)
@@ -66,17 +71,23 @@ export function useTranscription(
   }, [source, update, setAnalysis])
 
   const cancel = useCallback(() => {
+    stopped.current = true
     controller.current?.abort()
+  }, [])
+
+  /** Let an untranscribed project start on its own again, e.g. after "Transcribe again". */
+  const allowStart = useCallback(() => {
+    stopped.current = false
   }, [])
 
   // A project that has never been transcribed starts as soon as it opens.
   useEffect(() => {
-    if (status === 'none' && project?.media.hasAudio && source && !controller.current) start()
+    if (status === 'none' && project?.media.hasAudio && source && !controller.current && !stopped.current) start()
   }, [status, project?.media.hasAudio, source, start])
 
   useEffect(() => () => controller.current?.abort(), [])
 
-  return { job, start, cancel }
+  return { job, start, cancel, allowStart }
 }
 
 /** What the transcription banner says. */

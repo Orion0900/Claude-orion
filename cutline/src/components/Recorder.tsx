@@ -137,6 +137,16 @@ export function Recorder({ onClose, onUse }: Props) {
     }
   }, [facing])
 
+  // The review screen replaces the camera view, so a retake needs the live
+  // stream put back on the fresh <video>.
+  useEffect(() => {
+    const v = videoRef.current
+    const s = stream.current
+    if (mode === 'review' || !v || !s || v.srcObject === s) return
+    v.srcObject = s
+    void v.play().catch(() => {})
+  }, [mode])
+
   const stopScroll = () => cancelAnimationFrame(scroll.current.raf)
 
   const scrollTick = useCallback(

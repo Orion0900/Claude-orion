@@ -271,14 +271,29 @@ export const Preview = forwardRef<PlayerHandle, Props>(function Preview(
     const onHidden = () => {
       if (document.visibilityState === 'hidden' && state.current.playing) pause()
     }
+    // iOS pauses media on its own (a call, Control Center, AirPods out); a
+    // source can also end a moment before the last kept span says it does.
+    // Either way the player has to stop too, not sit there "playing".
+    const onPause = () => {
+      if (state.current.playing && !video.seeking) pause()
+    }
+    const onEnded = () => {
+      if (!state.current.playing) return
+      state.current.t = planRef.current.map.duration
+      pause()
+    }
     video.addEventListener('loadedmetadata', onMeta)
     video.addEventListener('seeked', onSeeked)
     video.addEventListener('loadeddata', onData)
+    video.addEventListener('pause', onPause)
+    video.addEventListener('ended', onEnded)
     document.addEventListener('visibilitychange', onHidden)
     return () => {
       video.removeEventListener('loadedmetadata', onMeta)
       video.removeEventListener('seeked', onSeeked)
       video.removeEventListener('loadeddata', onData)
+      video.removeEventListener('pause', onPause)
+      video.removeEventListener('ended', onEnded)
       document.removeEventListener('visibilitychange', onHidden)
       cancelAnimationFrame(state.current.raf)
     }

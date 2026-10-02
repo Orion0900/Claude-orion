@@ -58,10 +58,23 @@ try {
   await page.waitForSelector('.stage-banner', { timeout: 30_000 })
   await shot('transcribing')
 
+  console.log('Stop, then start again')
+  await page.click('.stage-banner button:has-text("Stop")')
+  await page.waitForSelector('text=Captions stopped', { timeout: 10_000 })
+  await page.waitForTimeout(1500)
+  check((await page.locator('text=Captions stopped').count()) === 1, 'Stop stays stopped')
+  await page.click('.stage-banner button:has-text("Start again")')
+  // An edit made while the words are still coming, to undo once they're in.
+  await page.locator('.presets .preset').nth(1).click()
+
   console.log('Transcribe')
   await page.click('button.tab:has-text("Edit")')
   await page.waitForSelector('.transcript .word', { timeout: 240_000 })
   await page.waitForSelector('.stage-banner', { state: 'detached', timeout: 240_000 })
+  await page.click('button[aria-label="Undo"]')
+  await page.waitForTimeout(300)
+  check((await page.locator('.transcript .word').count()) > 20, 'undoing an edit made during transcription keeps the words')
+  check((await page.locator('button[aria-label="Undo"]').isDisabled()), 'and that was the only undo step')
   const transcript = await page.locator('.transcript').innerText()
   check(/fellow americans/i.test(transcript), `transcript has the speech (“${transcript.slice(0, 60)}…”)`)
   check((transcript.match(/country/gi) ?? []).length >= 3, 'both passages were transcribed')

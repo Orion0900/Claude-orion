@@ -188,6 +188,16 @@ export function Editor({ id, settings, onBack, onOpenSettings }: Props) {
             <small style={{ color: 'var(--dim)' }}>{banner.detail}</small>
           </div>
         )}
+        {job.kind === 'stopped' && (
+          <div className="stage-banner" role="status">
+            <div className="row">
+              <strong>Captions stopped</strong>
+              <button className="btn small" onClick={transcription.start}>
+                Start again
+              </button>
+            </div>
+          </div>
+        )}
         {job.kind === 'error' && (
           <div className="stage-banner" role="alert">
             <strong>Captions didn't work this time</strong>
@@ -237,6 +247,7 @@ export function Editor({ id, settings, onBack, onOpenSettings }: Props) {
             settings={settings}
             transcribing={job.kind === 'running'}
             onRetranscribe={() => {
+              transcription.allowStart()
               update((p) => ({ ...p, words: [], translation: null, transcript: { status: 'none', language: null, model: null } }))
             }}
             showToast={showToast}

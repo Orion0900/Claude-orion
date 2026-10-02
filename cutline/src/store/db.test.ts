@@ -3,6 +3,7 @@ import { defaultEdit, defaultFormat, defaultHook, normalizeProject } from '../li
 import type { CaptionStyle, Project } from '../lib/types'
 import {
   deleteProject,
+  dropConnectionForTests,
   getAnalysis,
   getBlob,
   getProject,
@@ -66,6 +67,15 @@ describe('project storage', () => {
     expect(await getBlob('p1', 'source')).toBeNull()
     expect(await getAnalysis('p1')).toBeNull()
     expect((await listProjects()).length).toBe(1)
+  })
+})
+
+describe('a connection the browser closed', () => {
+  it('is reopened, so saving keeps working after the app was backgrounded', async () => {
+    await saveProject(project('q1'))
+    await dropConnectionForTests()
+    await saveProject(project('q2'))
+    expect(normalizeProject(await getProject('q2'), style)?.id).toBe('q2')
   })
 })
 

@@ -120,7 +120,13 @@ export function useProject(id: string): ProjectState {
       if (!prev) return
       const next = recipe(prev)
       if (next === prev) return
-      if (options.history !== false) {
+      if (options.history === false) {
+        // A change outside undo (words arriving from transcription) has to
+        // hold in every state undo and redo can return to, or stepping back
+        // past it would quietly bring the old, empty transcript back.
+        past.current = past.current.map(recipe)
+        future.current = future.current.map(recipe)
+      } else {
         const now = Date.now()
         const group = options.group
         const coalesce = group && lastGroup.current?.key === group && now - lastGroup.current.at < GROUP_WINDOW
