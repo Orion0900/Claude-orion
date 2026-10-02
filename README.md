@@ -39,6 +39,10 @@ end at your door.
 > and neck on uppers, half marathon Saturdays, 100 hyperextensions a week and
 > Maker School every day, with the routine, happiness, the offer and the why.
 > Fail = start over. Ships at `/92hard/`. See [92hard/README.md](92hard/README.md).
+> [Sana's CRE Game](sanas-cre-game/) — run a commercial real estate private
+> equity firm: underwrite and bid on deals, renovate and re-lease buildings,
+> survive the cycle, and raise ever-bigger funds through a real waterfall.
+> Ships at `/sanas-cre-game/`. See [sanas-cre-game/README.md](sanas-cre-game/README.md).
 > [Facet](facet/) — a QOVES-style facial analysis for the phone: thirty
 > measurements of proportion, symmetry and face shape against their ideal
 > ranges, a side-profile analysis and styling ideas, all worked out on the
