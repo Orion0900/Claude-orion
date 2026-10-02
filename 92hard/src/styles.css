@@ -812,6 +812,21 @@ input::-webkit-inner-spin-button {
   white-space: nowrap;
 }
 
+.earlier-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border-radius: var(--r-inner);
+  border: 1px dashed var(--line);
+  color: var(--dim);
+  font-size: 15px;
+  font-weight: 650;
+}
+
 .why-foot {
   margin: 30px 12px 0;
   text-align: center;
@@ -838,6 +853,13 @@ input::-webkit-inner-spin-button {
   border-radius: 50%;
   background: var(--red-soft);
   color: var(--red);
+}
+
+/* A day with nothing logged yet: something to fill in, not a failure. */
+.missed-mark.blank {
+  background: var(--volt-soft);
+  box-shadow: inset 0 0 0 1.5px var(--volt-line);
+  color: var(--volt);
 }
 
 .missed-title {
@@ -1397,6 +1419,67 @@ input::-webkit-inner-spin-button {
   color: var(--ink);
 }
 
+.seg.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.seg.four button {
+  font-size: 14px;
+}
+
+.day-one {
+  display: grid;
+  gap: 10px;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 6px 0 16px;
+  border-radius: var(--r-inner);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--dim);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.date-field input {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-3);
+  color: var(--ink);
+  font-size: 16px; /* 16px or iOS zooms in on focus */
+  font-weight: 650;
+  text-align: right;
+}
+
+.date-field input:focus {
+  outline: 2px solid var(--volt);
+  outline-offset: 1px;
+}
+
+/* Days before today, still to be filled in once the run starts. */
+.fill-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--volt);
+}
+
+.start-sheet {
+  display: grid;
+  gap: 14px;
+  padding-top: 6px;
+}
+
 .stepper {
   display: grid;
   grid-template-columns: 1fr 52px 84px 52px;
@@ -1497,6 +1580,20 @@ input::-webkit-inner-spin-button {
 .sheet-status.done {
   color: var(--volt);
   font-weight: 650;
+}
+
+.sheet-nav {
+  display: flex;
+  gap: 6px;
+}
+
+.sheet-nav .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.fill-btn {
+  margin-top: 14px;
 }
 
 .sheet .tasks {

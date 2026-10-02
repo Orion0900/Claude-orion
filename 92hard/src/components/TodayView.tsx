@@ -13,7 +13,7 @@ import {
 } from '../lib/challenge'
 import { monthDay, shortDate, type DateKey } from '../lib/dates'
 import { WHY } from '../lib/plan'
-import { HYPEREXTENSIONS_PER_WEEK, SETS_TARGET, type TaskId } from '../lib/tasks'
+import { HYPEREXTENSIONS_PER_WEEK, SETS_TARGET, isBlank, type TaskId } from '../lib/tasks'
 import { Confetti } from './Confetti'
 import { useConfirm } from './Confirm'
 import { Icon } from './Icons'
@@ -52,7 +52,7 @@ export function TodayView(props: Props) {
   )
 }
 
-function ActiveDay({ attempt, today, day, onChange, onOpenPlan }: Props & { day: number }) {
+function ActiveDay({ attempt, today, day, onChange, onOpenDay, onOpenPlan }: Props & { day: number }) {
   const tasks = dayTasks(attempt, day)
   const done = tasks.filter((task) => task.done).length
   const complete = done === tasks.length
@@ -97,6 +97,12 @@ function ActiveDay({ attempt, today, day, onChange, onOpenPlan }: Props & { day:
       </div>
       <RoutineNow today={today} onOpen={onOpenPlan} />
       <TaskList key={today} attempt={attempt} date={today} today={today} onChange={onChange(today)} />
+      {day > 1 && (
+        <button className="earlier-btn" onClick={() => onOpenDay(dateOfDay(attempt, day - 1))}>
+          <Icon name="pencil" size={16} />
+          Fill in an earlier day
+        </button>
+      )}
       <p className="why-foot">{WHY}</p>
     </>
   )
@@ -125,6 +131,8 @@ function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: numb
   const date = dateOfDay(attempt, missed)
   const made = streak(attempt, missed)
   const gaps = dayTasks(attempt, missed).filter((task) => !task.done)
+  // Nothing logged at all: most likely a day before the app was keeping count, still to fill in.
+  const blank = isBlank(logFor(attempt, date))
   const [confirmSheet, ask] = useConfirm()
   const end = async () => {
     const ok = await ask({
@@ -137,20 +145,24 @@ function MissedDay({ attempt, missed, onOpenDay, onEnd }: Props & { missed: numb
   }
   return (
     <section className="missed-view">
-      <span className="missed-mark">
-        <Icon name="x" size={44} />
+      <span className={blank ? 'missed-mark blank' : 'missed-mark'}>
+        <Icon name={blank ? 'pencil' : 'x'} size={blank ? 40 : 44} />
       </span>
-      <h1 className="missed-title">Day {missed} isn't done</h1>
-      <ul className="missing" aria-label={`What ${shortDate(date)} was missing`}>
-        {gaps.map((task) => (
-          <li key={task.id}>{missing(attempt, missed, task.id)}</li>
-        ))}
-      </ul>
+      <h1 className="missed-title">{blank ? `Fill in Day ${missed}` : `Day ${missed} isn't done`}</h1>
+      {!blank && (
+        <ul className="missing" aria-label={`What ${shortDate(date)} was missing`}>
+          {gaps.map((task) => (
+            <li key={task.id}>{missing(attempt, missed, task.id)}</li>
+          ))}
+        </ul>
+      )}
       <p className="missed-copy">
-        {shortDate(date)}. Did it and forgot to tick it? Log it now. If not: Fail = Start Over.
+        {blank
+          ? `Nothing's logged for ${shortDate(date)} yet. Fill in what you did. If you missed something: Fail = Start Over.`
+          : `${shortDate(date)}. Did it and forgot to tick it? Log it now. If not: Fail = Start Over.`}
       </p>
       <button className="btn primary" onClick={() => onOpenDay(date)}>
-        Log Day {missed}
+        {blank ? 'Fill it in' : `Log Day ${missed}`}
       </button>
       <button className="btn danger" onClick={end}>
         Start over at Day 1

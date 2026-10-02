@@ -32,6 +32,14 @@ const PATHS = {
     </>
   ),
   close: <path d="M7 7l10 10M17 7L7 17" />,
+  back: <path d="M14.5 5.5L8 12l6.5 6.5" />,
+  forward: <path d="M9.5 5.5L16 12l-6.5 6.5" />,
+  pencil: (
+    <>
+      <path d="M4.5 19.5l1-4.2L15.8 5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.7 18.5z" />
+      <path d="M13.5 7.3l3.2 3.2" />
+    </>
+  ),
 } as const
 
 export type IconName = keyof typeof PATHS

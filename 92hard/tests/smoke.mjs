@@ -1,7 +1,8 @@
 // Walks a run on a phone-sized screen with the clock pinned: a weekday, the
 // plan, a Saturday rest day and half marathon, a week's hyperextensions, a
-// missed day logged late, a week short on hyperextensions and a start-over,
-// backups, a run saved by the first version, and a finished run.
+// missed day logged late, a week short on hyperextensions and a start-over
+// from yesterday, filling in earlier days and moving Day 1, backups, runs
+// saved by earlier versions, and a finished run.
 // SHOTS=<dir> saves screenshots. Run after `npm run build`.
 import assert from 'node:assert/strict'
 import { IPHONE, at, launch, serve, watchErrors } from './harness.mjs'
@@ -24,6 +25,7 @@ const openOn = async (date, time = '12:00:00') => {
   await page.reload()
 }
 const lifted = { sets: 15, split: 'lower', rest: false, halfMarathon: false, hyperextensions: 0, makerSchool: true, note: '' }
+const seedState = (state) => page.evaluate((state) => localStorage.setItem('92hard.state', JSON.stringify(state)), state)
 const seed = (logs) =>
   page.evaluate((logs) => {
     const state = JSON.parse(localStorage.getItem('92hard.state'))
@@ -149,13 +151,14 @@ await page.tap('.split >> text=Upper + neck')
 await page.tap('.task-toggle >> text=Maker School')
 await page.waitForSelector('.cheer')
 
-// Skip Thursday the 8th entirely, then open the app on the 9th.
+// Thursday the 8th: the lift stops at nine sets and Maker School never gets ticked.
+await seed({ '2026-10-08': { ...lifted, sets: 9, split: null, makerSchool: false } })
 await openOn('2026-10-09', '08:00:00')
 await page.waitForSelector('.missed-view')
 await page.waitForTimeout(300)
 await shot('10-missed')
-assert.match(await text('.missed-title'), /Day 8/i)
-assert.match(await text('.missing'), /No lift, no rest day/)
+assert.match(await text('.missed-title'), /Day 8 isn't done/i)
+assert.match(await text('.missing'), /Lift stopped at 9 of 15 sets/)
 assert.match(await text('.missing'), /No Maker School/)
 
 // It was done, just never ticked: log it late from the sheet.
@@ -165,7 +168,7 @@ await page.waitForTimeout(400)
 await page.tap('.sheet .count-btn')
 await page.fill('.sheet .count-input', '30')
 await page.locator('.sheet .count-input').press('Enter')
-await tapTimes('.sheet .add-set', 15)
+await tapTimes('.sheet .add-set', 6)
 await page.tap('.sheet .split >> text=Lower')
 await page.tap('.sheet .task-toggle >> text=Maker School')
 await page.waitForTimeout(400)
@@ -192,7 +195,7 @@ await shot('12-week-short')
 assert.match(await text('.missed-title'), /Day 14/i)
 assert.match(await text('.missing'), /Week 2 ended at 60 of 100 hyperextensions/)
 
-// Fail = Start Over.
+// Fail = Start Over. This time Day 1 was yesterday, so it gets filled in first.
 await page.tap('.missed-view .btn.danger')
 await page.waitForSelector('.confirm')
 await page.waitForTimeout(300)
@@ -200,17 +203,75 @@ await shot('13-confirm-start-over')
 await page.tap('.confirm .btn.danger')
 await page.waitForSelector('.start')
 assert.match(await text('.start-lede'), /Attempt 2.*13 days/)
-await page.tap('.seg >> text=Earlier')
-await page.fill('.stepper-input', '12')
-await page.locator('.stepper-input').blur()
-assert.match(await text('.start-dates'), /Oct 4/)
+await page.tap('.seg >> text=Yesterday')
+assert.match(await text('.start-dates'), /Day 1 Wed, Oct 14/)
+assert.match(await text('.fill-note'), /fill in Wed, Oct 14 next/)
+await page.waitForTimeout(200)
+await shot('14-start-yesterday', true)
 await page.tap('.btn.primary.big')
+await page.waitForSelector('.missed-view')
+await page.waitForTimeout(300)
+await shot('15-fill-in-day-1')
+assert.match(await text('.missed-title'), /Fill in Day 1/i)
+assert.equal(await page.locator('.missed-mark.blank').count(), 1)
+assert.equal(await page.locator('.missing').count(), 0)
+await page.tap('.missed-view .btn.primary')
+await page.waitForSelector('.sheet')
+await tapTimes('.sheet .add-set', 15)
+await page.tap('.sheet .split >> text=Lower')
+await page.tap('.sheet .task-toggle >> text=Maker School')
+assert.match(await text('.sheet-status'), /All done/)
+assert.equal(await page.locator('.sheet [aria-label="Day after"]').isDisabled(), false)
+await page.tap('.sheet [aria-label="Close"]')
 await page.waitForSelector('.hero')
-assert.equal(await text('.hero-number'), '12')
+assert.equal(await text('.hero-number'), '2')
+
+// Really it began the day before that: move Day 1 back from Progress.
+await page.tap('.tab >> text=Progress')
+await page.tap('.btn >> text=Change Day 1')
+await page.waitForSelector('.start-sheet')
+await page.tap('.start-sheet .seg >> text=Other')
+await page.fill('.start-sheet input[type=date]', '2026-10-13')
+assert.match(await text('.start-sheet .start-dates'), /Day 1 Tue, Oct 13/)
+assert.match(await text('.start-sheet .fill-note'), /fill in Tue, Oct 13 next/)
+await page.waitForTimeout(300)
+await shot('16-change-day-1')
+await page.tap('.start-sheet .btn.primary')
+await page.waitForSelector('.missed-view')
+assert.match(await text('.missed-title'), /Fill in Day 1/i)
+
+// Fill it in, stepping across to see the day after is still done.
+await page.tap('.missed-view .btn.primary')
+await page.waitForSelector('.sheet')
+assert.match(await text('.sheet-date'), /Oct 13/)
+assert.equal(await page.locator('.sheet [aria-label="Day before"]').isDisabled(), true)
+await page.tap('.sheet [aria-label="Day after"]')
+assert.match(await text('.sheet-date'), /Oct 14/)
+assert.match(await text('.sheet-status'), /All done/)
+await page.tap('.sheet [aria-label="Day before"]')
+await page.tap('.sheet .rest-btn')
+await page.tap('.sheet .task-toggle >> text=Maker School')
+await page.waitForTimeout(300)
+await shot('17-sheet-filled')
+assert.match(await text('.sheet-status'), /All done/)
+await page.tap('.sheet [aria-label="Close"]')
+await page.waitForSelector('.hero')
+assert.equal(await text('.hero-number'), '3')
+
+// An earlier day can still be topped up from Today.
+await page.tap('.earlier-btn')
+await page.waitForSelector('.sheet')
+assert.match(await text('.sheet-date'), /Oct 14/)
+await page.tap('.sheet .step >> text=+25')
+assert.equal(await text('.sheet .count-btn'), '25/100')
+await page.tap('.sheet [aria-label="Close"]')
+await page.waitForSelector('.sheet', { state: 'detached' })
+assert.equal(await text('.count-btn'), '25/100')
+
 await page.tap('.tab >> text=Progress')
 await page.waitForTimeout(300)
-await shot('14-progress-carried', true)
-assert.equal(await page.locator('.board .cell.carried').count(), 11)
+await shot('18-progress', true)
+assert.equal(await page.locator('.board .cell.done').count(), 2)
 assert.equal(await page.locator('.history-item').count(), 2)
 
 // Back up, erase everything, and restore the backup from the start screen.
@@ -221,14 +282,30 @@ assert.match(download.suggestedFilename(), /^92-hard-backup-2026-10-15\.json$/)
 await page.tap('text=Erase everything')
 await page.tap('.confirm .btn >> text=Cancel')
 await page.waitForSelector('.confirm', { state: 'detached' })
-assert.equal(await page.locator('.facts dd').first().innerText(), 'Sun, Oct 4')
+assert.equal(await page.locator('.facts dd').first().innerText(), 'Tue, Oct 13')
 await page.tap('text=Erase everything')
 await page.tap('.confirm .btn.danger')
 await page.waitForSelector('.start')
 assert.match(await text('.start-lede'), /went for it/)
 await page.setInputFiles('.start-foot input[type=file]', backupPath)
 await page.waitForSelector('.hero')
-assert.equal(await text('.hero-number'), '12')
+assert.equal(await text('.hero-number'), '3')
+
+// A run saved with a day counted as done, by an earlier version, can have it filled in instead.
+await seedState({ version: 2, attempt: { start: '2026-10-14', carried: 1, logs: {} }, history: [] })
+await openOn('2026-10-15', '09:00:00')
+await page.waitForSelector('.hero')
+assert.equal(await text('.hero-number'), '2')
+await page.tap('.tab >> text=Progress')
+await page.tap('.board .cell.carried')
+await page.waitForSelector('.sheet')
+assert.match(await text('.sheet-status'), /Counted as done/)
+await page.tap('.sheet .fill-btn')
+await page.waitForSelector('.sheet .tasks')
+await page.tap('.sheet [aria-label="Close"]')
+await page.tap('.tab >> text=Today')
+await page.waitForSelector('.missed-view')
+assert.match(await text('.missed-title'), /Fill in Day 1/i)
 
 // A run that starts tomorrow waits, and can be brought forward.
 await page.tap('.tab >> text=Progress')

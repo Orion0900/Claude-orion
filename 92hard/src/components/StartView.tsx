@@ -1,20 +1,12 @@
 import { useState } from 'react'
-import { CHALLENGE_DAYS, attemptOnDay, finishDate, newAttempt, type AppState, type Attempt } from '../lib/challenge'
-import { addDays, shortDate, type DateKey } from '../lib/dates'
+import { finishDate, newAttempt, type AppState, type Attempt } from '../lib/challenge'
+import { shortDate, type DateKey } from '../lib/dates'
 import { WHY } from '../lib/plan'
 import { isInstalled } from '../hooks'
-import { Icon } from './Icons'
 import { RestoreButton, RulesList } from './Shared'
+import { DayOnePicker, FillInNote } from './StartDate'
 
-type When = 'today' | 'tomorrow' | 'already'
-
-const WHEN: Array<[When, string]> = [
-  ['today', 'Today'],
-  ['tomorrow', 'Tomorrow'],
-  ['already', 'Earlier'],
-]
-
-/** The commitment: why, the rules, the start day, and one button. */
+/** The commitment: why, the rules, Day 1, and one button. */
 export function StartView({
   state,
   today,
@@ -26,13 +18,8 @@ export function StartView({
   onBegin: (attempt: Attempt) => void
   onRestore: (state: AppState) => void
 }) {
-  const [when, setWhen] = useState<When>('today')
-  // Kept as typed so a two-digit day can be entered; clamped when used.
-  const [dayText, setDayText] = useState('2')
-  const clampDay = (n: number) => Math.min(CHALLENGE_DAYS, Math.max(2, Number.isFinite(n) ? Math.floor(n) : 2))
-  const day = clampDay(Number.parseInt(dayText, 10))
-  const attempt =
-    when === 'today' ? newAttempt(today) : when === 'tomorrow' ? newAttempt(addDays(today, 1)) : attemptOnDay(today, day)
+  const [start, setStart] = useState(today)
+  const attempt = newAttempt(start)
   const attemptNumber = state.history.length + 1
   const best = state.history.reduce((n, past) => Math.max(n, past.completed), 0)
 
@@ -55,43 +42,12 @@ export function StartView({
       </div>
 
       <div className="start-when">
-        <span className="section-label" id="when-label">
-          Day 1 is
-        </span>
-        <div className="seg" role="radiogroup" aria-labelledby="when-label">
-          {WHEN.map(([id, label]) => (
-            <button key={id} role="radio" aria-checked={when === id} className={when === id ? 'on' : ''} onClick={() => setWhen(id)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        {when === 'already' && (
-          <div className="stepper">
-            <span className="stepper-label">Today is day</span>
-            <button className="icon-btn" aria-label="Earlier day" disabled={day <= 2} onClick={() => setDayText(String(clampDay(day - 1)))}>
-              <Icon name="minus" />
-            </button>
-            <input
-              className="stepper-input"
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              min={2}
-              max={CHALLENGE_DAYS}
-              aria-label="Today is day"
-              value={dayText}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setDayText(e.target.value)}
-              onBlur={() => setDayText(String(day))}
-            />
-            <button className="icon-btn" aria-label="Later day" disabled={day >= CHALLENGE_DAYS} onClick={() => setDayText(String(clampDay(day + 1)))}>
-              <Icon name="plus" />
-            </button>
-          </div>
-        )}
+        <span className="section-label">Day 1 is</span>
+        <DayOnePicker today={today} value={start} onChange={setStart} />
         <p className="start-dates">
           Day 1 {shortDate(attempt.start)} <span aria-hidden="true">→</span> Day 92 {shortDate(finishDate(attempt))}
         </p>
+        <FillInNote start={start} today={today} />
       </div>
 
       <button className="btn primary big" onClick={() => onBegin(attempt)}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FAIL_RULE, RULES, cleanCount, emptyLog, liftDone, normalizeLog } from './tasks'
+import { FAIL_RULE, RULES, cleanCount, emptyLog, isBlank, liftDone, normalizeLog } from './tasks'
 
 describe('the rules', () => {
   it('are the five on the whiteboard, and the one that makes them hard', () => {
@@ -20,6 +20,16 @@ describe('a lift', () => {
     expect(liftDone({ ...emptyLog(), sets: 14, split: 'upper' })).toBe(false)
     expect(liftDone({ ...emptyLog(), sets: 15, split: 'upper' })).toBe(true)
     expect(liftDone({ ...emptyLog(), sets: 20, split: 'lower' })).toBe(true)
+  })
+})
+
+describe('a blank day', () => {
+  it('has nothing logged at all', () => {
+    expect(isBlank(emptyLog())).toBe(true)
+    expect(isBlank({ ...emptyLog(), note: 'rained' })).toBe(true)
+    expect(isBlank({ ...emptyLog(), sets: 1 })).toBe(false)
+    expect(isBlank({ ...emptyLog(), rest: true })).toBe(false)
+    expect(isBlank({ ...emptyLog(), hyperextensions: 10 })).toBe(false)
   })
 })
 
