@@ -52,13 +52,19 @@ Three tabs: **Today**, **Plan** and **Progress**.
 - **The rule, enforced.** Open the app after a day that wasn't finished and
   it says so before anything else, and what was missing: log it now if you
   did it and forgot to tick it, or start over at Day 1.
+- **Fill in days after the fact.** Any day from Day 1 up to today can be
+  logged late. **Fill in an earlier day** at the bottom of Today opens
+  yesterday, and the arrows in that sheet step back and forth through the
+  run. A past day with nothing logged asks to be filled in.
 - **The 92.** All 92 days, a week to a row: done, today, missed, still to
-  come. Tap a past day to see or fix its log.
+  come. Tap a day to fill in or fix its log.
 - **Totals and attempts.** Lifts, sets, hyperextensions, Maker School
   sessions and half marathons for the run so far. Every earlier attempt is
   kept with how far it got, and the longest run is the one to beat.
-- **Start when you like.** Today, tomorrow, or already part-way in: say which
-  day you're on and the days before it count as done.
+- **Day 1 is any date.** Yesterday, today, tomorrow, or another date from
+  the phone's picker. Started before you had the app? Pick the real Day 1
+  and fill in the days since. **Change Day 1** on Progress moves it later
+  on, and every log stays on the day it happened.
 - **Backups.** The whole run as one file through the share sheet: Save to
   Files, AirDrop, Mail. Restore it from Progress, or from the start screen of
   a new phone.
@@ -76,14 +82,18 @@ Three tabs: **Today**, **Plan** and **Progress**.
 - **Saturdays:** a half marathon too.
 - **The last day of each week:** the week's hyperextensions, added up across
   its days, have to reach 100. Day 92 owes none, and neither does a week the
-  app only saw part of.
+  app only saw part of (runs saved by an earlier version could count days
+  as done without a log; those can be filled in instead).
 - A day is a calendar day on the phone's clock, turning over at midnight.
   Dates are counted on the date alone, so a daylight saving change can never
   make a day vanish or repeat.
 - Every day before today has to be done. The first one that isn't ends the
   run; today is never missed while it's still today.
 - A day can be logged late. Training at night and ticking it off in the
-  morning is fine; it's an honesty system, like the original.
+  morning is fine, and so is filling in days from before the app; it's an
+  honesty system, like the original. A day with nothing logged at all is
+  treated as one to fill in, not a fail, until you fill it in or start
+  over.
 - Starting over files the run under Attempts with how many days in a row it
   held. A do-over on Day 1 with nothing done isn't counted as an attempt.
 

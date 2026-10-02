@@ -177,10 +177,26 @@ export function newAttempt(start: DateKey, carried = 0): Attempt {
   return { start, carried: Math.min(CHALLENGE_DAYS - 1, cleanCount(carried)), logs: {} }
 }
 
-/** A run already under way: today is Day `day`, and the days before it count as done. */
-export function attemptOnDay(today: DateKey, day: number): Attempt {
-  const d = Math.min(CHALLENGE_DAYS, Math.max(1, Math.floor(day)))
-  return newAttempt(addDays(today, -(d - 1)), d - 1)
+/** The earliest and latest Day 1 on offer: no earlier than makes today Day 92, no more than a month out. */
+export function startRange(today: DateKey): [DateKey, DateKey] {
+  return [addDays(today, -(CHALLENGE_DAYS - 1)), addDays(today, 30)]
+}
+
+/**
+ * Moves Day 1 to another date. Logs stay on the calendar days they were made,
+ * and every day of the run before today is open to fill in, including any the
+ * run had counted as done without a log.
+ */
+export function changeStart(state: AppState, start: DateKey): AppState {
+  if (!state.attempt) return state
+  return { ...state, attempt: { ...state.attempt, start, carried: 0 } }
+}
+
+/** Opens a day that was counted as done without a log, and the counted days after it, to be filled in. */
+export function fillInCarried(state: AppState, day: number): AppState {
+  const attempt = state.attempt
+  if (!attempt || day < 1 || day > attempt.carried) return state
+  return { ...state, attempt: { ...attempt, carried: day - 1 } }
 }
 
 /** The current attempt as history will remember it, or null if it never really began. */
