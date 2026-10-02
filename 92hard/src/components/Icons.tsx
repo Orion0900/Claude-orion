@@ -2,8 +2,6 @@
 const PATHS = {
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   x: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
-  plus: <path d="M12 5v14M5 12h14" />,
-  minus: <path d="M5 12h14" />,
   undo: (
     <>
       <path d="M9 14L4 9l5-5" />

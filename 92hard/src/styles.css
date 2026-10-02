@@ -594,101 +594,22 @@ input::-webkit-inner-spin-button {
   outline: none;
 }
 
-/* Gym */
-
-.pips {
-  display: grid;
-  grid-template-columns: repeat(15, 1fr);
-  gap: 4px;
+/* Lift: one tick, with the week's count and the rest day underneath. */
+.task.lift {
+  gap: 0;
+  padding: 0;
 }
 
-.pip {
-  height: 30px;
-  border-radius: 6px;
-  background: var(--surface-3);
+.task-check {
+  width: 100%;
+  padding: 18px 16px;
+  border-radius: var(--r) var(--r) 0 0;
+  text-align: left;
 }
 
-.pip.on {
-  background: var(--volt);
-}
-
-.pip:active:not(:disabled) {
-  transform: scaleY(0.85);
-}
-
-.lift-controls {
-  display: grid;
-  grid-template-columns: 52px 1fr;
-  gap: 10px;
-}
-
-.add-set {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 52px;
-  border-radius: var(--r-inner);
-  background: var(--volt);
-  color: var(--volt-ink);
-  font: 400 23px/1 var(--display);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.add-set.met {
-  background: var(--surface-2);
-  color: var(--volt);
-}
-
-.split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.split button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  height: 52px;
-  padding: 0 10px;
-  border-radius: var(--r-inner);
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* Fifteen sets in and neither picked: the lift doesn't count yet, so say so. */
-.split.ask button {
-  border-color: var(--volt-line);
-  animation: nudge 1.6s var(--ease-out) 2;
-}
-
-.mini-check {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid var(--faint);
-  color: transparent;
-}
-
-.split button.on {
-  border-color: var(--volt-line);
-  color: var(--volt);
-}
-
-.split button.on .mini-check {
-  border-color: var(--volt);
-  background: var(--volt);
-  color: var(--volt-ink);
+.task-check:active:not(:disabled) {
+  transform: none;
+  background: var(--volt-soft);
 }
 
 .week-line {
@@ -696,9 +617,9 @@ input::-webkit-inner-spin-button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 44px;
-  margin-bottom: -6px;
-  padding-top: 8px;
+  min-height: 56px;
+  margin: 0 16px;
+  padding: 6px 0;
   border-top: 1px solid var(--line);
   font-size: 14px;
   color: var(--dim);
@@ -1738,13 +1659,6 @@ input::-webkit-inner-spin-button {
   }
   100% {
     transform: scale(1);
-  }
-}
-
-@keyframes nudge {
-  50% {
-    border-color: var(--volt);
-    box-shadow: 0 0 0 3px var(--volt-soft);
   }
 }
 

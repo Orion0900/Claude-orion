@@ -19,10 +19,9 @@ import {
   HYPEREXTENSIONS_PER_WEEK,
   LIFTS_PER_WEEK,
   SETS_TARGET,
+  VLOG_FROM,
   cleanCount,
-  liftDone,
   type DayLog,
-  type Split,
 } from '../lib/tasks'
 import { Icon } from './Icons'
 
@@ -58,6 +57,14 @@ export function TaskList(props: Props) {
         done={log.makerSchool}
         onToggle={() => onChange((l) => ({ ...l, makerSchool: !l.makerSchool }))}
       />
+      {date >= VLOG_FROM && (
+        <ToggleCard
+          title="Vlog"
+          detail="1× a day"
+          done={log.vlog}
+          onToggle={() => onChange((l) => ({ ...l, vlog: !l.vlog }))}
+        />
+      )}
     </div>
   )
 }
@@ -77,12 +84,7 @@ function TaskHead({ done, title, detail, count }: { done: boolean; title: string
   )
 }
 
-const SPLITS: Array<[Split, string]> = [
-  ['upper', 'Upper + neck'],
-  ['lower', 'Lower'],
-]
-
-/** Fifteen sets, upper with neck or lower. Or the week's one rest day. */
+/** One tick once the day's 15 sets are in. Or the week's one rest day. */
 function LiftCard({ attempt, date, onChange }: Props) {
   const log = logFor(attempt, date)
   const day = dayNumber(attempt, date)
@@ -109,62 +111,22 @@ function LiftCard({ attempt, date, onChange }: Props) {
     )
   }
 
-  const done = liftDone(log)
-  const changeSets = (next: (sets: number) => number) => onChange((l) => ({ ...l, sets: cleanCount(next(l.sets), 999) }))
-  const asking = log.sets >= SETS_TARGET && !log.split
-  const count = log.sets > SETS_TARGET ? `${log.sets} sets` : `${log.sets}/${SETS_TARGET}`
   return (
-    <article className={done ? 'task done' : 'task'} aria-label="Lift">
-      <TaskHead
-        done={done}
-        title="Lift"
-        detail={asking ? 'Upper or lower?' : `${SETS_TARGET} sets · neck on uppers`}
-        count={count}
-      />
-      <div className="pips" role="group" aria-label="Sets">
-        {Array.from({ length: SETS_TARGET }, (_, i) => (
-          <button
-            key={i}
-            className={i < log.sets ? 'pip on' : 'pip'}
-            aria-label={`${i + 1} ${i ? 'sets' : 'set'}`}
-            aria-pressed={i < log.sets}
-            // Tapping the last filled pip takes it back off.
-            onClick={() => changeSets((sets) => (sets === i + 1 ? i : i + 1))}
-          />
-        ))}
-      </div>
-      <div className="lift-controls">
-        <button className="icon-btn" aria-label="One set fewer" disabled={log.sets === 0} onClick={() => changeSets((sets) => sets - 1)}>
-          <Icon name="minus" />
-        </button>
-        <button className={log.sets >= SETS_TARGET ? 'add-set met' : 'add-set'} onClick={() => changeSets((sets) => sets + 1)}>
-          <Icon name="plus" size={22} />
-          Set
-        </button>
-      </div>
-      <div className={asking ? 'split ask' : 'split'} role="radiogroup" aria-label="Upper or lower">
-        {SPLITS.map(([split, label]) => (
-          <button
-            key={split}
-            role="radio"
-            aria-checked={log.split === split}
-            className={log.split === split ? 'on' : ''}
-            // Tapping the chosen one again clears it.
-            onClick={() => onChange((l) => ({ ...l, split: l.split === split ? null : split }))}
-          >
-            <span className="mini-check" aria-hidden="true">
-              <Icon name="check" size={14} />
-            </span>
-            {label}
-          </button>
-        ))}
-      </div>
+    <article className={log.lifted ? 'task lift done' : 'task lift'} aria-label="Lift">
+      <button
+        className="task-check"
+        role="checkbox"
+        aria-checked={log.lifted}
+        onClick={() => onChange((l) => ({ ...l, lifted: !l.lifted }))}
+      >
+        <TaskHead done={log.lifted} title="Lift" detail={`${SETS_TARGET} sets · neck on uppers`} />
+      </button>
       <div className="week-line">
         <span>
           {fullWeek ? `${lifts} of ${LIFTS_PER_WEEK} lifts this week` : `${lifts} ${lifts === 1 ? 'lift' : 'lifts'} this week`}
         </span>
         {rested === null ? (
-          !done && (
+          !log.lifted && (
             <button className="rest-btn" onClick={() => onChange((l) => ({ ...l, rest: true }))}>
               Rest day
             </button>

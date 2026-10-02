@@ -27,9 +27,9 @@ export function StatTiles({ totals }: { totals: Totals }) {
   const tiles: Array<[string, number]> = [
     ['Days done', totals.daysDone],
     ['Lifts', totals.lifts],
-    ['Sets', totals.sets],
     ['Hyperextensions', totals.hyperextensions],
     ['Maker School', totals.makerSchool],
+    ['Vlogs', totals.vlogs],
     ['Half marathons', totals.halfMarathons],
   ]
   return (

@@ -9,9 +9,9 @@ npm run build
 node tests/smoke.mjs
 ```
 
-It starts a run on Thursday, October 1st and lifts (fifteen sets, then upper
-or lower), checks the routine's now and next and the Plan tab, takes
-Saturday as the rest day with its half marathon, makes the week's 100
+It starts a run on Thursday, October 1st and ticks the lift, checks the
+routine's now and next and the Plan tab, picks up the vlog from October 2nd,
+takes Saturday as the rest day with its half marathon, makes the week's 100
 hyperextensions on its last day, skips a day and logs it late, ends a week
 short of 100 and starts over from yesterday, fills that day in, moves Day 1
 back a day and fills that one in too (stepping between days in the sheet),

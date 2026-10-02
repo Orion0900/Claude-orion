@@ -3,7 +3,7 @@
  * the app itself, so cache the shell as it's used: the checklist has to open
  * in a basement gym with no signal.
  */
-const VERSION = 'v3'
+const VERSION = 'v4'
 const CACHE = `92hard-${VERSION}`
 
 self.addEventListener('install', (event) => {

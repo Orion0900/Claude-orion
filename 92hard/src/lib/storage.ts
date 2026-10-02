@@ -33,7 +33,7 @@ export function loadState(store = defaultStore()): AppState {
 export function saveState(state: AppState, store = defaultStore()): boolean {
   if (!store) return false
   try {
-    store.setItem(STORAGE_KEY, JSON.stringify({ version: 2, ...state }))
+    store.setItem(STORAGE_KEY, JSON.stringify({ version: 3, ...state }))
     return true
   } catch {
     return false

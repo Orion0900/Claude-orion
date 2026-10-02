@@ -13,7 +13,7 @@ import {
 } from '../lib/challenge'
 import { monthDay, shortDate, type DateKey } from '../lib/dates'
 import { WHY } from '../lib/plan'
-import { HYPEREXTENSIONS_PER_WEEK, SETS_TARGET, isBlank, type TaskId } from '../lib/tasks'
+import { HYPEREXTENSIONS_PER_WEEK, isBlank, type TaskId } from '../lib/tasks'
 import { Confetti } from './Confetti'
 import { useConfirm } from './Confirm'
 import { Icon } from './Icons'
@@ -113,9 +113,7 @@ function missing(attempt: Attempt, day: number, id: TaskId): string {
   const log = logFor(attempt, dateOfDay(attempt, day))
   switch (id) {
     case 'lift':
-      if (log.rest) return 'A second rest day in one week'
-      if (log.sets >= SETS_TARGET) return 'Lift not marked upper or lower'
-      return log.sets > 0 ? `Lift stopped at ${log.sets} of ${SETS_TARGET} sets` : 'No lift, no rest day'
+      return log.rest ? 'A second rest day in one week' : 'No lift, no rest day'
     case 'halfMarathon':
       return 'No half marathon'
     case 'hyperextensions': {
@@ -124,6 +122,8 @@ function missing(attempt: Attempt, day: number, id: TaskId): string {
     }
     case 'makerSchool':
       return 'No Maker School'
+    case 'vlog':
+      return 'No vlog'
   }
 }
 

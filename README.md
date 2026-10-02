@@ -37,7 +37,7 @@ end at your door.
 > [92 Hard](92hard/) — a 75 Hard-style challenge tracker for the iPhone, made
 > 92 days long on the rules from the whiteboard: lift 6× a week with 15 sets
 > and neck on uppers, half marathon Saturdays, 100 hyperextensions a week and
-> Maker School every day, with the routine, happiness, the offer and the why.
+> Maker School and a vlog every day, with the routine, happiness, the offer and the why.
 > Fail = start over. Ships at `/92hard/`. See [92hard/README.md](92hard/README.md).
 > [Sana's CRE Game](sanas-cre-game/) — run a commercial real estate private
 > equity firm: underwrite and bid on deals, renovate and re-lease buildings,
