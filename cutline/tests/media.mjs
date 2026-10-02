@@ -738,6 +738,66 @@ await check('export at 60 fps', async () => {
   assert(near(r.times[1], 1 / 60, 1e-9), 'draw called every 1/60 s of edited time')
 })
 
+await check('in-app recording (raw MediaRecorder WebM)', async () => {
+  const r = await page.evaluate(async () => {
+    // What the in-app recorder hands over on Chrome: WebM with no duration and no seek index.
+    const canvas = document.createElement('canvas')
+    canvas.width = 360
+    canvas.height = 640
+    const g = canvas.getContext('2d')
+    const audio = new AudioContext()
+    const osc = audio.createOscillator()
+    const gain = audio.createGain()
+    gain.gain.value = 0.3
+    const dest = audio.createMediaStreamDestination()
+    osc.connect(gain).connect(dest)
+    osc.start()
+    await audio.resume()
+    const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()])
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' })
+    const chunks = []
+    recorder.ondataavailable = (e) => chunks.push(e.data)
+    const started = performance.now()
+    recorder.start(500)
+    await new Promise((resolve) => {
+      const tick = () => {
+        const t = (performance.now() - started) / 1000
+        g.fillStyle = `hsl(${t * 120} 80% 50%)`
+        g.fillRect(0, 0, 360, 640)
+        g.fillStyle = '#fff'
+        g.font = 'bold 60px sans-serif'
+        g.fillText(t.toFixed(2), 60, 320)
+        if (t < 3.2) requestAnimationFrame(tick)
+        else resolve()
+      }
+      tick()
+    })
+    const stopped = new Promise((resolve) => (recorder.onstop = resolve))
+    recorder.stop()
+    await stopped
+    osc.stop()
+    await audio.close()
+    const raw = new Blob(chunks, { type: 'video/webm' })
+    await T.save('in-app-raw.webm', raw)
+    const { probeMedia, makeThumbnail } = await import('/src/media/probe.ts')
+    const { decodeAudio } = await import('/src/media/audio.ts')
+    const { exportVideo } = await import('/src/media/export.ts')
+    const info = await probeMedia(raw, 'recording.webm')
+    const thumb = await makeThumbnail(raw, 1)
+    const decoded = await decodeAudio(raw)
+    const result = await exportVideo({ source: raw, ranges: [{ start: 0.5, end: 1.5 }, { start: 2, end: 3 }], width: 360, height: 640, draw: T.draw() })
+    await T.save(`in-app-export.${result.extension}`, result.blob)
+    return { info, thumb: !!thumb, audio: decoded && { sampleRate: decoded.sampleRate, duration: decoded.duration }, file: `in-app-export.${result.extension}` }
+  })
+  console.log(`    ${JSON.stringify(r)}`)
+  const raw = probe(join(OUT, 'in-app-raw.webm'))
+  assert(!raw.format.duration || raw.format.duration === 'N/A' || Number(raw.format.duration) > 0, `raw recording as Chrome writes it (ffprobe duration: ${raw.format.duration ?? 'none'})`)
+  assert(near(r.info.duration, 3.2, 0.3) && r.info.width === 360 && r.info.hasAudio && r.info.videoCodec === 'vp8', `probe finds its duration anyway (${r.info.duration.toFixed(2)} s, ${r.info.videoCodec}/${r.info.audioCodec})`)
+  assert(r.thumb && r.audio && near(r.audio.duration, r.info.duration, 0.3), 'thumbnail and audio decode work on it')
+  const s = streams(join(OUT, r.file))
+  assert(near(s.duration, 2, 0.05) && !!s.audio, `exporting 2 s of it works (${s.duration.toFixed(3)} s)`)
+})
+
 await check('abort', async () => {
   const r = await page.evaluate(async () => {
     const { exportVideo } = await import('/src/media/export.ts')

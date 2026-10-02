@@ -66,7 +66,7 @@ try {
   check(/fellow americans/i.test(transcript), `transcript has the speech (“${transcript.slice(0, 60)}…”)`)
   check((transcript.match(/country/gi) ?? []).length >= 3, 'both passages were transcribed')
   const before = seconds((await page.locator('.transport .time').innerText()).split('/')[1])
-  check(before > 25 && before < 27, `edited length starts as the whole video (${before} s)`)
+  check(before >= 25 && before <= 26, `edited length starts as the whole video (${before} s)`)
   await shot('transcript')
 
   console.log('AI Edit')

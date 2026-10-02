@@ -42,6 +42,9 @@ const MAX_FILLER_SOUND = 0.8
 const SOUND_PAD = 0.05
 /** Speech has to stand this far above the room tone for the loudness to be trusted. */
 const MIN_CONTRAST_DB = 12
+
+/** Quieter than any microphone's own noise: samples this low are digital silence, not a room. */
+const DIGITAL_SILENCE_DB = -70
 /** How far a cut edge that landed on a loud frame may move to find a quiet one. */
 const NUDGE = 0.06
 const DEFAULT_MAX_PAUSE = 0.4
@@ -137,9 +140,18 @@ function levelsOf(analysis: AudioAnalysis | null | undefined): Levels | null {
   const { envelope: env, frameDuration: frame } = analysis
   const cached = levelCache.get(env)
   if (cached !== undefined && (cached === null || cached.frame === frame)) return cached
-  const sorted = Float32Array.from(env).sort()
+  // Digital silence (exact zeros, as at the start of some phone recordings or
+  // where an app padded the audio) isn't the room: left in, it drags the floor
+  // so low that ordinary room tone reads as speech and no pause is ever cut.
+  // So the levels are read from the frames that have any sound at all.
+  const all = Float32Array.from(env).sort()
+  const firstAudible = all.findIndex((x) => toDb(x) > DIGITAL_SILENCE_DB)
+  const sorted = firstAudible < 0 ? all.subarray(0, 0) : all.subarray(firstAudible)
+  if (sorted.length < 10) {
+    levelCache.set(env, null)
+    return null
+  }
   const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))]
-  // Digital silence (exact zeros) would drag the thresholds down to nothing.
   const floorDb = Math.max(-80, toDb(at(0.05)))
   const spanDb = toDb(at(0.95)) - floorDb
   // A recording that's loud all the way through (music, wind) says nothing

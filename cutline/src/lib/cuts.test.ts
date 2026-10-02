@@ -274,6 +274,18 @@ describe('planCuts with loudness', () => {
     expect(mid.start).toBeCloseTo(1.2 + 0.16, 2)
   })
 
+  it('reads the room tone past stretches of digital silence', () => {
+    // Room tone at about -40 dB, speech at -14 dB, and a padded-in run of
+    // exact zeros at the start. The zeros mustn't make the room sound loud.
+    const words = [word('ask', 1.0, 1.3), word('not', 1.4, 1.7), word('what', 2.9, 3.2)]
+    const analysis = envelope(4, [[1.0, 1.3, 0.2], [1.4, 1.7, 0.2], [2.9, 3.2, 0.2]], 0.01)
+    analysis.envelope.fill(0, 0, 80)
+    const plan = planCuts(words, edit({ maxPause: 0.4 }), 4, analysis)
+    const mid = plan.pauses.find((c) => c.start > 1.7 && c.end < 2.9)
+    expect(mid).toBeDefined()
+    expect(mid!.end - mid!.start).toBeGreaterThan(0.6)
+  })
+
   it('ignores a recording too loud throughout to tell pauses from speech', () => {
     const words = [word('a', 0.2, 0.5), word('b', 2.6, 3)]
     const flat = envelope(3.4, [], 0.2)
