@@ -33,7 +33,8 @@ function cues(pages: readonly CaptionPage[]): { start: number; end: number; text
 export function toSrt(pages: CaptionPage[]): string {
   const list = cues(pages)
   if (!list.length) return ''
-  return `${list.map((c, i) => `${i + 1}\n${timestamp(c.start, ',')} --> ${timestamp(c.end, ',')}\n${c.text}`).join('\n\n')}\n`
+  const body = list.map((c, i) => `${i + 1}\n${timestamp(c.start, ',')} --> ${timestamp(c.end, ',')}\n${c.text}`)
+  return `${body.join('\n\n')}\n`
 }
 
 /** WebVTT: the header, then `00:00:01.234 --> 00:00:02.000` cues with their text escaped. */
@@ -63,7 +64,8 @@ export function toPlainText(words: Word[]): string {
     const next = list[i + 1]
     const gap = next ? next.start - w.end : Infinity
     const sentenceEnd = !next || endsSentence(w.text, next.text)
-    if (gap >= PARAGRAPH_PAUSE || (sentenceEnd && (gap >= SENTENCE_PARAGRAPH_PAUSE || current.length >= LONG_PARAGRAPH))) {
+    const long = current.length >= LONG_PARAGRAPH
+    if (gap >= PARAGRAPH_PAUSE || (sentenceEnd && (gap >= SENTENCE_PARAGRAPH_PAUSE || long))) {
       paragraphs.push(current.join(' '))
       current = []
     }

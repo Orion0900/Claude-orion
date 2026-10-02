@@ -141,9 +141,11 @@ try {
             }
           },
         })
-        return { ok: true, ms: Math.round(performance.now() - started), seconds: audio.length / 16000, phases, lastDownload, transcribeUpdates, backwards, result }
+        const ms = Math.round(performance.now() - started)
+        return { ok: true, ms, seconds: audio.length / 16000, phases, lastDownload, transcribeUpdates, backwards, result }
       } catch (error) {
-        return { ok: false, ms: Math.round(performance.now() - started), name: error.name, message: error.message, cause: String(error.cause ?? '') }
+        const ms = Math.round(performance.now() - started)
+        return { ok: false, ms, name: error.name, message: error.message, cause: String(error.cause ?? '') }
       }
     }
     Object.assign(window, { client, run })
@@ -163,9 +165,11 @@ try {
     const americans = first.result.words.find((w) => /^americans/i.test(w.text))
     check(americans && americans.start > 1 && americans.start < 4, `"Americans" starts 1-4 s (${americans?.start})`)
     checkWords(first.result.words, first.seconds)
-    check(first.phases.download < first.phases.load && first.phases.load < first.phases.transcribe, `phases in order ${JSON.stringify(first.phases)}`)
-    const mb = (first.lastDownload?.loaded ?? 0) / 1e6
-    check(first.lastDownload && first.lastDownload.loaded === first.lastDownload.total && mb > 40, `download summed over files: ${mb.toFixed(1)} MB`)
+    const { download, load, transcribe } = first.phases
+    check(download < load && load < transcribe, `phases in order ${JSON.stringify(first.phases)}`)
+    const last = first.lastDownload
+    const mb = (last?.loaded ?? 0) / 1e6
+    check(last && last.loaded === last.total && mb > 40, `download summed over files: ${mb.toFixed(1)} MB`)
     check(first.transcribeUpdates >= 2 && !first.backwards, `transcribe progress moves forward (${first.transcribeUpdates} updates)`)
     console.log(`  ${first.ms} ms in all; transcribing started at ${first.phases.transcribe} ms`)
   }
@@ -211,19 +215,31 @@ try {
   const before = await page.evaluate(() => {
     const controller = new AbortController()
     controller.abort()
-    return window.client.transcribe(new Float32Array(16000), { model: 'tiny', language: null, signal: controller.signal }).catch((e) => e.name)
+    const options = { model: 'tiny', language: null, signal: controller.signal }
+    return window.client.transcribe(new Float32Array(16000), options).catch((e) => e.name)
   })
   check(before === 'AbortError', `an already-aborted signal rejects straight away (${before})`)
+  const released = await page.evaluate(async () => {
+    const pending = window.run('speech.wav', { model: 'tiny', language: null })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    window.client.releaseModel()
+    return pending
+  })
+  check(!released.ok && released.name === 'AbortError', `releaseModel stops a transcription under way (${released.name})`)
 
   // 5. A model that isn't there fails with a plain message.
   console.log('\nEnglish-only weights, which the local copy lacks')
   const missing = await run('jfk.wav', { model: 'tiny', language: 'en' })
-  check(!missing.ok && /couldn’t be loaded/.test(missing.message), `fails calmly: "${missing.message}" (${missing.cause.slice(0, 120)})`)
+  check(
+    !missing.ok && /couldn’t be downloaded/.test(missing.message),
+    `fails calmly: "${missing.message}" (${missing.cause.slice(0, 120)})`,
+  )
   check(served.some((p) => p.startsWith('/hf/Xenova/whisper-tiny.en/')), 'asked for the .en repo')
 
   // 6. Everything came from this machine, ONNX Runtime from the app itself.
   check(outside.length === 0, `no requests left the machine (${outside.slice(0, 3).join(', ')})`)
-  check(requests.some((u) => u.endsWith('/ort/ort-wasm-simd-threaded.wasm')), 'ONNX Runtime WebAssembly fetched from ./ort/')
+  const runtime = requests.find((u) => /\/ort\/ort-wasm-simd-threaded\.wasm(\?|$)/.test(u))
+  check(Boolean(runtime), `ONNX Runtime WebAssembly fetched from the app (${runtime?.replace(origin, '')})`)
 } finally {
   const warnings = logs.filter((l) => /error|warn/i.test(l))
   if (warnings.length) console.log(`\nBrowser warnings and errors:\n  ${warnings.slice(0, 20).join('\n  ')}`)

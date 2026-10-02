@@ -63,7 +63,12 @@ function candidates(words: readonly TimedWord[]): Candidate[] {
  * get a gentle punch at a sentence start. Deterministic: the same input
  * always gives the same marks, sorted by start.
  */
-export function autoZooms(input: { words: TimedWord[]; cutPoints: Seconds[]; duration: Seconds; strength: number }): ZoomMark[] {
+export function autoZooms(input: {
+  words: TimedWord[]
+  cutPoints: Seconds[]
+  duration: Seconds
+  strength: number
+}): ZoomMark[] {
   const { duration } = input
   const strength = Number.isFinite(input.strength) ? Math.max(0, input.strength) : 0
   if (!(duration > 0) || strength <= 0) return []

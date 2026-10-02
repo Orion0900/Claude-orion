@@ -20,7 +20,7 @@ export const EMOJI_DICTIONARY: readonly (readonly [string, string])[] = [
   ['💵', 'dollar bucks paycheck'],
   ['🤑', 'rich! millionaire! billionaire! billion'],
   ['💸', 'expensive spend spending budget cost costs'],
-  ['💳', 'credit debit payment pay'],
+  ['💳', 'credit debit payment'],
   ['🏦', 'bank banking loan mortgage'],
   ['📈', 'growth invest! investing investment stocks increase trending'],
   ['💼', 'business! job career office~ work~ boss'],
@@ -29,7 +29,7 @@ export const EMOJI_DICTIONARY: readonly (readonly [string, string])[] = [
   ['🛍️', 'shopping shop haul mall'],
   ['🛒', 'groceries grocery cart'],
   ['🏷️', 'price sale discount cheap coupon'],
-  ['🆓', 'free!'],
+  ['🆓', 'free'],
   ['🎯', 'goal! target focus aim'],
   ['🏆', 'win! winner champion trophy success! successful'],
   ['🥇', 'gold medal'],
@@ -148,7 +148,7 @@ export const EMOJI_DICTIONARY: readonly (readonly [string, string])[] = [
   // body and health
   ['💪', 'gym! workout! strong strength muscle fitness exercise protein'],
   ['🏋️', 'lifting weights'],
-  ['🏃', 'run runner marathon cardio'],
+  ['🏃', 'run~ runner marathon cardio'],
   ['🧘', 'yoga meditation meditate mindfulness breathe'],
   ['🩺', 'doctor health medical'],
   ['💊', 'medicine vitamins supplements'],
@@ -235,8 +235,8 @@ export const EMOJI_DICTIONARY: readonly (readonly [string, string])[] = [
   ['🧺', 'laundry'],
   ['🗑️', 'trash garbage'],
   ['📦', 'package box delivery unboxing'],
-  ['🚚', 'shipping truck moving'],
-  ['🗣️', 'talk speak speech voice'],
+  ['🚚', 'shipping truck'],
+  ['🗣️', 'talk~ speak speech voice'],
   ['👥', 'audience followers people~'],
   ['❗', 'important! attention'],
   ['🚨', 'alert emergency'],
@@ -260,7 +260,7 @@ for (const [emoji, list] of EMOJI_DICTIONARY) {
 }
 
 /** Forms that would stem onto a dictionary word with the wrong meaning. */
-const NEVER = new Set(['fired', 'firing', 'fires', 'tipped', 'tipping', 'killing', 'boxing', 'starring', 'wished'])
+const NEVER = new Set(['fired', 'firing', 'fires', 'tipped', 'tipping', 'killing', 'boxing'])
 
 /** Lowercase, apostrophes dropped, anything but letters and digits stripped. */
 function bare(text: string): string {
@@ -329,15 +329,19 @@ export function suggestEmojis(words: Word[]): Map<string, string> {
     return m ? [{ i, id: w.id, ...m }] : []
   })
   found.sort((a, b) => b.strength - a.strength || a.i - b.i)
-  const taken: { i: number; emoji: string }[] = []
+  // What's been placed where, so each check only looks at its neighbours.
+  const placed: (string | undefined)[] = new Array(live.length)
   const out = new Map<string, string>()
   for (const c of found) {
     const room = c.strength === 1 ? WEAK_SPACING : EMOJI_SPACING
-    const crowded = taken.some(
-      (t) => Math.abs(t.i - c.i) < room || (t.emoji === c.emoji && Math.abs(t.i - c.i) < REPEAT_SPACING),
-    )
+    let crowded = false
+    const last = Math.min(live.length, c.i + REPEAT_SPACING)
+    for (let k = Math.max(0, c.i - REPEAT_SPACING + 1); k < last && !crowded; k++) {
+      const there = placed[k]
+      crowded = there !== undefined && (Math.abs(k - c.i) < room || there === c.emoji)
+    }
     if (crowded) continue
-    taken.push({ i: c.i, emoji: c.emoji })
+    placed[c.i] = c.emoji
     out.set(c.id, c.emoji)
   }
   return out
@@ -347,7 +351,9 @@ export function suggestEmojis(words: Word[]): Map<string, string> {
 const EMPHASIS_EVERY = 7
 /** Emphasised words this many words apart at least. */
 const EMPHASIS_SPACING = 4
-const NUMBER_WORDS = new Set(['hundred', 'thousand', 'million', 'millions', 'billion', 'billions', 'trillion', 'double', 'triple', 'twice', 'half'])
+const NUMBER_WORDS = new Set(
+  'hundred thousand million millions billion billions trillion double triple twice half'.split(' '),
+)
 /** Upper-case words that are just how the word is written, not shouting. */
 const PLAIN_CAPS = new Set(['I', 'OK', 'A'])
 
@@ -371,12 +377,13 @@ export function suggestEmphasis(words: Word[]): Set<string> {
   })
   scored.sort((a, b) => b.s - a.s || a.i - b.i)
   const budget = Math.max(1, Math.floor(live.length / EMPHASIS_EVERY))
-  const taken: number[] = []
+  const taken = new Uint8Array(live.length)
   const out = new Set<string>()
   for (const c of scored) {
     if (out.size >= budget) break
-    if (taken.some((t) => Math.abs(t - c.i) < EMPHASIS_SPACING)) continue
-    taken.push(c.i)
+    const from = Math.max(0, c.i - EMPHASIS_SPACING + 1)
+    if (taken.subarray(from, c.i + EMPHASIS_SPACING).includes(1)) continue
+    taken[c.i] = 1
     out.add(c.id)
   }
   return out
@@ -391,7 +398,8 @@ function score(text: string, counts: ReadonlyMap<string, number>): number {
   const exclaims = /!["'”’)]*$/.test(raw)
   if (/\d/.test(b) || /^[$€£¥]/.test(raw) || NUMBER_WORDS.has(b)) return 6 + (exclaims ? 1 : 0)
   let s = 0
-  if (letters.length >= 2 && letters === letters.toUpperCase() && letters !== letters.toLowerCase() && !PLAIN_CAPS.has(letters)) s += 4
+  const shouting = letters.length >= 2 && letters === letters.toUpperCase() && letters !== letters.toLowerCase()
+  if (shouting && !PLAIN_CAPS.has(letters)) s += 4
   if (exclaims) s += 3
   if (letters.length >= 7) s += 2 + Math.min(1.5, (letters.length - 7) * 0.3)
   else if (letters.length >= 5 && counts.get(b) === 1) s += 1

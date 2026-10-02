@@ -139,7 +139,8 @@ function levelsOf(analysis: AudioAnalysis | null | undefined): Levels | null {
   if (cached !== undefined && (cached === null || cached.frame === frame)) return cached
   const sorted = Float32Array.from(env).sort()
   const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))]
-  const floorDb = toDb(at(0.05))
+  // Digital silence (exact zeros) would drag the thresholds down to nothing.
+  const floorDb = Math.max(-80, toDb(at(0.05)))
   const spanDb = toDb(at(0.95)) - floorDb
   // A recording that's loud all the way through (music, wind) says nothing
   // about where the pauses are, so it's ignored rather than half-trusted.
@@ -323,16 +324,21 @@ function unwrittenSounds(
 ): Item[] {
   const items: Item[] = []
   const touching = 2.5 * L.frame
+  // The gap starts where the furthest-reaching word so far stops, which
+  // isn't always the word just before when Whisper's words overlap.
+  let lo = 0
+  let before = -1
   for (let i = 0; i <= heard.length; i++) {
-    const lo = i === 0 ? 0 : heard[i - 1].end
     const hi = i === heard.length ? duration : heard[i].start
-    if (hi - lo < MIN_SOUND) continue
-    for (const s of runs(L, lo, hi, (x) => x > L.loud, MIN_SOUND, 0.06)) {
-      const owner =
-        i > 0 && s.start - lo < touching ? spoken[i - 1] : i < heard.length && hi - s.end < touching ? spoken[i] : null
-      const keep = owner ? owner.keep : !(edit.removeFillers && s.end - s.start <= MAX_FILLER_SOUND)
-      items.push({ ...s, keep, guardStart: s.start - SOUND_PAD, guardEnd: s.end + SOUND_PAD })
+    if (hi - lo >= MIN_SOUND) {
+      for (const s of runs(L, lo, hi, (x) => x > L.loud, MIN_SOUND, 0.06)) {
+        const owner =
+          before >= 0 && s.start - lo < touching ? spoken[before] : i < heard.length && hi - s.end < touching ? spoken[i] : null
+        const keep = owner ? owner.keep : !(edit.removeFillers && s.end - s.start <= MAX_FILLER_SOUND)
+        items.push({ ...s, keep, guardStart: s.start - SOUND_PAD, guardEnd: s.end + SOUND_PAD })
+      }
     }
+    if (i < heard.length && heard[i].end >= lo) [lo, before] = [heard[i].end, i]
   }
   return items
 }
@@ -358,7 +364,11 @@ function droppedCuts(items: readonly Item[], duration: Seconds, L: Levels | null
     let j = i
     while (j + 1 < items.length && !items[j + 1].keep) runEnd = Math.max(runEnd, items[++j].end)
     const next = items[j + 1]
-    cuts.push({ start: cutBefore(prev, runStart, L), end: next ? cutAfter(next, runEnd, L) : duration })
+    const start = cutBefore(prev, runStart, L)
+    const end = next ? cutAfter(next, runEnd, L) : duration
+    // A removed word Whisper put inside a kept one can't go without clipping
+    // it, and then the pause after it isn't the removed word's to take.
+    if (start < end && start < runEnd) cuts.push({ start, end })
     i = j + 1
   }
   const cores = items.filter((it) => it.keep).map((it) => ({ start: it.start - MIN_GUARD, end: it.end + MIN_GUARD }))
@@ -405,6 +415,22 @@ function pauseSpans(items: readonly Item[], forced: Range[], win: Range, maxPaus
   return out
 }
 
+/** The parts of sorted, disjoint `ranges` inside `span`, found by binary search. */
+function clipTo(ranges: readonly Range[], span: Range): Range[] {
+  let lo = 0
+  let hi = ranges.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (ranges[mid].end <= span.start) lo = mid + 1
+    else hi = mid
+  }
+  const out: Range[] = []
+  for (let i = lo; i < ranges.length && ranges[i].start < span.end; i++) {
+    out.push({ start: Math.max(span.start, ranges[i].start), end: Math.min(span.end, ranges[i].end) })
+  }
+  return out
+}
+
 /** The guard around `t`, if one covers it. */
 function guardAt(guards: readonly Range[], t: Seconds): Range | null {
   let lo = 0
@@ -432,7 +458,7 @@ function shortenGap(
   guards: readonly Range[],
   L: Levels | null,
 ): Range[] {
-  const segs = intersectRanges(remain, [gap])
+  const segs = clipTo(remain, gap)
   const total = segs.reduce((n, s) => n + s.end - s.start, 0)
   if (total <= keepLen + MIN_SPAN) return []
   // Positions below are "gap time": how far along the gap's remaining pieces.
@@ -493,7 +519,14 @@ function sourceAt(segs: readonly Range[], p: number): Seconds {
 }
 
 /** A removal in gap time as source spans, edges that landed on a click moved somewhere quiet. */
-function toSource(segs: readonly Range[], from: number, to: number, L: Levels | null, lo: Seconds, hi: Seconds): Range[] {
+function toSource(
+  segs: readonly Range[],
+  from: number,
+  to: number,
+  L: Levels | null,
+  lo: Seconds,
+  hi: Seconds,
+): Range[] {
   const out: Range[] = []
   const nudge = (t: Seconds, min: Seconds, max: Seconds) =>
     L && isLoudAt(L, t) && max - min > L.frame ? quietest(L, min, max, t) : t
@@ -505,7 +538,9 @@ function toSource(segs: readonly Range[], from: number, to: number, L: Levels | 
     if (b - a > EPS) {
       let start = a <= pos + EPS ? s.start : s.start + (a - pos)
       let end = b >= pos + len - EPS ? s.end : s.start + (b - pos)
-      if (start > s.start) start = nudge(start, Math.max(s.start, lo, start - NUDGE), Math.min(end - MIN_SPAN, start + NUDGE))
+      if (start > s.start) {
+        start = nudge(start, Math.max(s.start, lo, start - NUDGE), Math.min(end - MIN_SPAN, start + NUDGE))
+      }
       if (end < s.end) end = nudge(end, Math.max(start + MIN_SPAN, end - NUDGE), Math.min(s.end, hi, end + NUDGE))
       out.push({ start, end })
     }

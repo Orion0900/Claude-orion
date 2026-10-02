@@ -79,6 +79,17 @@ const speech = readWav(join(fixtures, 'speech.wav'))
   check(noise.words.length === 0, `no words in hiss (${noise.words.map((w) => w.text).join(' ')})`)
 }
 
+// A loud stretch without speech first. It's too loud to skip, so it's
+// transcribed, but it mustn't decide the language or leave words behind.
+{
+  const audio = concat(hiss(20, -25), jfk)
+  const { words, language } = await run('20 s of loud hiss, then JFK, language detected', audio, null, { quiet: true })
+  check(language === 'en', `language is en (${language})`)
+  check(similarity(words, JFK) > 0.8, `words match the speech (${similarity(words, JFK).toFixed(2)})`)
+  const early = words.filter((w) => w.end < 20)
+  check(early.length === 0, `nothing in the hiss (${early.map((w) => w.text).join(' ')})`)
+}
+
 // A long quiet start: the first word must not swallow it.
 {
   const audio = concat(new Float32Array(5 * RATE), jfk, new Float32Array(10 * RATE))

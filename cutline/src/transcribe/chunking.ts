@@ -18,10 +18,15 @@ const SPEECH_ABOVE_FLOOR_DB = 6
 const MIN_SPEECH_DB = -60
 // Less sound than this in a window is a click or a bump, not words.
 const MIN_SPEECH_SECONDS = 0.15
-// A window with a tenth of a second louder than this (-35 dBFS) is always
-// transcribed, even when nothing in it stands out from the rest, as with a
-// voice over steady music. Skipping speech is worse than a wasted pass.
+// A window with a tenth of a second louder than this (-35 dBFS) is
+// transcribed even when nothing in it stands out from the noise floor, as
+// with a voice over loud background sound. Skipping speech is worse than a
+// wasted pass.
 const ALWAYS_HEARD = 10 ** (-35 / 10)
+// Speech comes and goes: its loudest tenth of a second is well above its
+// typical one. Steady sound like hiss or a fan stays within this (2 dB).
+const STEADY_RATIO = 10 ** (2 / 10)
+const STEADY_WINDOW_SECONDS = 0.1
 
 export interface SpeechProfile {
   /** Mean square of each frame. */
@@ -35,7 +40,7 @@ export interface Chunk {
   /** Seconds from the start of the audio. */
   start: number
   end: number
-  /** False when the window is clearly silent, so there's nothing to transcribe. */
+  /** False when there's clearly no speech in the window: silence, or steady noise. */
   speech: boolean
 }
 
@@ -150,6 +155,28 @@ export function speechAfter(profile: SpeechProfile, from: number, to: number, mi
 }
 
 /**
+ * Whether the sound between start and end holds steady, as noise does and
+ * speech never does: no tenth of a second is much louder than the typical
+ * one. Too short a stretch to tell counts as not steady.
+ */
+export function isSteady(profile: SpeechProfile, start: number, end: number): boolean {
+  const { power, frameSeconds } = profile
+  const [from, to] = frameRange(profile, start, end)
+  const width = Math.max(1, Math.round(STEADY_WINDOW_SECONDS / frameSeconds))
+  const step = Math.max(1, Math.floor(width / 2))
+  const means: number[] = []
+  for (let frame = from; frame + width <= to; frame += step) {
+    let sum = 0
+    for (let k = frame; k < frame + width; k++) sum += power[k]
+    means.push(sum / width)
+  }
+  if (means.length < 3) return false
+  means.sort((a, b) => a - b)
+  const loudest = means[means.length - 1]
+  return loudest <= DIGITAL_SILENCE || loudest < means[Math.floor(means.length / 2)] * STEADY_RATIO
+}
+
+/**
  * Splits the audio into windows of at most maxSeconds. What's left is
  * divided into equal parts, so no window ends up a stub, and each cut is
  * moved to the quietest stretch near its ideal place, so no word is split.
@@ -218,11 +245,8 @@ export function planChunks(profile: SpeechProfile, duration: number, options: Pa
     for (let frame = from; frame < to; frame += Math.max(1, Math.floor(quiet / 2))) {
       loudest = Math.max(loudest, around(frame))
     }
-    chunks.push({
-      start: chunkStart,
-      end: chunkEnd,
-      speech: speechSeconds(profile, chunkStart, chunkEnd) >= MIN_SPEECH_SECONDS || loudest >= ALWAYS_HEARD,
-    })
+    const heard = speechSeconds(profile, chunkStart, chunkEnd) >= MIN_SPEECH_SECONDS || loudest >= ALWAYS_HEARD
+    chunks.push({ start: chunkStart, end: chunkEnd, speech: heard && !isSteady(profile, chunkStart, chunkEnd) })
   }
   return chunks
 }

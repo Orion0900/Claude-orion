@@ -22,6 +22,8 @@ export interface TranscribeOptions {
 
 // Where transformers.js keeps downloaded files, in Cache Storage.
 const CACHE_NAME = 'transformers-cache'
+// Raised on a worker when it's let go of, to settle the call it was running.
+const DISCARDED = 'discarded'
 
 let source: ModelSource = {}
 let worker: Worker | null = null
@@ -51,6 +53,16 @@ export function transcribe(audio: Float32Array, options: TranscribeOptions): Pro
 /** For tests and self-hosting: where model files come from. */
 export function configureModelSource(next: ModelSource): void {
   source = { ...next }
+}
+
+/**
+ * Frees the memory the loaded model holds (tens to hundreds of megabytes),
+ * say before an export. The next transcription loads it again from the
+ * browser cache, which takes a few seconds. A transcription under way is
+ * stopped, and rejects with an AbortError.
+ */
+export function releaseModel(): void {
+  discardWorker()
 }
 
 /**
@@ -98,6 +110,7 @@ function run(audio: Float32Array, options: TranscribeOptions): Promise<Transcrib
     const finish = () => {
       target.removeEventListener('message', onMessage)
       target.removeEventListener('error', onError)
+      target.removeEventListener(DISCARDED, onDiscarded)
       signal?.removeEventListener('abort', onAbort)
     }
     const onMessage = (event: MessageEvent<WorkerReply>) => {
@@ -120,12 +133,15 @@ function run(audio: Float32Array, options: TranscribeOptions): Promise<Transcrib
     // Whisper can't be interrupted mid-step, so the worker goes, and the model
     // with it; the next call loads it again from the browser cache.
     const onAbort = () => {
+      if (worker === target) discardWorker()
+    }
+    const onDiscarded = () => {
       finish()
-      discardWorker()
       reject(abortError())
     }
     target.addEventListener('message', onMessage)
     target.addEventListener('error', onError)
+    target.addEventListener(DISCARDED, onDiscarded)
     signal?.addEventListener('abort', onAbort, { once: true })
     target.postMessage(request, [audio.buffer])
   })
@@ -137,7 +153,10 @@ function getWorker(): Worker {
 }
 
 function discardWorker(): void {
-  worker?.terminate()
+  if (!worker) return
+  worker.terminate()
+  // Whoever was waiting on it hears that it stopped.
+  worker.dispatchEvent(new Event(DISCARDED))
   worker = null
 }
 

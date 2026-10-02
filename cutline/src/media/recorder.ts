@@ -90,8 +90,9 @@ async function openVideo(source: Blob, codec: string | null, cleanup: (() => voi
   video.playsInline = true
   video.setAttribute('playsinline', '')
   video.preload = 'auto'
-  // In the document but out of sight: some browsers stop decoding detached or display:none videos.
-  Object.assign(video.style, { position: 'fixed', left: '0', top: '0', width: '2px', height: '2px', opacity: '0', pointerEvents: 'none', zIndex: '-1' })
+  // In the document and nominally visible, but out of sight: browsers may stop decoding a detached,
+  // display:none or fully transparent video, and iOS pauses muted video it thinks no one can see.
+  Object.assign(video.style, { position: 'fixed', left: '0', top: '0', width: '2px', height: '2px', opacity: '0.01', pointerEvents: 'none', zIndex: '-1' })
   document.body.appendChild(video)
   cleanup.push(() => {
     video.pause()
@@ -100,8 +101,9 @@ async function openVideo(source: Blob, codec: string | null, cleanup: (() => voi
     video.remove()
     URL.revokeObjectURL(url)
   })
+  // Metadata, not data: iOS may hold off loading media data until playback starts.
   const loaded = Promise.race([
-    once(video, 'loadeddata'),
+    once(video, 'loadedmetadata'),
     once(video, 'error').then(() => {
       throw videoCodecError(codec, video.error)
     }),
@@ -159,10 +161,11 @@ async function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
  * composition is drawn on, at playback speed. For browsers without WebCodecs
  * encoders (iOS before 26), or when they fail.
  *
- * Each span: seek (recorder paused, so the jump isn't recorded), draw its
- * first frame, play, resume the recorder and start that span of the
- * pre-mixed soundtrack together, draw every new video frame, and pause it
- * all when the span's length has played on the audio clock.
+ * Each span: with the recorder paused, seek a little before it and play, so
+ * playback is running smoothly by the span's first frame; on that frame,
+ * resume the recorder and start the matching part of the pre-mixed
+ * soundtrack, then draw every new video frame until the span's length has
+ * played on the audio clock, and pause it all for the next seek.
  */
 export async function recordExport(job: RecordJob): Promise<{ blob: Blob; mimeType: 'video/mp4' | 'video/webm' }> {
   const mimeType = recorderMimeType()
@@ -296,14 +299,16 @@ export async function recordExport(job: RecordJob): Promise<{ blob: Blob; mimeTy
             if (video && hasFrameCallbacks(video)) video.requestVideoFrameCallback((_, meta) => frame(meta.mediaTime))
             else requestAnimationFrame(() => frame())
           }
-          // The span ends on the audio clock even if no new frame comes (the clip ran out).
+          // The span ends on the audio clock even if no new frame comes (the clip ran out). Meanwhile,
+          // if the browser paused the video on its own (it does to muted video it decides is hidden), restart it.
           const check = () => {
             if (finished || halted) return
             const left = span - elapsed()
-            if (left <= 0.002) finish()
-            else timer = window.setTimeout(check, Math.max(1, left * 1000))
+            if (left <= 0.002) return finish()
+            if (video?.paused && !video.ended) void video.play().catch(() => {})
+            timer = window.setTimeout(check, Math.max(1, Math.min(250, left * 1000)))
           }
-          timer = window.setTimeout(check, span * 1000)
+          timer = window.setTimeout(check, Math.min(250, span * 1000))
           next()
         }),
       )

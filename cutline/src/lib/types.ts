@@ -231,4 +231,7 @@ export interface ZoomMark {
   end: Seconds
   /** Extra scale at the peak, e.g. 0.12. */
   amount: number
+  /** The edge falls on a jump cut, so the zoom changes there in one frame rather than easing. */
+  snapIn?: boolean
+  snapOut?: boolean
 }

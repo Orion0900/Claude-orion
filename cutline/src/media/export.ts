@@ -323,7 +323,7 @@ export async function exportVideo(options: ExportOptions): Promise<ExportResult>
   try {
     signal?.throwIfAborted()
     if (!Number.isFinite(options.width) || !Number.isFinite(options.height) || options.width < 2 || options.height < 2) {
-      throw new TypeError(`Bad export size ${options.width}x${options.height}`)
+      throw new RangeError(`Bad export size ${options.width}x${options.height}`)
     }
     // H.264 and HEVC need even sides.
     const width = Math.floor(options.width / 2) * 2
@@ -336,6 +336,12 @@ export async function exportVideo(options: ExportOptions): Promise<ExportResult>
     if (timeline.segments.length === 0) throw new MediaError('empty', 'Nothing is left to export: every part of the video has been cut.')
     const onAbort = () => src.input.dispose()
     signal?.addEventListener('abort', onAbort, { once: true })
+    // iOS suspends a page in the background and may take its codecs away meanwhile.
+    let leftScreen = false
+    const onVisibility = () => {
+      if (document.hidden) leftScreen = true
+    }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
 
     try {
       if (method !== 'recorder') {
@@ -348,7 +354,9 @@ export async function exportVideo(options: ExportOptions): Promise<ExportResult>
             if (plan) return await exportFast({ options, source: src, timeline, plan, reader, fps, width, height, report })
             if (method === 'webcodecs') throw new MediaError('unsupported-browser', "This browser can't encode video here. Update to the latest iOS, or open Cutline in Safari or Chrome.")
           } catch (error) {
-            if (signal?.aborted || error instanceof DrawError || method === 'webcodecs' || !recorderAvailable()) throw error
+            if (signal?.aborted || error instanceof DrawError) throw error
+            if (leftScreen) throw new MediaError('interrupted', 'The export stopped because Cutline left the screen. Keep it open until the export finishes.', { cause: error })
+            if (method === 'webcodecs' || !recorderAvailable()) throw error
             // The realtime path decodes with the browser's own player, which can manage what WebCodecs couldn't.
             console.warn('WebCodecs export failed; recording in realtime instead', error)
             report(0)
@@ -389,11 +397,13 @@ export async function exportVideo(options: ExportOptions): Promise<ExportResult>
       return { blob, mimeType, extension: mimeType === 'video/mp4' ? 'mp4' : 'webm', method: 'recorder' }
     } finally {
       signal?.removeEventListener('abort', onAbort)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
     }
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw abortError()
     if (error instanceof DrawError) throw error.original
-    if (error instanceof MediaError || error instanceof TypeError) throw error
+    if (error instanceof MediaError || error instanceof RangeError) throw error
+    console.error('Export failed', error)
     throw new MediaError('failed', 'The export failed. Try again, or restart Cutline if it keeps happening.', { cause: error })
   } finally {
     source?.input.dispose()

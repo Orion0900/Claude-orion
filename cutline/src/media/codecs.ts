@@ -41,15 +41,18 @@ const AVC_LEVELS = [
   { level: 0x34, frame: 36864, rate: 2073600, bitrate: 240_000_000 },
 ]
 
+/** H.264 profiles to offer an encoder, best first: High, Main, Constrained Baseline. */
+const AVC_PROFILES = ['6400', '4d00', '42e0'] as const
+
 /**
- * High-profile H.264 codec string with a level that covers the frame rate too:
- * 1080x1920 at 60 fps needs level 4.2, where size and bitrate alone say 4.0,
- * and some encoders refuse a level their input exceeds.
+ * H.264 codec string with a level that covers the frame rate too: 1080x1920
+ * at 60 fps needs level 4.2, where size and bitrate alone say 4.0, and some
+ * encoders refuse a level their input exceeds.
  */
-export function avcCodecString(width: number, height: number, fps: number, bitrate: number): string {
+export function avcCodecString(width: number, height: number, fps: number, bitrate: number, profile: (typeof AVC_PROFILES)[number] = '6400'): string {
   const frame = Math.ceil(width / 16) * Math.ceil(height / 16)
   const found = AVC_LEVELS.find((l) => frame <= l.frame && frame * fps <= l.rate && bitrate <= l.bitrate) ?? AVC_LEVELS[AVC_LEVELS.length - 1]
-  return `avc1.6400${found.level.toString(16).padStart(2, '0')}`
+  return `avc1.${profile}${found.level.toString(16).padStart(2, '0')}`
 }
 
 export function audioBitrate(codec: AudioCodec, channels: number): number {
@@ -93,9 +96,16 @@ export async function planEncode(o: { width: number; height: number; fps: number
   const tryVideo = async (codec: VideoCodec) => {
     if (!videoOk.has(codec)) {
       const bitrate = videoBitrate(codec, o.width, o.height, o.fps)
-      const codecString = codec === 'avc' ? avcCodecString(o.width, o.height, o.fps, bitrate) : undefined
-      const ok = await canEncodeVideo(codec, { width: o.width, height: o.height, frameRate: o.fps, quality: new Quality({ bitrate }), fullCodecString: codecString }).catch(() => false)
-      videoOk.set(codec, ok ? { bitrate, codecString } : null)
+      const strings = codec === 'avc' ? AVC_PROFILES.map((p) => avcCodecString(o.width, o.height, o.fps, bitrate, p)) : [undefined]
+      let found: { bitrate: number; codecString?: string } | null = null
+      for (const codecString of strings) {
+        const options = { width: o.width, height: o.height, frameRate: o.fps, quality: new Quality({ bitrate }), fullCodecString: codecString }
+        if (await canEncodeVideo(codec, options).catch(() => false)) {
+          found = { bitrate, codecString }
+          break
+        }
+      }
+      videoOk.set(codec, found)
     }
     return videoOk.get(codec) ?? null
   }

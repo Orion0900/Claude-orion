@@ -20,7 +20,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
-import { audioSamples, ensureFixtures, frameRgb, frameRgbAt, frameTimes, mse, probe, savePng, videoFrameCount } from './media-fixtures.mjs'
+import { audioSamples, ensureFixtures, frameRgb, frameTimes, mse, probe, savePng, videoFrameCount } from './media-fixtures.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FIXTURES = process.env.MEDIA_FIXTURES ?? join(tmpdir(), 'cutline-media', 'fixtures')
@@ -526,34 +526,36 @@ await check('export recorder', async () => {
   assert(r.progress.monotonic && r.progress.last === 1, 'progress climbs to 1')
   // Recorded frames aren't on a fixed grid, and each span's start and end land within a
   // frame or so of the ideal: take frames by time, away from the joins, allowing ±1 frame.
-  const picks = []
-  for (const seg of TL.segments) {
-    for (const t of [seg.offset + 0.2, seg.offset + (seg.end - seg.start) / 2, seg.offset + (seg.end - seg.start) - 0.2]) {
-      const k = Math.round(t * 30)
-      picks.push({ k, j: Math.round(sourceTime(TL, k / 30) * 30) })
-    }
-  }
-  checkFramesByTime('recorder', file, fx.talk, picks, { rows: 1280 - BAR, slack: 1 })
+  const picks = TL.segments.flatMap((seg) => [seg.offset + 0.2, seg.offset + (seg.end - seg.start) / 2, seg.offset + (seg.end - seg.start) - 0.2])
+  checkFramesByTime('recorder', file, fx.talk, TL, picks, { rows: 1280 - BAR, slack: 1 })
   checkSound('recorder', file, fx.talk, TL, { maxLag: 0.12, minCorr: 0.8, jitter: null })
 })
 
-/** Like checkFrames, but takes the output frame by timestamp (recordings have a variable frame rate). */
-function checkFramesByTime(label, outFile, refFile, picks, { rows, slack }) {
+/**
+ * Like checkFrames, for recordings, whose frames come at whatever rate the
+ * browser managed: takes the recorded frame on screen at each pick, and
+ * expects the source moment the cut maps that frame's own timestamp to.
+ */
+function checkFramesByTime(label, outFile, refFile, tl, picks, { rows, slack }) {
   const offsets = []
   const times = frameTimes(outFile)
   const first = times[0] ?? 0
-  for (const pick of picks) {
-    // Half a frame in: the frame on screen for this output frame.
-    const t = first + pick.k / 30 + 1 / 60
-    const out = frameRgbAt(outFile, t, times)
+  const gaps = times.slice(1).map((t, i) => t - times[i]).sort((a, b) => a - b)
+  console.log(`    recorded ${times.length} frames, median interval ${(gaps[Math.floor(gaps.length / 2)] * 1000).toFixed(0)} ms`)
+  for (const t of picks) {
+    let n = 0
+    while (n + 1 < times.length && times[n + 1] <= first + t + 1e-6) n++
+    const at = times[n] - first
+    const j = Math.round(sourceTime(tl, at) * 30)
+    const out = frameRgb(outFile, n)
     const candidates = []
     for (let d = -(slack + 2); d <= slack + 2; d++) {
-      if (pick.j + d < 0) continue
-      candidates.push({ d, err: mse(out, frameRgb(refFile, pick.j + d), 0, rows) })
+      if (j + d < 0) continue
+      candidates.push({ d, err: mse(out, frameRgb(refFile, j + d), 0, rows) })
     }
     candidates.sort((a, b) => a.err - b.err)
     offsets.push(candidates[0].d)
-    console.log(`    out at ${t.toFixed(3)} s → expected source frame ${pick.j}; best match ${pick.j + candidates[0].d} (mse ${candidates[0].err.toFixed(1)})`)
+    console.log(`    recorded frame ${n} at ${at.toFixed(3)} s → expected source frame ${j}; best match ${j + candidates[0].d} (mse ${candidates[0].err.toFixed(1)})`)
   }
   assert(offsets.every((d) => Math.abs(d) <= slack), `${label}: frames show the right source moment within ±${slack} frames (offsets ${offsets.join(', ')})`)
 }
@@ -619,46 +621,121 @@ await check('export with music', async () => {
   const file = join(OUT, r.file)
   const s = streams(file)
   assert(s.audio?.channels === 2, `stereo out for stereo music over mono speech (${s.audio?.channels} ch)`)
-  // How loud the music is in each window: projection of the output on the (resampled, looped) music.
+  // How loud the music is in a window: the output projected on the (resampled, looped) music.
+  // Full band for its absolute level where nobody talks; above 9 kHz, where the voice
+  // (band-limited below 8 kHz) can't disturb the measure, for how deep it ducks. Opus keeps
+  // that band's energy rather than its waveform, so there only ratios mean anything.
   const rate = 48000
-  const out = audioSamples(file, rate)
-  const m = audioSamples(fx.music, rate)
-  const level = (t) => {
+  const HIGH = 'highpass=f=9000:poles=2,highpass=f=9000:poles=2'
+  const projector = (outSignal, music) => (t) => {
     let dot = 0
     let norm = 0
     for (let n = Math.round(t * rate); n < Math.round((t + 0.3) * rate); n++) {
-      const v = m[n % m.length]
-      dot += out[n] * v
+      const v = music[n % music.length]
+      dot += outSignal[n] * v
       norm += v * v
     }
     return dot / norm
   }
-  // Edited 9.4–11.0 s is the 2 s pause inside the second span (source 11.8–13.4).
-  const pause = [9.5, 10.0, 10.5].map(level)
-  const talking = [1.5, 3.0, 4.5, 7.0, 13.0, 16.0, 19.0].map(level)
-  console.log(`    music level in the pause ${pause.map((v) => v.toFixed(2))}, under speech ${talking.map((v) => v.toFixed(2))}`)
-  assert(pause.every((v) => near(v, 0.5, 0.08)), 'music at its volume (0.5) in the pause')
-  assert(talking.every((v) => near(v, 0.125, 0.06)), 'ducked to ~25% of it (0.125) under speech')
+  const full = projector(audioSamples(file, rate), audioSamples(fx.music, rate))
+  const high = projector(audioSamples(file, rate, HIGH), audioSamples(fx.music, rate, HIGH))
+  // Where the speech is: 50 ms loudness of the source, on the edited clock.
+  const src = audioSamples(fx.talk, 16000)
+  const talkingAt = (t) => {
+    const s0 = Math.round(sourceTime(TL, t) * 16000)
+    let e = 0
+    for (let i = s0; i < s0 + 800; i++) e += (src[i] ?? 0) ** 2
+    return Math.sqrt(e / 800) > 0.02
+  }
+  // Windows inside a phrase: talking throughout, with no pause over 0.35 s in the half second before.
+  const talking = []
+  for (let t = 0.6; t < TL.duration - 0.6; t += 0.25) {
+    let quiet = 0
+    let longest = 0
+    let any = false
+    for (let u = t - 0.5; u < t + 0.3; u += 0.05) {
+      if (talkingAt(u)) {
+        any = true
+        quiet = 0
+      } else longest = Math.max(longest, (quiet += 0.05))
+    }
+    if (any && longest < 0.35 && TL.segments.every((seg) => Math.abs(t - seg.offset) > 0.6)) talking.push(t)
+  }
+  // Edited 9.2–11.2 s is the 2 s pause inside the second span (source 11.6–13.6); by 10.6 s the hold and release are over.
+  const pause = full(10.6)
+  const ratios = talking.map((t) => high(t) / high(10.6)).sort((a, b) => a - b)
+  const median = ratios[Math.floor(ratios.length / 2)]
+  const within = ratios.filter((v) => near(v, median, 0.03)).length
+  console.log(`    music level in the pause ${pause.toFixed(3)}; under speech (${ratios.length} windows) at ${median.toFixed(3)} of that (range ${ratios[0].toFixed(3)}–${ratios.at(-1).toFixed(3)})`)
+  assert(near(pause, 0.5, 0.05), `music at its volume (0.5) in a pause (${pause.toFixed(3)})`)
+  assert(ratios.length > 30 && near(median, 0.25, 0.04) && within >= ratios.length * 0.9, `ducked to ~25% under speech, steadily (${within}/${ratios.length} windows within ±0.03 of ${median.toFixed(3)})`)
   checkSound('music', file, fx.talk, TL, { minCorr: 0.8, maxLag: 0.03, jitter: 0.002 })
 
   const r2 = await runExport({ fixture: 'noaudio.webm', ranges: [{ start: 0, end: 12 }], width: 360, height: 640, fps: 30, music: { name: 'music.wav', volume: 0.8, ducking: true }, saveAs: 'export-music-only' })
   const file2 = join(OUT, r2.file)
   const s2 = streams(file2)
-  const out2 = audioSamples(file2, rate)
-  const lv = (t) => {
-    let dot = 0
-    let norm = 0
-    for (let n = Math.round(t * rate); n < Math.round((t + 0.3) * rate); n++) {
-      const v = m[n % m.length]
-      dot += out2[n] * v
-      norm += v * v
-    }
-    return dot / norm
-  }
+  const lv = projector(audioSamples(file2, rate), audioSamples(fx.music, rate))
   const levels = [1, 4, 8.5, 10].map(lv)
   console.log(`    music-only levels ${levels.map((v) => v.toFixed(2))}`)
   assert(!!s2.audio && near(s2.duration, 12, 0.05), 'a silent clip gets a music soundtrack')
   assert(levels.every((v) => near(v, 0.8, 0.1)), 'music at full volume with no speech to duck under, looped past its 9 s')
+})
+
+await check('export reads only what it needs', async () => {
+  const r = await page.evaluate(async () => {
+    // The same mediabunny instance src/media uses: find the URL Vite rewrote its import to.
+    const code = await (await fetch('/src/media/probe.ts')).text()
+    const url = code.match(/from\s+["']([^"']*mediabunny[^"']*)["']/)[1]
+    const { BlobSource } = await import(url)
+    const proto = Object.getPrototypeOf(BlobSource.prototype)
+    const original = proto._dispatchRead
+    let bytes = 0
+    proto._dispatchRead = function (start, end) {
+      bytes += end - start
+      return original.call(this, start, end)
+    }
+    try {
+      const { probeMedia } = await import('/src/media/probe.ts')
+      const { exportVideo } = await import('/src/media/export.ts')
+      const source = await T.fixture('long.webm')
+      const info = await probeMedia(source, 'long.webm')
+      const probed = bytes
+      bytes = 0
+      const started = performance.now()
+      await exportVideo({ source, ranges: [{ start: 100, end: 102 }, { start: 150, end: 151 }], width: 360, height: 640, draw: T.draw() })
+      return { probed, exported: bytes, size: source.size, duration: info.duration, ms: performance.now() - started }
+    } finally {
+      proto._dispatchRead = original
+    }
+  })
+  const mb = (n) => (n / 1e6).toFixed(2)
+  console.log(`    ${mb(r.size)} MB file, ${r.duration.toFixed(1)} s: probing read ${mb(r.probed)} MB; exporting 3 s of it read ${mb(r.exported)} MB in ${r.ms.toFixed(0)} ms`)
+  assert(r.probed < r.size * 0.1, `probing reads ${Math.round((100 * r.probed) / r.size)}% of the file`)
+  assert(r.exported < r.size * 0.25, `exporting a few seconds reads ${Math.round((100 * r.exported) / r.size)}% of the file, not all of it`)
+})
+
+await check('export audio-only source', async () => {
+  const ranges = [
+    { start: 1, end: 5 },
+    { start: 14, end: 18 },
+  ]
+  const r = await runExport({ fixture: 'speech.wav', ranges, width: 360, height: 640, fps: 30, saveAs: 'export-audio-only' })
+  const file = join(OUT, r.file)
+  const s = streams(file)
+  console.log(`    ${r.method} ${s.video?.codec_name} ${s.video?.width}x${s.video?.height} + ${s.audio?.codec_name}, ${s.duration.toFixed(3)} s; frames handed to draw: ${r.sizes}`)
+  assert(r.sizes.length === 1 && r.sizes[0] === '0x0', 'draw gets no frame (null, 0x0) and paints the picture itself')
+  assert(s.video?.width === 360 && !!s.audio && near(s.duration, 8, 0.05), 'a 360x640 video with the cut speech, 8 s')
+  checkSound('audio-only', file, fx.speech, timelineOf(ranges))
+})
+
+await check('export at 60 fps', async () => {
+  const r = await runExport({ fixture: 'talk.webm', ranges: [{ start: 3, end: 5 }], width: 360, height: 640, fps: 60, saveAs: 'export-60fps' })
+  const file = join(OUT, r.file)
+  const s = streams(file)
+  const frames = videoFrameCount(file)
+  console.log(`    ${s.video.r_frame_rate}, ${frames} frames, ${s.duration.toFixed(3)} s; first draw times ${r.times.map((t) => t.toFixed(4))}`)
+  assert(frames === 120 && near(s.duration, 2, 0.03), '2 s at 60 fps = 120 frames')
+  assert(near(r.times[1], 1 / 60, 1e-9), 'draw called every 1/60 s of edited time')
 })
 
 await check('abort', async () => {
@@ -724,6 +801,7 @@ await check('share', async () => {
 
 await check('probe exports', async () => {
   const names = ['export-webcodecs.webm', 'export-recorder.webm'].filter((n) => existsSync(join(OUT, n)))
+  if (!names.length) return void console.log('    (no exports from this run to read back)')
   const infos = await page.evaluate(async (names) => {
     const { probeMedia } = await import('/src/media/probe.ts')
     const out = {}

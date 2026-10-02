@@ -21,6 +21,7 @@ describe('avcCodecString', () => {
     expect(avcCodecString(720, 1280, 30, 4.4e6)).toBe('avc1.64001f') // 3.1
     expect(avcCodecString(2160, 3840, 30, 24e6)).toBe('avc1.640033') // 5.1
     expect(avcCodecString(2160, 3840, 60, 24e6)).toBe('avc1.640034') // 5.2
+    expect(avcCodecString(1080, 1920, 30, 10e6, '42e0')).toBe('avc1.42e028') // Constrained Baseline 4.0
   })
 })
 

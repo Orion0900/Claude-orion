@@ -73,6 +73,9 @@ const MAX_NEW_TOKENS = 440
 const MISSED_SPEECH_SECONDS = 0.5
 const RETRY_LEAD_IN = 0.3
 const MAX_PASSES = 3
+// Below this chance of the window holding no speech, a detected language is
+// trusted for the rest of the recording.
+const NO_SPEECH_LIMIT = 0.5
 
 export async function transcribeWith(
   asr: WhisperPipeline,
@@ -86,6 +89,10 @@ export async function transcribeWith(
   const multilingual = Boolean(asr.model.generation_config?.is_multilingual)
   // English-only weights never hear anything else.
   let language = multilingual ? options.language : 'en'
+  // A language is detected window by window until one clearly holds speech:
+  // a loud intro of music shouldn't decide it for the whole recording.
+  let settled = language !== null
+  let bestGuess: Detection | null = null
   const nextId = idMaker()
   const words: Word[] = []
   let reported = -1
@@ -103,7 +110,12 @@ export async function transcribeWith(
       const samples = audio.subarray(Math.round(from * SAMPLE_RATE), Math.round(chunk.end * SAMPLE_RATE))
       // The log-mel spectrogram the model hears, worked out once for both uses.
       const { input_features: features } = await asr.processor(samples)
-      if (multilingual && !language) language = await detectLanguage(asr, features)
+      if (!settled) {
+        const detection = await detectLanguage(asr, features)
+        if (!bestGuess || detection.noSpeech < bestGuess.noSpeech) bestGuess = detection
+        language = detection.language
+        settled = detection.noSpeech < NO_SPEECH_LIMIT || detection.language === null
+      }
       const offset = from
       const raw = await transcribeChunk(asr, samples, features, multilingual ? language : null, (seconds) =>
         report(offset + seconds),
@@ -119,7 +131,7 @@ export async function transcribeWith(
     }
     report(chunk.end)
   }
-  return { words, language }
+  return { words, language: settled ? language : (bestGuess?.language ?? null) }
 }
 
 /**
@@ -183,16 +195,25 @@ async function timeWords(
   return extra.chunks ?? []
 }
 
+interface Detection {
+  /** ISO 639-1 code, or null when the model has no language tokens. */
+  language: string | null
+  /** The model's chance that the window holds no speech at all. */
+  noSpeech: number
+}
+
 /**
  * Detects the spoken language the way Whisper does: one decoding step after
- * the start-of-transcript token, keeping the likeliest language token.
- * transformers.js 4.3 doesn't do this itself; it assumes English.
+ * the start-of-transcript token, keeping the likeliest language token. The
+ * same step gives the chance of no speech, from the token just before
+ * <|notimestamps|>. transformers.js 4.3 doesn't detect languages itself; it
+ * assumes English.
  */
-async function detectLanguage(asr: WhisperPipeline, features: unknown): Promise<string | null> {
+async function detectLanguage(asr: WhisperPipeline, features: unknown): Promise<Detection> {
   const config = asr.model.generation_config
   const languages = config?.lang_to_id
   const start = config?.decoder_start_token_id
-  if (!languages || start == null) return null
+  if (!languages || start == null) return { language: null, noSpeech: 0 }
   const output = await asr.model.forward({
     input_features: features,
     decoder_input_ids: new Tensor('int64', BigInt64Array.of(BigInt(start)), [1, 1]),
@@ -206,7 +227,13 @@ async function detectLanguage(asr: WhisperPipeline, features: unknown): Promise<
       best = token.slice(2, -2)
     }
   }
-  return best ? fromWhisperCode(best) : null
+  let peak = -Infinity
+  for (let i = 0; i < logits.length; i++) peak = Math.max(peak, logits[i])
+  let sum = 0
+  for (let i = 0; i < logits.length; i++) sum += Math.exp(logits[i] - peak)
+  const noSpeechToken = (config?.no_timestamps_token_id ?? 0) - 1
+  const noSpeech = noSpeechToken > 0 ? Math.exp(logits[noSpeechToken] - peak) / sum : 0
+  return { language: best ? fromWhisperCode(best) : null, noSpeech }
 }
 
 const trimmed = new WeakSet<object>()

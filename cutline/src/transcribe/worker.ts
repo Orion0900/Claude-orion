@@ -28,10 +28,20 @@ scope.onmessage = (event) => {
   queue = queue.then(() => handle(request))
 }
 
+// What went wrong, in words for the person using the app, by how far it got.
+const FAILURES = {
+  download: 'The speech model couldn’t be downloaded. Check the connection and try again.',
+  load: 'The speech model couldn’t be started. Try again, or choose a smaller model in Settings.',
+  transcribe: 'Something went wrong while transcribing.',
+}
+
 async function handle(request: TranscribeRequest): Promise<void> {
   const { id } = request
-  const post = (progress: TranscribeProgress) => scope.postMessage({ type: 'progress', id, progress })
-  let stage: 'load' | 'transcribe' = 'load'
+  let stage: keyof typeof FAILURES = 'download'
+  const post = (progress: TranscribeProgress) => {
+    if (progress.phase === 'load') stage = 'load'
+    scope.postMessage({ type: 'progress', id, progress })
+  }
   try {
     configure(request.source, request.base)
     const asr = await load(request.repo, post)
@@ -45,24 +55,24 @@ async function handle(request: TranscribeRequest): Promise<void> {
     scope.postMessage({
       type: 'error',
       id,
-      message:
-        stage === 'load'
-          ? 'The speech model couldn’t be loaded. Check the connection and try again.'
-          : 'Something went wrong while transcribing.',
+      message: FAILURES[stage],
       detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
     })
   }
 }
 
 function configure(source: ModelSource, base: string): void {
-  const wasm = env.backends.onnx.wasm
+  const { wasm, versions } = env.backends.onnx
   // ONNX Runtime only reads these when it first starts.
   if (wasm && !runtimeReady) {
     // Its WebAssembly is served by the app itself (see vite.config.ts) rather
     // than a CDN, so transcription needs nothing else once the model is cached.
+    // The paths never change, so the version goes in the query: otherwise the
+    // browser's caches would hand an updated app the old runtime's files.
+    const query = versions?.web ? `?v=${encodeURIComponent(versions.web)}` : ''
     wasm.wasmPaths = {
-      mjs: new URL('ort/ort-wasm-simd-threaded.mjs', base).href,
-      wasm: new URL('ort/ort-wasm-simd-threaded.wasm', base).href,
+      mjs: new URL(`ort/ort-wasm-simd-threaded.mjs${query}`, base).href,
+      wasm: new URL(`ort/ort-wasm-simd-threaded.wasm${query}`, base).href,
     }
     // Threads need cross-origin isolation, which GitHub Pages doesn't give
     // without help, so usually this is one.

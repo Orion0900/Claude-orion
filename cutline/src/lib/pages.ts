@@ -2,7 +2,7 @@
  * Caption pages: the words on screen at once, on the edited clock.
  */
 import { endsSentence, timedWords, type TimeMap } from './timeline'
-import type { CaptionPage, CaptionStyle, Seconds, TimedWord, Translation, Word } from './types'
+import type { CaptionPage, CaptionStyle, Range, Seconds, TimedWord, Translation, Word } from './types'
 
 type PageStyle = Pick<CaptionStyle, 'wordsPerPage' | 'maxLines' | 'emojis'>
 
@@ -112,7 +112,8 @@ export function pageAt(pages: CaptionPage[], t: Seconds): CaptionPage | null {
 
 /** Words closer than this are one stretch of speech when spreading a translation over it. */
 const SPEECH_JOIN = 0.3
-const CJK = /[぀-ヿ㐀-鿿豈-﫿가-힯]/
+// Hiragana and katakana, CJK ideographs and compatibility ideographs, Hangul syllables.
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]/
 /** Longest run of CJK text that counts as one caption "word". */
 const CJK_PIECE = 8
 
@@ -143,15 +144,9 @@ export function translatedPages(
     const tokens = tokenize(sentence.text)
     if (!spoken.length || !tokens.length) return
 
-    const spans = speechSpans(spoken)
-    const weights = tokens.map((t) => [...t].length + 1)
-    const total = weights.reduce((x, y) => x + y, 0)
-    let acc = 0
-    const words = tokens.map((text, i): TimedWord => {
-      const start = atFraction(spans, acc / total, false)
-      acc += weights[i]
-      return { id: `${sentence.firstWordId}~${n}.${i}`, text, start, end: atFraction(spans, acc / total, true), emphasis: false }
-    })
+    const words = spread(tokens, speechSpans(spoken)).map(
+      (w, i): TimedWord => ({ ...w, id: `${sentence.firstWordId}~${n}.${i}`, emphasis: false }),
+    )
 
     let run: TimedWord[] = []
     words.forEach((w, i) => {
@@ -200,8 +195,8 @@ function tokenize(text: string): string[] {
 }
 
 /** The stretches of edited time words are spoken over, joining the short gaps between them. */
-function speechSpans(words: readonly TimedWord[]): { start: Seconds; end: Seconds }[] {
-  const spans: { start: Seconds; end: Seconds }[] = []
+function speechSpans(words: readonly TimedWord[]): Range[] {
+  const spans: Range[] = []
   for (const w of words) {
     const last = spans[spans.length - 1]
     if (last && w.start - last.end < SPEECH_JOIN) last.end = Math.max(last.end, w.end)
@@ -211,18 +206,32 @@ function speechSpans(words: readonly TimedWord[]): { start: Seconds; end: Second
 }
 
 /**
- * The edited time a fraction of the way through the speech spans. At a
- * boundary between spans, `endOfSpan` picks the end of the earlier span
- * (for where a word stops) over the start of the later (where one starts).
+ * Lays words out over stretches of speech in proportion to their length.
+ * Each word goes in the stretch its middle lands in and keeps inside it, so
+ * a pause in the speech falls between words rather than through one.
  */
-function atFraction(spans: readonly { start: Seconds; end: Seconds }[], f: number, endOfSpan: boolean): Seconds {
-  const total = spans.reduce((n, s) => n + s.end - s.start, 0)
-  if (total <= 0) return spans[0].start
-  let left = Math.min(1, Math.max(0, f)) * total
-  for (let i = 0; i < spans.length; i++) {
-    const len = spans[i].end - spans[i].start
-    if (left < len || (endOfSpan && left <= len) || i === spans.length - 1) return spans[i].start + Math.min(left, len)
-    left -= len
-  }
-  return spans[spans.length - 1].end
+function spread(tokens: readonly string[], spans: readonly Range[]): { text: string; start: Seconds; end: Seconds }[] {
+  const lengths = spans.map((s) => s.end - s.start)
+  const speech = lengths.reduce((a, b) => a + b, 0)
+  if (!(speech > 0)) return tokens.map((text) => ({ text, start: spans[0].start, end: spans[0].start }))
+  const weights = tokens.map((t) => [...t].length + 1)
+  const total = weights.reduce((a, b) => a + b, 0)
+  const groups: number[][] = spans.map(() => [])
+  let acc = 0
+  weights.forEach((w, i) => {
+    const middle = ((acc + w / 2) / total) * speech
+    acc += w
+    let k = 0
+    for (let pos = lengths[0]; k + 1 < spans.length && middle >= pos; pos += lengths[++k]);
+    groups[k].push(i)
+  })
+  return groups.flatMap((members, k) => {
+    const weight = members.reduce((n, i) => n + weights[i], 0)
+    let t = spans[k].start
+    return members.map((i, m) => {
+      const start = t
+      t = m === members.length - 1 ? spans[k].end : t + (weights[i] / weight) * lengths[k]
+      return { text: tokens[i], start, end: t }
+    })
+  })
 }

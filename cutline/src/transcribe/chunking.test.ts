@@ -9,11 +9,25 @@ import {
   speechSeconds,
 } from './chunking'
 
-/** A stand-in for speech: a loud tone. */
+/** A loud, steady tone. */
 function tone(seconds: number, amplitude = 0.3): Float32Array {
   const out = new Float32Array(Math.round(seconds * SAMPLE_RATE))
   for (let i = 0; i < out.length; i++) out[i] = amplitude * Math.sin((2 * Math.PI * 220 * i) / SAMPLE_RATE)
   return out
+}
+
+/** A stand-in for speech: a tone that swells and fades three times a second. */
+function speech(seconds: number, amplitude = 0.3): Float32Array {
+  const out = new Float32Array(Math.round(seconds * SAMPLE_RATE))
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SAMPLE_RATE
+    out[i] = amplitude * Math.sin(2 * Math.PI * 220 * t) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 3 * t))
+  }
+  return out
+}
+
+function mix(a: Float32Array, b: Float32Array): Float32Array {
+  return a.map((x, i) => x + (b[i] ?? 0))
 }
 
 function silence(seconds: number): Float32Array {
@@ -116,8 +130,8 @@ describe('planChunks', () => {
   })
 
   it('keeps audio up to 28 s whole', () => {
-    expect(plan(tone(20))).toEqual([{ start: 0, end: 20, speech: true }])
-    expect(plan(tone(28))).toHaveLength(1)
+    expect(plan(speech(20))).toEqual([{ start: 0, end: 20, speech: true }])
+    expect(plan(speech(28))).toHaveLength(1)
   })
 
   it('cuts long audio into windows of at most 28 s, in the quiet', () => {
@@ -167,15 +181,19 @@ describe('planChunks', () => {
   })
 
   it('marks windows with nothing to hear', () => {
-    const chunks = plan(concat(tone(30), silence(30)))
+    const chunks = plan(concat(speech(30), silence(30)))
     expect(chunks.map((c) => c.speech)).toEqual([true, true, false])
     expect(plan(hiss(20, -50))[0].speech).toBe(false)
     // A quiet bump is not speech either.
     expect(plan(concat(hiss(10, -60), hiss(0.05, -45), hiss(10, -60)))[0].speech).toBe(false)
   })
 
-  it('always transcribes loud audio, even when nothing stands out in it', () => {
-    // Steady loud sound, like a voice over music at the same level.
-    expect(plan(hiss(20, -20))[0].speech).toBe(true)
+  it('skips steady sound, however loud, since speech comes and goes', () => {
+    expect(plan(hiss(20, -20))[0].speech).toBe(false)
+    expect(plan(tone(20))[0].speech).toBe(false)
+  })
+
+  it('transcribes a voice over loud steady sound', () => {
+    expect(plan(mix(hiss(20, -20), speech(20)))[0].speech).toBe(true)
   })
 })

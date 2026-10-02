@@ -6,7 +6,7 @@
  */
 
 import type { Word } from '../lib/types.ts'
-import { loudUntil, speechIslands, speechSeconds } from './chunking.ts'
+import { isSteady, loudUntil, speechIslands, speechSeconds } from './chunking.ts'
 import type { SpeechProfile } from './chunking.ts'
 
 /** A word or segment as transformers.js returns it: seconds from the start of the audio it heard. */
@@ -53,7 +53,7 @@ const SNAP_MIN_SECONDS = 0.2
 const WORD_GAP = 0.25
 // How far a word may grow to take in sound just past its edges.
 const REACH = 0.3
-// Below this share of speech-loud audio under its words, a stock phrase was made up.
+// With less speech-loud audio than this under it, a stock phrase was made up.
 const INVENTED_SPEECH_SHARE = 0.25
 const LONGEST_REPEATED_PHRASE = 8
 
@@ -69,9 +69,9 @@ const HAS_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
 const MUSIC_SIGNS = /[♪♫♬]/gu
 const BRACKETS: Record<string, string> = { '[': ']', '(': ')', '*': '*' }
 
-// What Whisper tends to write over silence or music. Dropped only when the
-// audio under them is mostly quiet, and the one-word ones only when they're
-// all a window holds, since "you" or "bye" ending a sentence is common.
+// What Whisper tends to write over silence, noise or music. Dropped only
+// where the audio under them is quiet or steady like noise, and the one-word
+// ones only when they're all a window holds: "you" ending a sentence is common.
 const STOCK_PHRASES = new Set(
   [
     'you',
@@ -305,18 +305,26 @@ export function snapToSpeech(words: readonly Timed[], profile: SpeechProfile, lo
 }
 
 /**
- * Whisper fills silence with stock phrases like "Thank you." Drops them
- * when the audio under them is mostly quiet: as the whole window, or tacked
- * on after the speech ended.
+ * Whisper fills silence and noise with stock phrases like "Thank you." Drops
+ * them when the audio under them is mostly quiet or holds steady like noise:
+ * as the whole window, or before or after the speech in it.
  */
 function dropInventions(words: Timed[], profile: SpeechProfile): Timed[] {
   const invented = (run: readonly Timed[]) =>
-    STOCK_PHRASES.has(phraseKey(run)) && speechShare(run, profile) < INVENTED_SPEECH_SHARE
+    STOCK_PHRASES.has(phraseKey(run)) &&
+    (speechShare(run, profile) < INVENTED_SPEECH_SHARE || isSteady(profile, run[0].start, run[run.length - 1].end))
   if (words.length > 0 && invented(words)) return []
-  for (let size = Math.min(6, words.length - 1); size >= 2; size--) {
-    if (invented(words.slice(-size))) return words.slice(0, -size)
+  let kept = words
+  for (let size = Math.min(6, kept.length - 1); size >= 2; size--) {
+    if (invented(kept.slice(0, size))) {
+      kept = kept.slice(size)
+      break
+    }
   }
-  return words
+  for (let size = Math.min(6, kept.length - 1); size >= 2; size--) {
+    if (invented(kept.slice(-size))) return kept.slice(0, -size)
+  }
+  return kept
 }
 
 function speechShare(words: readonly Timed[], profile: SpeechProfile): number {

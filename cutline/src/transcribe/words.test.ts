@@ -15,11 +15,18 @@ const context = (overrides: Partial<ChunkContext> = {}): ChunkContext => ({
 
 const texts = (words: Word[]) => words.map((w) => w.text)
 
-/** Loudness with speech-loud audio over the given spans and quiet elsewhere. */
+/**
+ * Loudness with speech over the given spans, quiet elsewhere. The speech
+ * swells and fades like syllables: a loud tenth of a second in every four.
+ */
 function profileWith(seconds: number, loud: [number, number][]): SpeechProfile {
   const frameSeconds = 0.01
   const power = new Float32Array(Math.round(seconds / frameSeconds)).fill(1e-6)
-  for (const [from, to] of loud) power.fill(0.01, Math.round(from / frameSeconds), Math.round(to / frameSeconds))
+  for (const [from, to] of loud) {
+    for (let frame = Math.round(from / frameSeconds); frame < Math.round(to / frameSeconds); frame++) {
+      power[frame] = frame % 40 < 10 ? 0.01 : 0.001
+    }
+  }
   return { power, frameSeconds, threshold: 1e-4 }
 }
 
@@ -156,7 +163,7 @@ describe('collapseRepeats', () => {
 })
 
 describe('silence', () => {
-  it('drops stock phrases made up over silence', () => {
+  it('drops stock phrases made up over silence or steady noise', () => {
     const profile = profileWith(10, [[0, 2]])
     const tail = normalizeChunk(
       [raw(' We', 0, 0.5), raw(' won.', 0.5, 2), raw(' Thank', 4, 6), raw(' you.', 6, 9)],
@@ -166,11 +173,19 @@ describe('silence', () => {
     expect(normalizeChunk([raw(' you', 0, 9)], context({ duration: 10, profile: profileWith(10, []) }))).toEqual([])
     const watching = [raw(' Thanks', 3, 4), raw(' for', 4, 5), raw(' watching!', 5, 6)]
     expect(normalizeChunk(watching, context({ duration: 10, profile }))).toEqual([])
+    // Loud but steady, like hiss, before the speech starts.
+    const hissThenSpeech: SpeechProfile = { ...profileWith(10, [[5, 7]]), threshold: 1e-7 }
+    const lead = normalizeChunk(
+      [raw(' Thank', 0, 1), raw(' you', 1, 2), raw(' for', 2, 3), raw(' watching!', 3, 4.5), raw(' Hello', 5, 6), raw(' there.', 6, 7)],
+      context({ duration: 10, profile: hissThenSpeech }),
+    )
+    expect(texts(lead)).toEqual(['Hello', 'there.'])
   })
 
   it('keeps the same phrases when they were really said', () => {
     const profile = profileWith(10, [[0, 3]])
-    const words = normalizeChunk([raw(' Thank', 0, 0.4), raw(' you', 0.4, 0.9), raw(' so', 1, 1.5), raw(' much.', 1.5, 3)], context({ duration: 10, profile }))
+    const said = [raw(' Thank', 0, 0.4), raw(' you', 0.4, 0.9), raw(' so', 1, 1.5), raw(' much.', 1.5, 3)]
+    const words = normalizeChunk(said, context({ duration: 10, profile }))
     expect(texts(words)).toEqual(['Thank', 'you', 'so', 'much.'])
     // A last "you" ending a sentence stays even where the audio is quiet.
     const quietEnd = normalizeChunk([raw(' Love', 0, 1), raw(' you.', 4, 6)], context({ duration: 10, profile }))

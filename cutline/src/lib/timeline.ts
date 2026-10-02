@@ -98,7 +98,8 @@ export class TimeMap {
     const i = lastAtOrBefore(this.ranges, source, (r) => r.start)
     if (i < 0) return 0
     const r = this.ranges[i]
-    return source < r.end ? this.starts[i] + (source - r.start) : i + 1 < this.ranges.length ? this.starts[i + 1] : this.duration
+    if (source < r.end) return this.starts[i] + (source - r.start)
+    return i + 1 < this.ranges.length ? this.starts[i + 1] : this.duration
   }
 
   /** Source time of an edited time, clamped to [0, duration]. */
@@ -133,7 +134,8 @@ export function timedWords(words: Word[], map: TimeMap): TimedWord[] {
     const end = Math.max(w.start, w.end)
     if (!survives(map, start, end)) continue
     const from = map.toEditedClamped(start)
-    out.push({ id: w.id, text: w.text, start: from, end: Math.max(from, map.toEditedClamped(end)), emphasis: !!w.emphasis })
+    const to = Math.max(from, map.toEditedClamped(end))
+    out.push({ id: w.id, text: w.text, start: from, end: to, emphasis: !!w.emphasis })
   }
   out.forEach((w, i) => {
     if (w.end - w.start >= MIN_WORD) return
@@ -160,7 +162,8 @@ const SENTENCE_PAUSE = 1.2
 const LONG_SENTENCE = 30
 const MAX_SENTENCE = 50
 
-const ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'st', 'sr', 'jr', 'vs', 'etc', 'inc', 'ltd', 'co', 'mt', 'no', 'approx'])
+// Not "no": "No." is a whole sentence far more often than it's "number".
+const ABBREVIATIONS = new Set('mr mrs ms dr prof st sr jr vs etc inc ltd mt approx'.split(' '))
 
 /** True if `text` ends a sentence, given the word after it. */
 export function endsSentence(text: string, next?: string): boolean {
@@ -169,8 +172,9 @@ export function endsSentence(text: string, next?: string): boolean {
   if (/(…|\.\.\.)$/.test(t)) return !!next && /^[\p{Lu}]/u.test(next) && !/^I\b|^I['’]/.test(next)
   if (!t.endsWith('.')) return false
   const bare = t.slice(0, -1).toLowerCase().replace(/^["'“‘«(\[]+/, '')
-  // Mr. Smith, e.g. this, the U.S. and J. Doe don't end anything.
-  return !(ABBREVIATIONS.has(bare) || /^\p{L}$/u.test(bare) || /^(\p{L}\.)+\p{L}$/u.test(bare))
+  // Mr. Smith, e.g. this and the U.S. don't end anything. (A lone letter
+  // might be an initial, but "plan B." ends sentences far more often.)
+  return !(ABBREVIATIONS.has(bare) || /^(\p{L}\.)+\p{L}$/u.test(bare))
 }
 
 /**

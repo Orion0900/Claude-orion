@@ -8,7 +8,7 @@
 // already has it (with real speech) it's used as is; otherwise a stand-in
 // with a speech-like soundtrack in the same pattern is generated.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export function run(cmd, args, { input } = {}) {
@@ -28,9 +28,9 @@ export function videoFrameCount(file) {
   return Number(out.toString().trim())
 }
 
-/** The first audio stream, mixed to mono, as 32-bit floats at `rate`. */
-export function audioSamples(file, rate = 48000) {
-  const buf = run('ffmpeg', ['-v', 'error', '-i', file, '-map', '0:a:0', '-ac', '1', '-ar', String(rate), '-f', 'f32le', '-'])
+/** The first audio stream, mixed to mono, as 32-bit floats at `rate`, after an optional filter. */
+export function audioSamples(file, rate = 48000, filter = null) {
+  const buf = run('ffmpeg', ['-v', 'error', '-i', file, '-map', '0:a:0', ...(filter ? ['-af', filter] : []), '-ac', '1', '-ar', String(rate), '-f', 'f32le', '-'])
   return new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4)
 }
 
@@ -54,12 +54,6 @@ export function frameTimes(file) {
   return out.toString().trim().split('\n').map(Number)
 }
 
-/** The frame on screen at `seconds` (the last one starting at or before it), as RGB bytes. */
-export function frameRgbAt(file, seconds, times = frameTimes(file)) {
-  let n = 0
-  while (n + 1 < times.length && times[n + 1] <= seconds + 1e-6) n++
-  return frameRgb(file, n)
-}
 
 export function savePng(file, index, out, filter = null) {
   const vf = [`select=eq(n\\,${index})`, filter].filter(Boolean).join(',')
@@ -97,7 +91,7 @@ export function ensureFixtures(dir) {
   mkdirSync(dir, { recursive: true })
   const speech = make(dir, 'speech.wav', (out) =>
     ffmpeg('-f', 'lavfi', '-i', SPEECHLIKE, '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.08:seed=7:r=48000:d=25.8',
-      '-filter_complex', `[1]volume='${TALKING}':eval=frame[n];[0][n]amix=inputs=2:normalize=0`, '-ac', '1', '-c:a', 'pcm_s16le', '-f', 'wav', out),
+      '-filter_complex', `[1]volume='${TALKING}':eval=frame,lowpass=f=4000[n];[0][n]amix=inputs=2:normalize=0`, '-ac', '1', '-c:a', 'pcm_s16le', '-f', 'wav', out),
   )
   const talkFrom = (size) => (out) =>
     ffmpeg('-f', 'lavfi', '-i', `testsrc2=size=${size}:rate=30:duration=25.8`, '-i', speech, '-c:v', 'libvpx-vp9', '-b:v', '1500k',
@@ -121,6 +115,12 @@ export function ensureFixtures(dir) {
       '-deadline', 'realtime', '-cpu-used', '8', '-row-mt', '1', '-tile-columns', '2', '-threads', '8', '-c:a', 'libopus', '-b:a', '96k', '-f', 'mp4', tmp)
     ffmpeg('-display_rotation:v:0', '-90', '-i', tmp, '-c', 'copy', '-f', 'mp4', out)
   })
+  // 3.4 minutes (talk.webm eight times over, ~30 MB): well past BlobSource's 8 MB cache, to show reads stay local.
+  const long = make(dir, 'long.webm', (out) => {
+    const list = `${out}.txt`
+    writeFileSync(list, Array.from({ length: 8 }, () => `file '${talk.replace(/'/g, "'\\''")}'`).join('\n'))
+    ffmpeg('-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-f', 'webm', out)
+  })
   const hevc = make(dir, 'hevc.mp4', (out) => ffmpeg('-i', talk, '-t', '3', '-c:v', 'libx265', '-preset', 'ultrafast', '-tag:v', 'hvc1', '-c:a', 'aac', '-f', 'mp4', out))
   // Music: a chord over pink noise, 9 s, 44.1 kHz stereo (so it has to be resampled and looped).
   const music = make(dir, 'music.wav', (out) =>
@@ -128,5 +128,5 @@ export function ensureFixtures(dir) {
       '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.15:seed=3:r=44100:d=9', '-filter_complex', '[1]aformat=channel_layouts=stereo[n];[0][n]amix=inputs=2:normalize=0',
       '-c:a', 'pcm_s16le', '-f', 'wav', out),
   )
-  return { dir, speech, talk, landscape, mp4, rotated, noAudio, uhd, hevc, music }
+  return { dir, speech, talk, landscape, mp4, rotated, noAudio, uhd, long, hevc, music }
 }

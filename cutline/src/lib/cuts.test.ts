@@ -188,6 +188,14 @@ describe('planCuts: removed words and fillers', () => {
     }
   })
 
+  it('leaves a removed word Whisper put inside a kept one, and the pause after it', () => {
+    const words = [word('sooo', 0, 2), word('um', 0.5, 0.8), word('next', 3, 3.5)]
+    expect(planCuts(words, edit({ removeSilences: false }), 4).forced).toEqual([])
+    // Even with another kept word tucked inside the long one.
+    const nested = [word('sooo', 0, 3), word('um', 1, 1.2), word('yes', 1.5, 1.8), word('next', 4, 4.2)]
+    expect(planCuts(nested, edit({ removeSilences: false }), 5).forced).toEqual([])
+  })
+
   it('cuts a squeezed filler right up to its neighbours without entering them', () => {
     const words = [word('and', 0, 0.3), word('uh', 0.33, 0.5), word('then', 0.53, 0.8)]
     close(planCuts(words, edit({ removeSilences: false }), 1).forced, [r(0.33, 0.5)])
@@ -256,6 +264,14 @@ describe('planCuts with loudness', () => {
     const start = planCuts(words, edit({ removeSilences: false }), 3, analysis).forced[0].start
     expect(start).toBeLessThan(0.9)
     expect(start).toBeGreaterThanOrEqual(0.4 + PAD_AFTER - 1e-9)
+  })
+
+  it('copes with pauses of digital silence', () => {
+    const words = [word('the', 0.2, 0.4), word('end', 0.5, 1), word('Then', 3, 3.3)]
+    const analysis = envelope(4, [[0.2, 0.4], [0.5, 1.2], [3, 3.3], [1.2, 1.3, 0.0005]], 0)
+    const mid = planCuts(words, edit({ maxPause: 0.4 }), 4, analysis).pauses.find((c) => c.start > 1 && c.end < 3)!
+    // The faint decay after 1.2 is room noise next to speech, not more of the word.
+    expect(mid.start).toBeCloseTo(1.2 + 0.16, 2)
   })
 
   it('ignores a recording too loud throughout to tell pauses from speech', () => {

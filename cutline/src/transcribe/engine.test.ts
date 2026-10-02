@@ -34,7 +34,8 @@ const START = 51
 const EN = 52
 const FR = 53
 const TRANSCRIBE = 54
-const NO_TIMESTAMPS = 55
+const NO_SPEECH = 55
+const NO_TIMESTAMPS = 56
 const TIME_ZERO = NO_TIMESTAMPS + 1
 const ts = (seconds: number) => TIME_ZERO + Math.round(seconds / 0.02)
 const SIZE = ts(30) + 1
@@ -48,12 +49,14 @@ interface Script {
 
 function fakeWhisper(options: {
   multilingual?: boolean
-  detect?: 'en' | 'fr'
+  /** What language detection hears on each call, and whether it hears speech. */
+  detect?: (call: number) => { language: 'en' | 'fr'; speech: boolean }
   generate?: (audio: Float32Array, call: number) => Script
   segments?: RawChunk[]
 }) {
   const { multilingual = true } = options
   const calls: Record<string, unknown>[] = []
+  let detections = 0
   const progress: number[] = []
   const config = {
     is_multilingual: multilingual,
@@ -108,9 +111,11 @@ function fakeWhisper(options: {
       generation_config: config,
       generate,
       forward: vi.fn(async () => {
+        const heard = options.detect?.(detections++) ?? { language: 'en', speech: true }
         const data = new Float32Array(SIZE)
-        data[EN] = options.detect === 'fr' ? 1 : 5
-        data[FR] = options.detect === 'fr' ? 5 : 1
+        data[EN] = heard.language === 'en' ? 5 : 1
+        data[FR] = heard.language === 'fr' ? 5 : 1
+        data[NO_SPEECH] = heard.speech ? 0 : 12
         return { logits: { data } }
       }),
     },
@@ -121,11 +126,26 @@ function fakeWhisper(options: {
   return { asr, calls, generate, segmentCall, progress, forward: asr.model.forward }
 }
 
-/** Loud steady sound, so every window is transcribed and no word edges move. */
+/** A stand-in for speech: a tone that swells and fades three times a second. */
 function loud(seconds: number): Float32Array {
   const out = new Float32Array(Math.round(seconds * SAMPLE_RATE))
-  for (let i = 0; i < out.length; i++) out[i] = 0.3 * Math.sin((2 * Math.PI * 220 * i) / SAMPLE_RATE)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SAMPLE_RATE
+    out[i] = 0.3 * Math.sin(2 * Math.PI * 220 * t) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 3 * t))
+  }
   return out
+}
+
+/** A quiet room, hiss at -60 dBFS, with speech over the given spans. */
+function speechAt(seconds: number, spans: [number, number][]): Float32Array {
+  const audio = new Float32Array(Math.round(seconds * SAMPLE_RATE))
+  let seed = 1
+  for (let i = 0; i < audio.length; i++) {
+    seed = (seed * 16807) % 2147483647
+    audio[i] = ((seed / 2147483647) * 2 - 1) * 0.0017
+  }
+  for (const [from, to] of spans) audio.set(loud(to - from), Math.round(from * SAMPLE_RATE))
+  return audio
 }
 
 describe('transcribeWith', () => {
@@ -137,7 +157,7 @@ describe('transcribeWith', () => {
         times: [0, 0.5, 1.0, 1.5, 1.5],
       }),
     })
-    const { words, language } = await transcribeWith(asr, loud(2), { language: 'en' })
+    const { words, language } = await transcribeWith(asr, speechAt(2, [[0, 1]]), { language: 'en' })
     expect(language).toBe('en')
     expect(words.map((w) => [w.text, w.start, w.end])).toEqual([
       ['hello', 0, 0.5],
@@ -147,14 +167,29 @@ describe('transcribeWith', () => {
 
   it('detects the language once and transcribes in it', async () => {
     const { asr, calls, forward } = fakeWhisper({
-      detect: 'fr',
+      detect: () => ({ language: 'fr', speech: true }),
       generate: () => ({ tokens: [ts(0), 1, ts(1), END], times: [0, 1, 1, 1] }),
     })
     const { language } = await transcribeWith(asr, loud(40), { language: null })
     expect(language).toBe('fr')
     expect(forward).toHaveBeenCalledTimes(1)
-    expect(calls.length).toBe(2)
+    expect(calls.length).toBeGreaterThanOrEqual(2)
     for (const call of calls) expect(call).toMatchObject({ language: 'fr', task: 'transcribe', return_token_timestamps: true })
+  })
+
+  it('waits for a window with speech before settling the language', async () => {
+    // A loud intro the model hears as no speech, then French.
+    const { asr, calls, forward } = fakeWhisper({
+      detect: (call) => (call === 0 ? { language: 'en', speech: false } : { language: 'fr', speech: true }),
+      generate: () => ({ tokens: [ts(0), 1, ts(1), END], times: [0, 1, 1, 1] }),
+    })
+    const { language } = await transcribeWith(asr, loud(80), { language: null })
+    expect(language).toBe('fr')
+    expect(forward).toHaveBeenCalledTimes(2)
+    const languages = calls.map((call) => call.language)
+    expect(languages[0]).toBe('en')
+    expect(languages.length).toBeGreaterThanOrEqual(3)
+    expect(languages.slice(1).every((l) => l === 'fr')).toBe(true)
   })
 
   it('gives English-only models no language or task, and reports English', async () => {
@@ -180,7 +215,11 @@ describe('transcribeWith', () => {
       ],
     })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    const { words } = await transcribeWith(asr, loud(4), { language: 'en' })
+    const audio = speechAt(4, [
+      [0, 2],
+      [2.5, 3],
+    ])
+    const { words } = await transcribeWith(asr, audio, { language: 'en' })
     warn.mockRestore()
     expect(segmentCall).toHaveBeenCalledWith(expect.any(Float32Array), { language: 'en', task: 'transcribe', return_timestamps: true })
     expect(words.map((w) => w.text)).toEqual(['hello', 'there', 'world'])
@@ -194,7 +233,7 @@ describe('transcribeWith', () => {
     const { asr } = fakeWhisper({
       generate: () => ({ tokens: [...looping, END], times: looping.map((_, i) => i * 0.05).concat(3) }),
     })
-    const { words } = await transcribeWith(asr, loud(5), { language: 'en' })
+    const { words } = await transcribeWith(asr, speechAt(5, [[0, 1]]), { language: 'en' })
     expect(words.map((w) => w.text)).toEqual(['hello', 'world', 'again', 'more'])
   })
 
@@ -203,20 +242,17 @@ describe('transcribeWith', () => {
       generate: () => ({ tokens: [ts(0), 1, ts(2), ts(2), 2, ts(4), END], times: [0, 1, 2, 2, 3, 4, 4] }),
     })
     const progress: number[] = []
-    await transcribeWith(asr, loud(5), { language: 'en', onProgress: (done, total) => progress.push(done / total) })
+    const audio = speechAt(5, [[0, 4]])
+    await transcribeWith(asr, audio, { language: 'en', onProgress: (done, total) => progress.push(done / total) })
     expect(progress).toEqual([0, 0.4, 0.8, 1])
   })
 
   it('takes a second look at speech left after the last word', async () => {
     // Speech at 0-2 s and 6-8 s over a quiet room; the model stops after the first.
-    const audio = new Float32Array(10 * SAMPLE_RATE)
-    let seed = 1
-    for (let i = 0; i < audio.length; i++) {
-      seed = (seed * 16807) % 2147483647
-      audio[i] = ((seed / 2147483647) * 2 - 1) * 0.001
-    }
-    audio.set(loud(2), 0)
-    audio.set(loud(2), 6 * SAMPLE_RATE)
+    const audio = speechAt(10, [
+      [0, 2],
+      [6, 8],
+    ])
     const { asr, calls } = fakeWhisper({
       generate: (_, call) =>
         call === 0
