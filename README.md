@@ -48,6 +48,11 @@ end at your door.
 > ranges, a side-profile analysis and styling ideas, all worked out on the
 > device — photos never leave it. Ships at `/facet/`. See
 > [facet/README.md](facet/README.md).
+> [Cutline](cutline/) — a Captions-style AI video editor for the iPhone:
+> animated word-by-word captions from on-device Whisper, pauses and ums cut in
+> one tap, punch-in zooms, hooks, a teleprompter, and optional Claude tools for
+> hooks, best clips and translation. Ships at `/cutline/`. See
+> [cutline/README.md](cutline/README.md).
 
 ## What it does
 
