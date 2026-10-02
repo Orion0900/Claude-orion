@@ -95,7 +95,7 @@ export function EditPanel(props: Props) {
         />
         {edit.removeSilences && (
           <SliderRow
-            label="Longest pause"
+            label="Max pause"
             value={edit.maxPause}
             min={0.1}
             max={1.2}
@@ -106,7 +106,7 @@ export function EditPanel(props: Props) {
         )}
         <ToggleRow
           title="Remove filler words"
-          detail="Um, uh, er and the like"
+          detail="Um, uh, er — and stray sounds between words"
           checked={edit.removeFillers}
           onChange={(v) => update((p) => ({ ...p, edit: { ...p.edit, removeFillers: v } }))}
         />

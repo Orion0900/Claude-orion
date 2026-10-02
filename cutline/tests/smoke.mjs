@@ -105,6 +105,15 @@ try {
   await page.waitForTimeout(400)
   await shot('hook')
 
+  console.log('AI and Music tabs')
+  await page.click('button.tab:has-text("AI")')
+  await page.waitForSelector('text=Emojis & keywords')
+  check((await page.locator('button:has-text("Add API key")').count()) === 1, 'Claude tools ask for a key first')
+  await shot('ai-tab')
+  await page.click('button.tab:has-text("Music")')
+  await page.waitForSelector('button:has-text("Add music")')
+  await shot('music-tab')
+
   console.log('Play')
   await page.click('.play-btn')
   await page.waitForTimeout(1500)

@@ -17,7 +17,7 @@ It's a web app that installs like a native one. Once the site is deployed
 2. Tap **Share**, then **Add to Home Screen**.
 
 It gets its own icon and launches full screen. The first transcription
-downloads the speech model (about 75 MB for the default size), once; after
+downloads the speech model (about 80 MB for the default size), once; after
 that captions work without a signal. iOS only offers Add to Home Screen from
 Safari. Exporting uses WebCodecs, which needs iOS 26 or later for the fast
 path; older versions fall back to recording the edit in real time.

@@ -222,7 +222,8 @@ export function Editor({ id, settings, onBack, onOpenSettings }: Props) {
         />
       </div>
 
-      <section className="panel" aria-label={TABS.find((t) => t.id === tab)?.label}>
+      {/* Keyed by tab so each one opens at its top, not where the last was scrolled to. */}
+      <section key={tab} className="panel" aria-label={TABS.find((t) => t.id === tab)?.label}>
         {tab === 'captions' && <CaptionsPanel project={project} update={update} />}
         {tab === 'edit' && (
           <EditPanel

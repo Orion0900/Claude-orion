@@ -912,7 +912,7 @@ select {
 
 .slider-row {
   display: grid;
-  grid-template-columns: 92px 1fr 48px;
+  grid-template-columns: 96px 1fr 52px;
   align-items: center;
   gap: 10px;
   min-height: 44px;
@@ -1395,7 +1395,7 @@ textarea.field {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--safe-bottom) + 90px);
+  top: calc(var(--safe-top) + 60px);
   z-index: 60;
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
@@ -1412,7 +1412,7 @@ textarea.field {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 16px) scale(0.96);
+    transform: translate(-50%, -16px) scale(0.96);
   }
 }
 
