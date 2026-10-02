@@ -18,6 +18,10 @@ const SPEECH_ABOVE_FLOOR_DB = 6
 const MIN_SPEECH_DB = -60
 // Less sound than this in a window is a click or a bump, not words.
 const MIN_SPEECH_SECONDS = 0.15
+// A window with a tenth of a second louder than this (-35 dBFS) is always
+// transcribed, even when nothing in it stands out from the rest, as with a
+// voice over steady music. Skipping speech is worse than a wasted pass.
+const ALWAYS_HEARD = 10 ** (-35 / 10)
 
 export interface SpeechProfile {
   /** Mean square of each frame. */
@@ -31,7 +35,7 @@ export interface Chunk {
   /** Seconds from the start of the audio. */
   start: number
   end: number
-  /** False when nothing in the window is loud enough to be speech. */
+  /** False when the window is clearly silent, so there's nothing to transcribe. */
   speech: boolean
 }
 
@@ -159,7 +163,8 @@ export function planChunks(profile: SpeechProfile, duration: number, options: Pa
   const sums = new Float64Array(power.length + 1)
   for (let i = 0; i < power.length; i++) sums[i + 1] = sums[i] + power[i]
   const quiet = Math.max(1, Math.round(quietSeconds / frameSeconds))
-  const quietAround = (frame: number) => {
+  // Mean square of the quietSeconds centred on a frame boundary.
+  const around = (frame: number) => {
     const from = Math.max(0, Math.min(power.length - quiet, frame - Math.floor(quiet / 2)))
     const to = Math.min(power.length, from + quiet)
     return to > from ? (sums[to] - sums[from]) / (to - from) : 0
@@ -175,15 +180,29 @@ export function planChunks(profile: SpeechProfile, duration: number, options: Pa
     const target = start + remaining / Math.ceil(remaining / longest)
     const latest = Math.min(start + longest, Math.floor(target + reach / 2))
     const earliest = Math.max(start + quiet, latest - reach)
-    let best = latest
-    let bestPower = Infinity
+    const candidates: number[] = []
+    let quietest = Infinity
     for (let frame = earliest; frame <= latest; frame++) {
-      const p = quietAround(frame)
-      const closer = Math.abs(frame - target) < Math.abs(best - target)
-      if (p < bestPower || (p === bestPower && closer)) {
-        best = frame
-        bestPower = p
+      const p = around(frame)
+      candidates.push(p)
+      quietest = Math.min(quietest, p)
+    }
+    // Several places can be about as quiet, like a long silent gap: cut in
+    // the middle of the quiet run nearest the ideal place.
+    const tolerance = quietest * 1e-3 + 1e-12
+    let best = latest
+    let bestDistance = Infinity
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i] > quietest + tolerance) continue
+      let j = i
+      while (j + 1 < candidates.length && candidates[j + 1] <= quietest + tolerance) j++
+      const middle = earliest + Math.floor((i + j) / 2)
+      const distance = Math.max(0, earliest + i - target, target - (earliest + j))
+      if (distance < bestDistance) {
+        best = middle
+        bestDistance = distance
       }
+      i = j
     }
     cuts.push(best)
     start = best
@@ -194,10 +213,15 @@ export function planChunks(profile: SpeechProfile, duration: number, options: Pa
   for (let i = 1; i < bounds.length; i++) {
     const chunkStart = bounds[i - 1]
     const chunkEnd = bounds[i]
+    const [from, to] = frameRange(profile, chunkStart, chunkEnd)
+    let loudest = 0
+    for (let frame = from; frame < to; frame += Math.max(1, Math.floor(quiet / 2))) {
+      loudest = Math.max(loudest, around(frame))
+    }
     chunks.push({
       start: chunkStart,
       end: chunkEnd,
-      speech: speechSeconds(profile, chunkStart, chunkEnd) >= MIN_SPEECH_SECONDS,
+      speech: speechSeconds(profile, chunkStart, chunkEnd) >= MIN_SPEECH_SECONDS || loudest >= ALWAYS_HEARD,
     })
   }
   return chunks

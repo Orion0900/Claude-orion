@@ -17,6 +17,7 @@ import { abortError, audioCodecError, MediaError, unsupportedFileError } from '.
 import { downmixToMono, Resampler } from './dsp'
 import { decodedAudioReader, type AudioReader, type DecodedAudio } from './mix'
 import { openInput } from './probe'
+import { throttleProgress } from './progress'
 
 export type { DecodedAudio } from './mix'
 export { analyzeLoudness } from './dsp'
@@ -199,7 +200,8 @@ export async function openAudioReader(input: Input, track: InputAudioTrack, file
  * else the browser's decodeAudioData. null when there's no audio track.
  */
 export async function decodeAudio(file: Blob, options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {}): Promise<DecodedAudio | null> {
-  const { signal, onProgress } = options
+  const { signal } = options
+  const onProgress = throttleProgress(options.onProgress, 0.005)
   signal?.throwIfAborted()
   const input = openInput(file)
   const onAbort = () => input.dispose()
@@ -216,7 +218,7 @@ export async function decodeAudio(file: Blob, options: { onProgress?: (fraction:
     if (await canDecodeAudioTrack(track)) {
       try {
         const decoded = await decodeWholeTrack(track, duration, signal, onProgress)
-        onProgress?.(1)
+        onProgress(1)
         return decoded
       } catch (error) {
         if (signal?.aborted) throw error
@@ -224,7 +226,7 @@ export async function decodeAudio(file: Blob, options: { onProgress?: (fraction:
       }
     }
     const decoded = await decodeWithAudioContext(input, track, file, signal)
-    onProgress?.(1)
+    onProgress(1)
     return decoded
   } catch (error) {
     if (signal?.aborted) throw abortError()

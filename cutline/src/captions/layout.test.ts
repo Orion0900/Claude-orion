@@ -9,8 +9,10 @@ import {
   flicker,
   glideProgress,
   greedyLineCount,
+  joinsWithoutSpace,
   pageMotion,
   popBump,
+  readsRightToLeft,
   restingMotion,
   swipeProgress,
   wordMotion,
@@ -56,16 +58,52 @@ describe('breakLines', () => {
     expect(r.widths).toEqual([170, 500])
   })
 
+  it('takes another line, if allowed, once a line passes the comfortable width', () => {
+    const widths = [100, 100, 100, 100]
+    expect(breakLines(widths, 10, 500, 2).starts).toEqual([0])
+    const comfy = breakLines(widths, 10, 500, 2, 300)
+    expect(comfy.starts).toEqual([0, 2])
+    expect(comfy.scale).toBe(1)
+    // With no second line allowed, it stays on one line, still inside the hard limit.
+    expect(breakLines(widths, 10, 500, 1, 300)).toEqual({ starts: [0], widths: [430], scale: 1 })
+  })
+
   it('handles empty pages and silly maxLines', () => {
     expect(breakLines([], 10, 100, 2)).toEqual({ starts: [], widths: [], scale: 1 })
     expect(breakLines([10, 10], 5, 100, 0).starts).toEqual([0])
     expect(breakLines([60, 60, 60], 5, 100, Number.NaN).starts).toEqual([0])
   })
 
+  it('takes a space before each word when given one per word', () => {
+    // No space between the middle pair, as between two Japanese words.
+    const r = breakLines([100, 100, 100], [0, 10, 0], 1000, 2)
+    expect(r.widths).toEqual([310])
+    expect(greedyLineCount([100, 100, 100], [0, 50, 0], 260)).toBe(2)
+    expect(breakLines([100, 100, 100, 100], [0, 0, 40, 0], 250, 2).starts).toEqual([0, 2])
+  })
+
   it('counts greedy lines', () => {
     expect(greedyLineCount([], 1, 10)).toBe(0)
     expect(greedyLineCount([5, 5, 5], 1, 11)).toBe(2)
     expect(greedyLineCount([5, 5, 5], 1, 17)).toBe(1)
+  })
+})
+
+describe('scripts', () => {
+  it('runs Chinese and Japanese words together but spaces everything else', () => {
+    expect(joinsWithoutSpace('今日は', '天気')).toBe(true)
+    expect(joinsWithoutSpace('สวัสดี', 'ครับ')).toBe(true)
+    expect(joinsWithoutSpace('hello', 'world')).toBe(false)
+    expect(joinsWithoutSpace('東京', 'Tower')).toBe(false)
+    expect(joinsWithoutSpace('안녕하세요', '여러분')).toBe(false)
+    expect(joinsWithoutSpace('', '天気')).toBe(false)
+  })
+
+  it('spots right-to-left pages', () => {
+    expect(readsRightToLeft(['مرحبا', 'بكم', 'جميعا'])).toBe(true)
+    expect(readsRightToLeft(['שלום', 'לכולם'])).toBe(true)
+    expect(readsRightToLeft(['hello', 'مرحبا', 'there'])).toBe(false)
+    expect(readsRightToLeft([])).toBe(false)
   })
 })
 

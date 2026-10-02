@@ -246,6 +246,8 @@ export interface DuckingOptions {
   release?: number
   /** Seconds the duck starts ahead of the speech, so the first word isn't fighting the music. */
   lookahead?: number
+  /** Seconds the duck holds after speech, so the music doesn't swell in every pause between phrases. */
+  hold?: number
 }
 
 /**
@@ -253,30 +255,30 @@ export interface DuckingOptions {
  * "Speech is loud" is judged against this recording's own speech level (its
  * 90th-percentile frame), so a quiet recording ducks as well as a loud one;
  * frames from 18 dB under that level fade the duck in over 8 dB, and nothing
- * under -50 dBFS counts. Then it's smoothed with a one-pole attack/release
- * after a lookahead minimum, so the music dips just before a phrase and
- * swells back gently after it.
+ * under -50 dBFS counts. Each frame takes the deepest duck from `hold` before
+ * it to `lookahead` after it, then a one-pole attack/release smooths that:
+ * the music dips just before a phrase, stays down through the short pauses
+ * inside it, and swells back gently once the talking stops.
  */
 export function duckingGains(envelope: Float32Array, frameDuration: number, options: DuckingOptions = {}): Float32Array {
-  const { level = 0.25, attack = 0.08, release = 0.3, lookahead = 0.08 } = options
+  const { level = 0.25, attack = 0.08, release = 0.3, lookahead = 0.08, hold = 0.5 } = options
   const n = envelope.length
   const toDb = (v: number) => 20 * Math.log10(Math.max(v, 1e-9))
   const speechDb = toDb(percentile(envelope, 0.9))
   const full = Math.max(speechDb - 18, -50)
   const onset = full - 8
-  const target = new Float32Array(n)
-  for (let i = 0; i < n; i++) {
-    const amount = Math.min(1, Math.max(0, (toDb(envelope[i]) - onset) / (full - onset)))
-    target[i] = 1 - (1 - level) * amount
-  }
+  const amount = new Float32Array(n)
+  for (let i = 0; i < n; i++) amount[i] = Math.min(1, Math.max(0, (toDb(envelope[i]) - onset) / (full - onset)))
   const ahead = Math.max(0, Math.round(lookahead / frameDuration))
+  const behind = Math.max(0, Math.round(hold / frameDuration))
   const gains = new Float32Array(n)
   const attackK = 1 - Math.exp(-frameDuration / attack)
   const releaseK = 1 - Math.exp(-frameDuration / release)
   let g = 1
   for (let i = 0; i < n; i++) {
-    let want = target[i]
-    for (let j = i + 1; j <= Math.min(n - 1, i + ahead); j++) want = Math.min(want, target[j])
+    let deepest = 0
+    for (let j = Math.max(0, i - behind); j <= Math.min(n - 1, i + ahead); j++) deepest = Math.max(deepest, amount[j])
+    const want = 1 - (1 - level) * deepest
     g += (want - g) * (want < g ? attackK : releaseK)
     gains[i] = g
   }

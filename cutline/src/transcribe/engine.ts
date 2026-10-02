@@ -18,6 +18,8 @@ export interface WhisperPipeline {
     generation_config: WhisperGenerationConfig | null
     generate(options: Record<string, unknown>): Promise<unknown>
     forward(inputs: Record<string, unknown>): Promise<{ logits: { data: ArrayLike<number> } }>
+    /** ONNX Runtime sessions: 'model' is the encoder. */
+    sessions?: Record<string, OrtSession>
   }
   tokenizer: {
     _decode_asr(sequences: unknown[], options: Record<string, unknown>): [string, { chunks?: RawChunk[] }]
@@ -32,6 +34,17 @@ interface WhisperGenerationConfig {
   decoder_start_token_id?: number | null
   no_timestamps_token_id?: number | null
   eos_token_id?: number | number[] | null
+  /** [layer, head] pairs of the cross-attention that word timing reads. */
+  alignment_heads?: [number, number][] | null
+}
+
+interface OrtTensor {
+  dims: readonly number[]
+}
+
+interface OrtSession {
+  outputNames: readonly string[]
+  run(feeds: unknown, ...rest: unknown[]): Promise<Record<string, OrtTensor>>
 }
 
 interface TensorLike {
@@ -53,7 +66,6 @@ export interface EngineResult {
 
 // Whisper's timestamp tokens and attention frames are 20 ms apart.
 const TIME_PRECISION = 0.02
-const SAMPLES_PER_FRAME = SAMPLE_RATE * TIME_PRECISION
 // The decoder holds 448 tokens, and the prompt takes up to three of them.
 const MAX_NEW_TOKENS = 440
 // Sound after a window's last word worth a second look: about a word's
@@ -67,6 +79,7 @@ export async function transcribeWith(
   audio: Float32Array,
   options: EngineOptions,
 ): Promise<EngineResult> {
+  trimOutputs(asr)
   const total = audio.length / SAMPLE_RATE
   const profile = analyse(audio)
   const chunks = planChunks(profile, total)
@@ -75,9 +88,11 @@ export async function transcribeWith(
   let language = multilingual ? options.language : 'en'
   const nextId = idMaker()
   const words: Word[] = []
-  let reported = 0
+  let reported = -1
   const report = (done: number) => {
-    reported = Math.max(reported, Math.min(done, total))
+    const clamped = Math.min(done, total)
+    if (clamped <= reported) return
+    reported = clamped
     options.onProgress?.(reported, total)
   }
 
@@ -86,9 +101,11 @@ export async function transcribeWith(
     let from = chunk.speech ? chunk.start : chunk.end
     for (let pass = 0; pass < MAX_PASSES && from < chunk.end; pass++) {
       const samples = audio.subarray(Math.round(from * SAMPLE_RATE), Math.round(chunk.end * SAMPLE_RATE))
-      if (multilingual && !language) language = await detectLanguage(asr, samples)
+      // The log-mel spectrogram the model hears, worked out once for both uses.
+      const { input_features: features } = await asr.processor(samples)
+      if (multilingual && !language) language = await detectLanguage(asr, features)
       const offset = from
-      const raw = await transcribeChunk(asr, samples, multilingual ? language : null, (seconds) =>
+      const raw = await transcribeChunk(asr, samples, features, multilingual ? language : null, (seconds) =>
         report(offset + seconds),
       )
       const found = normalizeChunk(raw, { offset, duration: chunk.end - offset, profile, nextId })
@@ -112,14 +129,15 @@ export async function transcribeWith(
 async function transcribeChunk(
   asr: WhisperPipeline,
   audio: Float32Array,
+  features: unknown,
   language: string | null,
   onTime: (seconds: number) => void,
 ): Promise<RawChunk[]> {
   const duration = audio.length / SAMPLE_RATE
   // English-only models refuse a language or task; multilingual ones need both.
-  const prompt = language ? { language: toWhisperCode(language), task: 'transcribe' } : {}
+  const prompt: Record<string, string> = language ? { language: toWhisperCode(language), task: 'transcribe' } : {}
   try {
-    return await timeWords(asr, audio, prompt, onTime)
+    return await timeWords(asr, features, duration, prompt, onTime)
   } catch (error) {
     // Exports without cross-attention outputs can't time single words, but
     // they can still time segments, whose words are then spread over them.
@@ -132,21 +150,21 @@ async function transcribeChunk(
 
 async function timeWords(
   asr: WhisperPipeline,
-  audio: Float32Array,
+  features: unknown,
+  duration: number,
   prompt: Record<string, string>,
   onTime: (seconds: number) => void,
 ): Promise<RawChunk[]> {
   const config = asr.model.generation_config ?? {}
-  const { input_features } = await asr.processor(audio)
   const output = (await asr.model.generate({
-    inputs: input_features,
+    inputs: features,
     ...prompt,
     return_timestamps: true,
     return_token_timestamps: true,
     // A fixed budget keeps generation to a single pass over this window,
     // whose word alignment then only looks at the frames that hold audio.
     max_new_tokens: MAX_NEW_TOKENS,
-    num_frames: Math.ceil(audio.length / SAMPLES_PER_FRAME),
+    num_frames: Math.ceil(duration / TIME_PRECISION - 1e-6),
     // A fresh array each time: generate() adds Whisper's own processors to it.
     logits_processor: [new Watcher(config, onTime)],
   })) as { sequences: TensorLike; token_timestamps: TensorLike }
@@ -159,7 +177,7 @@ async function timeWords(
   // sound, as in OpenAI's implementation, so shift everything by one.
   const shifted = times.map((_, i) => (i === 0 ? 0 : Math.round(times[i - 1] * 100) / 100))
   const [, extra] = asr.tokenizer._decode_asr(
-    [{ tokens, token_timestamps: shifted, stride: [audio.length / SAMPLE_RATE, 0, 0] }],
+    [{ tokens, token_timestamps: shifted, stride: [duration, 0, 0] }],
     { time_precision: TIME_PRECISION, return_timestamps: 'word', force_full_sequences: false },
   )
   return extra.chunks ?? []
@@ -170,14 +188,13 @@ async function timeWords(
  * the start-of-transcript token, keeping the likeliest language token.
  * transformers.js 4.3 doesn't do this itself; it assumes English.
  */
-async function detectLanguage(asr: WhisperPipeline, audio: Float32Array): Promise<string | null> {
+async function detectLanguage(asr: WhisperPipeline, features: unknown): Promise<string | null> {
   const config = asr.model.generation_config
   const languages = config?.lang_to_id
   const start = config?.decoder_start_token_id
   if (!languages || start == null) return null
-  const { input_features } = await asr.processor(audio)
   const output = await asr.model.forward({
-    input_features,
+    input_features: features,
     decoder_input_ids: new Tensor('int64', BigInt64Array.of(BigInt(start)), [1, 1]),
   })
   const logits = output.logits.data
@@ -190,6 +207,54 @@ async function detectLanguage(asr: WhisperPipeline, audio: Float32Array): Promis
     }
   }
   return best ? fromWhisperCode(best) : null
+}
+
+const trimmed = new WeakSet<object>()
+
+/**
+ * The Xenova Whisper exports also output every attention matrix, and
+ * transformers.js asks ONNX Runtime for all outputs. The encoder's alone
+ * are heads × 1500 × 1500 numbers a layer: over 200 MB copied out of the
+ * runtime per window for tiny, more than a gigabyte for small, and none of
+ * it used. So each session is asked for only what is: the encoder's hidden
+ * state, and the decoder's logits, cache and the cross-attention layers
+ * that word timing reads.
+ */
+function trimOutputs(asr: WhisperPipeline): void {
+  const { sessions, generation_config: config } = asr.model
+  const read = new Set((config?.alignment_heads ?? []).map(([layer]) => `cross_attentions.${layer}`))
+  if (sessions?.model) keepOutputs(sessions.model, (name) => !name.includes('attentions'))
+  if (sessions?.decoder_model_merged) {
+    keepOutputs(sessions.decoder_model_merged, (name) => !name.includes('attentions') || read.has(name))
+  }
+}
+
+function keepOutputs(session: OrtSession, keep: (name: string) => boolean): void {
+  if (trimmed.has(session)) return
+  trimmed.add(session)
+  const fetches = session.outputNames.filter(keep)
+  if (fetches.length === session.outputNames.length) return
+  const run = session.run.bind(session)
+  session.run = async (feeds, ...rest) => {
+    if (rest.length > 0) return run(feeds, ...rest)
+    const outputs = await run(feeds, fetches)
+    // Word timing finds each layer's cross-attention by its place among the
+    // outputs, so a layer it doesn't read keeps its place with a stand-in.
+    const sample = Object.entries(outputs).find(([name]) => name.startsWith('cross_attentions'))?.[1]
+    const result: Record<string, OrtTensor> = {}
+    for (const name of session.outputNames) {
+      if (name in outputs) result[name] = outputs[name]
+      else if (sample && name.startsWith('cross_attentions')) result[name] = standIn(sample)
+    }
+    return result
+  }
+}
+
+/** An all-zero tensor shaped like `sample` but one frame wide. */
+function standIn(sample: OrtTensor): OrtTensor {
+  const [batch, heads, steps] = sample.dims
+  const Tensor = sample.constructor as new (type: string, data: Float32Array, dims: number[]) => OrtTensor
+  return new Tensor('float32', new Float32Array(batch * heads * steps), [batch, heads, steps, 1])
 }
 
 /**

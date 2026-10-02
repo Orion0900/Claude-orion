@@ -19,6 +19,7 @@ import { ChunkCollector } from './collector'
 import { abortError, isAbortError, MediaError, unsupportedFileError, videoCodecError } from './errors'
 import { renderEditedAudio, type AudioReader, type DecodedAudio } from './mix'
 import { openInput, trackCodec } from './probe'
+import { throttleProgress } from './progress'
 import { buildTimeline, frameCount, frameSourceTimes, type Timeline } from './ranges'
 import { createExportAudioContext, recordExport, recorderAvailable, recorderMimeType } from './recorder'
 
@@ -137,19 +138,6 @@ function makePainter(draw: DrawFrame, width: number, height: number) {
   }
 }
 
-/** Calls through only on a 0.25% change, so a fast export doesn't re-render the UI for every frame. */
-function throttleProgress(onProgress?: (fraction: number) => void) {
-  let last = -1
-  return (fraction: number) => {
-    if (!onProgress) return
-    const f = Math.min(1, Math.max(0, fraction))
-    if (Math.abs(f - last) >= 0.0025 || (f === 1 && last !== 1)) {
-      last = f
-      onProgress(f)
-    }
-  }
-}
-
 function audioChunk(channels: Float32Array[], from: number, to: number, sampleRate: number): AudioSample {
   const n = to - from
   const data = new Float32Array(n * channels.length)
@@ -250,6 +238,8 @@ async function exportFast(job: FastJob): Promise<ExportResult> {
       }
     }
 
+    // A jump cut is a new picture; a key frame there saves the encoder smearing the old one into it.
+    const cutFrames = new Set(timeline.segments.slice(1).map((seg) => Math.ceil(seg.offset * fps - 1e-6)))
     let last: CanvasImageSource | null = null
     try {
       for (let k = 0; k < count; k++) {
@@ -260,7 +250,7 @@ async function exportFast(job: FastJob): Promise<ExportResult> {
           if (!next.done && next.value) last = next.value.canvas
         }
         paint(ctx, last, frameSize, t)
-        await videoSource.add(t, 1 / fps)
+        await videoSource.add(t, 1 / fps, cutFrames.has(k) ? { keyFrame: true } : undefined)
         await feedUntil(t + AUDIO_CHUNK)
         report(AUDIO_SHARE + (1 - AUDIO_SHARE - 0.02) * ((k + 1) / count))
       }

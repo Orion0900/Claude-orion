@@ -87,6 +87,28 @@ const speech = readWav(join(fixtures, 'speech.wav'))
   check(words.at(-1)?.end < 16.5, `last word ends with the speech (${words.at(-1)?.end})`)
 }
 
+// A model that can't time single words: generate() throws as it does for an
+// export without cross-attention outputs, and segments are used instead.
+{
+  const generate = asr.model.generate
+  const warn = console.warn
+  asr.model.generate = function (options) {
+    if (options.return_token_timestamps) {
+      throw new Error('Model outputs must contain cross attentions to extract timestamps.')
+    }
+    return generate.call(this, options)
+  }
+  console.warn = () => {}
+  try {
+    const { words } = await run('jfk.wav, word timing unavailable', jfk, 'en')
+    check(similarity(words, JFK) > 0.8, `words match the speech (${similarity(words, JFK).toFixed(2)})`)
+    checkTimes(words, 11)
+  } finally {
+    asr.model.generate = generate
+    console.warn = warn
+  }
+}
+
 // Longer than one window: JFK five times over, with pauses.
 {
   const parts = []

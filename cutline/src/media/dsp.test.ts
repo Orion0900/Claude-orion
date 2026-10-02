@@ -157,14 +157,22 @@ describe('duckingGains', () => {
     expect(g[599]).toBeGreaterThan(0.9)
   })
 
-  it('starts ducking ahead of the speech and lets go gradually', () => {
+  it('starts ducking ahead of the speech, holds through a pause, and lets go gradually', () => {
     const g = duckingGains(env, frame)
     expect(g[199]).toBeLessThan(0.75) // already well down when the first word lands
     expect(g[185]).toBeGreaterThan(0.95) // but not long before it
-    // Release: 300 ms time constant, so 63% of the way back after 0.3 s.
-    const back = (g[430] - 0.25) / 0.75
+    expect(g[440]).toBeCloseTo(0.25, 2) // held for half a second after the last word
+    // Then a 300 ms release: 63% of the way back 0.3 s after the hold.
+    const back = (g[480] - 0.25) / 0.75
     expect(back).toBeGreaterThan(0.55)
     expect(back).toBeLessThan(0.7)
+  })
+
+  it('stays down through the short pauses between phrases', () => {
+    const phrases = new Float32Array(600).fill(0.001)
+    for (const [a, b] of [[100, 180], [210, 300], [330, 420]]) phrases.fill(0.2, a, b)
+    const g = duckingGains(phrases, frame)
+    for (let i = 125; i < 420; i++) expect(g[i]).toBeLessThan(0.3)
   })
 
   it('judges loudness against the recording’s own speech level', () => {

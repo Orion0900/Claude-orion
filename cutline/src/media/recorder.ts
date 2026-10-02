@@ -78,6 +78,9 @@ function once(target: EventTarget, event: string): Promise<Event> {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/** requestVideoFrameCallback arrived in Safari 15.4; typed as always there, so checked by hand. */
+const hasFrameCallbacks = (video: HTMLVideoElement) => typeof (video as Partial<HTMLVideoElement>).requestVideoFrameCallback === 'function'
+
 /** A muted, inline, invisible <video>, loaded. Muted so it may play without a fresh tap; its sound isn't used. */
 async function openVideo(source: Blob, codec: string | null, cleanup: (() => void)[]): Promise<HTMLVideoElement> {
   const url = URL.createObjectURL(source)
@@ -114,6 +117,31 @@ async function openVideo(source: Blob, codec: string | null, cleanup: (() => voi
   return video
 }
 
+/** Seconds of cut material played, unrecorded, ahead of each span. */
+const PREROLL = 0.25
+
+/**
+ * Resolves with the media time of the first frame presented at or after
+ * `target` (by requestVideoFrameCallback where there is one, else by polling
+ * currentTime each animation frame), or wherever playback ended.
+ */
+function untilMediaTime(video: HTMLVideoElement, target: number, halted: () => boolean): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const deadline = performance.now() + (Math.max(0, target - video.currentTime) + 5) * 1000
+    const step = (mediaTime: number) => {
+      if (halted()) return
+      if (mediaTime >= target || video.ended) return resolve(mediaTime)
+      if (performance.now() > deadline) return reject(new MediaError('failed', 'The video stopped playing during the export. Try again.'))
+      wait()
+    }
+    const wait = () => {
+      if (hasFrameCallbacks(video)) video.requestVideoFrameCallback((_, meta) => step(meta.mediaTime))
+      else requestAnimationFrame(() => step(video.currentTime))
+    }
+    wait()
+  })
+}
+
 async function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
   if (Math.abs(video.currentTime - time) > 0.0005 || video.seeking) {
     const seeked = once(video, 'seeked')
@@ -121,7 +149,7 @@ async function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
     await withTimeout(seeked, 15000)
   }
   // The picture after a seek can land a beat after 'seeked'; wait for it where we can tell.
-  if ('requestVideoFrameCallback' in video) {
+  if (hasFrameCallbacks(video)) {
     await Promise.race([new Promise<void>((resolve) => video.requestVideoFrameCallback(() => resolve())), sleep(250)])
   }
 }
@@ -208,18 +236,31 @@ export async function recordExport(job: RecordJob): Promise<{ blob: Blob; mimeTy
 
     for (const seg of timeline.segments) {
       const length = seg.end - seg.start
-      if (video) await guard(seekTo(video, seg.start))
-      paint(seg.offset)
-      if (video) await guard(video.play())
+      // How far into the span recording picks up: 0, or as close as playback allows.
+      let into = 0
+      if (video) {
+        // Play into the span from a moment before it (unrecorded), so playback is already
+        // running smoothly when its first frame comes up, and start recording on that frame.
+        await guard(seekTo(video, Math.max(0, seg.start - PREROLL)))
+        await guard(video.play())
+        const reached = await guard(untilMediaTime(video, seg.start - 0.5 / 30, () => halted))
+        into = Math.min(Math.max(reached - seg.start, 0), length)
+      }
+      if (length - into < 0.001) {
+        video?.pause()
+        continue
+      }
+      paint(seg.offset + into)
       const node = buffer && context && destination ? context.createBufferSource() : null
       const startedAt = now()
       if (node && destination) {
         node.buffer = buffer
         node.connect(destination)
-        node.start(0, seg.offset, length)
+        node.start(0, seg.offset + into, length - into)
       }
       if (recorder.state === 'inactive') recorder.start(1000)
       else recorder.resume()
+      const span = length - into
 
       await guard(
         new Promise<void>((resolve, reject) => {
@@ -239,12 +280,12 @@ export async function recordExport(job: RecordJob): Promise<{ blob: Blob; mimeTy
             if (finished || halted) return
             try {
               const played = elapsed()
-              if (played >= length) return finish()
-              const local = video ? Math.min(Math.max((mediaTime ?? video.currentTime) - seg.start, 0), length) : played
+              if (played >= span) return finish()
+              const local = video ? Math.min(Math.max((mediaTime ?? video.currentTime) - seg.start, into), length) : into + played
               paint(seg.offset + local)
               job.onProgress?.(Math.min(1, (seg.offset + local) / total))
               // A stalled decoder leaves the picture behind the sound; jump it back in step.
-              if (video && played - local > 0.15) video.currentTime = seg.start + played
+              if (video && played - (local - into) > 0.15) video.currentTime = seg.start + into + played
               next()
             } catch (error) {
               finished = true
@@ -252,17 +293,17 @@ export async function recordExport(job: RecordJob): Promise<{ blob: Blob; mimeTy
             }
           }
           const next = () => {
-            if (video && 'requestVideoFrameCallback' in video) video.requestVideoFrameCallback((_, meta) => frame(meta.mediaTime))
+            if (video && hasFrameCallbacks(video)) video.requestVideoFrameCallback((_, meta) => frame(meta.mediaTime))
             else requestAnimationFrame(() => frame())
           }
           // The span ends on the audio clock even if no new frame comes (the clip ran out).
           const check = () => {
             if (finished || halted) return
-            const left = length - elapsed()
+            const left = span - elapsed()
             if (left <= 0.002) finish()
             else timer = window.setTimeout(check, Math.max(1, left * 1000))
           }
-          timer = window.setTimeout(check, length * 1000)
+          timer = window.setTimeout(check, span * 1000)
           next()
         }),
       )

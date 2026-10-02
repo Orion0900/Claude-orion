@@ -26,6 +26,11 @@ export function easeOutBack(x: number, overshoot = 1.70158): number {
 
 /* ---- Line breaking ---- */
 
+/** The space between words: one for all, or the space before each word (the first's is ignored). */
+export type Gaps = number | readonly number[]
+
+const gapBefore = (gap: Gaps, i: number) => (typeof gap === 'number' ? gap : (gap[i] ?? 0))
+
 export interface LineBreaks {
   /** Index of the first word on each line. */
   starts: number[]
@@ -36,18 +41,28 @@ export interface LineBreaks {
 }
 
 /**
- * Splits words of the given widths into as few lines as fit `maxWidth`
- * (never more than `maxLines`), then evens those lines out so a page reads
- * as a block rather than a full line with a straggler under it. When the
- * words can't fit in `maxLines` lines, `scale` says how much smaller the
- * text must be drawn; widths and gaps scale together, so the same breaks
- * still hold at the smaller size.
+ * Splits words of the given widths into as few lines as fit, never more
+ * than `maxLines`, then evens those lines out so a page reads as a block
+ * rather than a full line with a straggler under it.
+ *
+ * Lines are counted against `comfortWidth` (default: `maxWidth`): past it,
+ * another line is used if one is allowed, which keeps captions compact and
+ * clear of the buttons apps put down the right edge. Only `maxWidth` is a
+ * hard limit: when the words can't fit in `maxLines` lines that wide,
+ * `scale` says how much smaller to draw them. Widths and gaps scale
+ * together, so the same breaks still hold at the smaller size.
  */
-export function breakLines(widths: readonly number[], gap: number, maxWidth: number, maxLines: number): LineBreaks {
+export function breakLines(
+  widths: readonly number[],
+  gap: Gaps,
+  maxWidth: number,
+  maxLines: number,
+  comfortWidth = maxWidth,
+): LineBreaks {
   const n = widths.length
   if (n === 0) return { starts: [], widths: [], scale: 1 }
   const limit = Math.max(1, Math.floor(maxLines) || 1)
-  const lines = Math.min(greedyLineCount(widths, gap, maxWidth), limit, n)
+  const lines = Math.min(greedyLineCount(widths, gap, Math.min(comfortWidth, maxWidth)), limit, n)
   const { starts, lineWidths } = balance(widths, gap, lines)
   let widest = 0
   for (const w of lineWidths) widest = Math.max(widest, w)
@@ -56,13 +71,14 @@ export function breakLines(widths: readonly number[], gap: number, maxWidth: num
 }
 
 /** How many lines filling each as full as it goes takes; no layout needs fewer. */
-export function greedyLineCount(widths: readonly number[], gap: number, maxWidth: number): number {
+export function greedyLineCount(widths: readonly number[], gap: Gaps, maxWidth: number): number {
   if (widths.length === 0) return 0
   let count = 1
   let line = widths[0]
   for (let i = 1; i < widths.length; i++) {
-    if (line + gap + widths[i] <= maxWidth + 1e-6) {
-      line += gap + widths[i]
+    const g = gapBefore(gap, i)
+    if (line + g + widths[i] <= maxWidth + 1e-6) {
+      line += g + widths[i]
     } else {
       count++
       line = widths[i]
@@ -76,11 +92,16 @@ export function greedyLineCount(widths: readonly number[], gap: number, maxWidth
  * ties going to the most even split. A page is a handful of words, so
  * trying every split is cheap.
  */
-function balance(widths: readonly number[], gap: number, lines: number): { starts: number[]; lineWidths: number[] } {
+function balance(widths: readonly number[], gap: Gaps, lines: number): { starts: number[]; lineWidths: number[] } {
   const n = widths.length
+  // prefix[k]: the first k words; gaps[k]: the spaces before words 1..k-1.
   const prefix = [0]
-  for (let i = 0; i < n; i++) prefix.push(prefix[i] + widths[i])
-  const lineWidth = (from: number, to: number) => prefix[to] - prefix[from] + gap * (to - from - 1)
+  const gaps = [0]
+  for (let i = 0; i < n; i++) {
+    prefix.push(prefix[i] + widths[i])
+    gaps.push(gaps[i] + (i > 0 ? gapBefore(gap, i) : 0))
+  }
+  const lineWidth = (from: number, to: number) => prefix[to] - prefix[from] + gaps[to] - gaps[from + 1]
 
   // worst[l][j] / spread[l][j]: best widest line and sum of squared widths
   // for the first j words on l lines; from[l][j] is where that last line starts.
@@ -122,6 +143,26 @@ function balance(widths: readonly number[], gap: number, lines: number): { start
   return { starts, lineWidths }
 }
 
+/* ---- Scripts ---- */
+
+// Chinese, Japanese, Thai, Lao, Myanmar and Khmer don't put spaces between words.
+const UNSPACED = /[\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]|[\ud840-\ud87f][\udc00-\udfff]/
+const RTL = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/
+
+/** Whether two neighbouring words run together with no space, as in Chinese or Japanese. */
+export function joinsWithoutSpace(before: string, after: string): boolean {
+  const last = Array.from(before).pop() ?? ''
+  const first = Array.from(after)[0] ?? ''
+  return UNSPACED.test(last) && UNSPACED.test(first)
+}
+
+/** Whether a page reads right to left (Arabic, Hebrew, Persian, Urdu): most of its words are in such a script. */
+export function readsRightToLeft(texts: readonly string[]): boolean {
+  let rtl = 0
+  for (const text of texts) if (RTL.test(text)) rtl++
+  return rtl * 2 > texts.length
+}
+
 /* ---- Timing ---- */
 
 /**
@@ -153,9 +194,9 @@ export const DURATION = {
   /** Page entrance. */
   enter: 0.16,
   /** A word swelling as it starts. */
-  pop: 0.18,
+  pop: 0.16,
   /** A word bouncing in. */
-  bounce: 0.3,
+  bounce: 0.26,
   /** A word typed onto the page. */
   reveal: 0.15,
   /** The highlight box sliding to the next word. */
@@ -187,7 +228,7 @@ export function pageMotion(animation: CaptionAnimation, age: number, out: Motion
       out.alpha = clamp01(age / 0.06)
       break
     case 'fade':
-      out.alpha = easeOutCubic(age / 0.2)
+      out.alpha = easeOutCubic(age / 0.18)
       break
     case 'slide':
       out.rise = (1 - easeOutCubic(age / 0.18)) * 0.7
@@ -205,7 +246,12 @@ export function pageMotion(animation: CaptionAnimation, age: number, out: Motion
 /** Whether words stay hidden until they're spoken. */
 export const revealsWords = (animation: CaptionAnimation) => animation === 'typewriter' || animation === 'bounce'
 
-/** How one word arrives, `age` seconds after it's spoken; only typewriter and bounce move words in. */
+/**
+ * How one word arrives, `age` seconds after it's spoken; only typewriter
+ * and bounce move words in. Words arrive by growing and rising rather than
+ * fading: a half-transparent outlined word shows its outline through its
+ * letters, which looks muddy.
+ */
 export function wordMotion(animation: CaptionAnimation, age: number, out: Motion = restingMotion()): Motion {
   out.alpha = 1
   out.scale = 1
@@ -216,11 +262,11 @@ export function wordMotion(animation: CaptionAnimation, age: number, out: Motion
     return out
   }
   if (animation === 'typewriter') {
-    out.alpha = clamp01(age / 0.08)
-    out.rise = (1 - easeOutCubic(age / DURATION.reveal)) * 0.3
+    const x = age / DURATION.reveal
+    out.scale = 0.7 + 0.3 * easeOutBack(x, 1.4)
+    out.rise = (1 - easeOutCubic(x)) * 0.32
   } else {
     const x = age / DURATION.bounce
-    out.alpha = clamp01(age / 0.05)
     out.scale = 0.3 + 0.7 * easeOutBack(x, 3.2)
     out.rise = (1 - easeOutBack(x, 1.8)) * 0.5
   }

@@ -1,6 +1,6 @@
 /** Caption look: the preset strip, then type, layout and colours. */
 import { useEffect, useRef } from 'react'
-import { ensureFont, FONTS } from '../../captions/fonts'
+import { ensureFont, FONTS, resolveWeight } from '../../captions/fonts'
 import { applyPreset, PRESET_ORDER, PRESETS } from '../../captions/presets'
 import { drawCaptions } from '../../captions/render'
 import type { CaptionPage, CaptionPresetId, CaptionStyle, FontId, Project } from '../../lib/types'
@@ -45,8 +45,8 @@ export function CaptionsPanel({ project, update }: Props) {
               type="button"
               className="pill"
               aria-pressed={style.font === id}
-              style={{ fontFamily: `"${FONTS[id].family}", sans-serif`, fontWeight: nearestWeight(id, style.weight) }}
-              onClick={() => set({ font: id, weight: nearestWeight(id, style.weight) })}
+              style={{ fontFamily: `"${FONTS[id].family}", sans-serif`, fontWeight: resolveWeight(id, style.weight) }}
+              onClick={() => set({ font: id, weight: resolveWeight(id, style.weight) })}
             >
               {FONTS[id].label}
             </button>
@@ -150,11 +150,6 @@ function ColorRow({ label, children }: { label: string; children: React.ReactNod
       {children}
     </div>
   )
-}
-
-function nearestWeight(font: FontId, weight: number): number {
-  const weights = FONTS[font].weights
-  return weights.reduce((best, w) => (Math.abs(w - weight) < Math.abs(best - weight) ? w : best), weights[0])
 }
 
 /* ---- Preset tiles, each drawn by the real caption renderer ---- */

@@ -89,7 +89,7 @@ describe('renderEditedAudio', () => {
   it('lays music under the speech, ducked while it talks', async () => {
     const r = 8000
     const speech: DecodedAudio = { sampleRate: r, channels: [new Float32Array(r * 6)], duration: 6 }
-    speech.channels[0].set(Float32Array.from({ length: r * 2 }, (_, i) => 0.3 * Math.sin((2 * Math.PI * 200 * i) / r)), r * 3)
+    speech.channels[0].set(Float32Array.from({ length: r }, (_, i) => 0.3 * Math.sin((2 * Math.PI * 200 * i) / r)), r * 2)
     const musicData = Float32Array.from({ length: r }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 50 * i) / r))
     const music: DecodedAudio = { sampleRate: r, channels: [musicData, musicData], duration: 1 }
     const tl = buildTimeline([{ start: 0, end: 6 }])
@@ -111,8 +111,9 @@ describe('renderEditedAudio', () => {
       return dot / norm
     }
     expect(level(1)).toBeCloseTo(1, 1)
-    expect(level(4)).toBeCloseTo(0.25, 1)
-    expect(level(5.5)).toBeGreaterThan(0.5)
+    expect(level(2.5)).toBeCloseTo(0.25, 1)
+    expect(level(3.1)).toBeCloseTo(0.25, 1) // held just after
+    expect(level(4.6)).toBeGreaterThan(0.9) // back up
   })
 
   it('makes a music-only soundtrack for a silent source', async () => {

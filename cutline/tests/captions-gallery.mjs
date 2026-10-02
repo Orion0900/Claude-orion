@@ -3,9 +3,13 @@
 // captions: the hard cases) and over a plain white wall, at several moments
 // of a page. Writes full-size PNGs, contact sheets, motion strips and other
 // aspect ratios, then checks the worker/OffscreenCanvas path and times a
-// frame.
+// frame. Look at the pictures: that's the test.
 //
-// Usage: node tests/captions-gallery.mjs [outDir]
+// Usage: node tests/captions-gallery.mjs [outDir]   (default: <tmpdir>/cutline-captions-gallery)
+//        ONLY=bold,neon node tests/captions-gallery.mjs   just those presets' frames and sheets
+// Files: contact-sheet.png (every preset x start / mid-word / end / white wall / MONEY page),
+// overview-*.png, sheet-<preset>.png, detail-<preset>.png (full size), motion-<preset>.png,
+// aspect-16x9.png, aspect-1x1.png, and <preset>-<moment>-<background>.png at 1080x1920.
 // Needs Playwright's Chromium (already installed; never `playwright install`).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

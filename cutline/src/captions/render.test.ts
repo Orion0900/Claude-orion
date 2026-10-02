@@ -15,6 +15,7 @@ class FakeCtx {
   shadowOffsetY = 0
   textAlign = 'start'
   textBaseline = 'alphabetic'
+  direction = 'inherit'
   lineJoin = 'miter'
   lineCap = 'butt'
   m = [1, 0, 0, 1, 0, 0]
@@ -26,7 +27,7 @@ class FakeCtx {
 
   static KEYS = [
     'font', 'fillStyle', 'strokeStyle', 'lineWidth', 'globalAlpha', 'shadowColor', 'shadowBlur', 'shadowOffsetX',
-    'shadowOffsetY', 'textAlign', 'textBaseline', 'lineJoin', 'lineCap',
+    'shadowOffsetY', 'textAlign', 'textBaseline', 'direction', 'lineJoin', 'lineCap',
   ] as const
 
   state(): Record<string, unknown> {
@@ -261,6 +262,69 @@ describe('drawCaptions', () => {
       drawCaptions(asCtx(ctx), PAGE, t, style, FRAME)
     }
     expect(ctx.calls).toEqual(fresh)
+  })
+
+  it('runs right-to-left pages from the right', () => {
+    const page = { ...PAGE, emoji: null, words: [word('a', 'مرحبا', 1, 1.3), word('b', 'بكم', 1.3, 1.6), word('c', 'جميعا', 1.6, 2)] }
+    const ctx = draw({ ...presetStyle('bold'), uppercase: false, size: 0.05 }, 2.5, page)
+    const fills = finalFills(ctx)
+    const x = (text: string) => FakeCtx.device(fills.get(text)!).x
+    expect(x('مرحبا')).toBeGreaterThan(x('بكم'))
+    expect(x('بكم')).toBeGreaterThan(x('جميعا'))
+    // One line, so the comparison above is along it.
+    expect(new Set([...finalFills(ctx).values()].map((c) => Math.round(c.y))).size).toBe(1)
+  })
+
+  it('runs Japanese words together with no space', () => {
+    const page = { ...PAGE, emoji: null, words: [word('a', '今日は', 1, 1.3), word('b', 'いい', 1.3, 1.6), word('c', '天気', 1.6, 2)] }
+    const style = { ...presetStyle('minimal'), size: 0.04 }
+    const fills = finalFills(draw(style, 2.5, page))
+    const first = fills.get('今日は')!
+    const second = fills.get('いい')!
+    const px = Number(/([\d.]+)px/.exec(first.font)?.[1])
+    // The fake measures 0.6em a character: the second word starts right where the first ends.
+    expect(FakeCtx.device(second).x - FakeCtx.device(first).x).toBeCloseTo(3 * 0.6 * px, 5)
+  })
+
+  it('notices a style edited in place', () => {
+    const style = presetStyle('bold')
+    const ctx = new FakeCtx()
+    drawCaptions(asCtx(ctx), PAGE, 2.6, style, FRAME)
+    const before = FakeCtx.device(finalFills(ctx).get('THING')!).y
+    style.position = 0.3
+    ctx.calls = []
+    drawCaptions(asCtx(ctx), PAGE, 2.6, style, FRAME)
+    expect(FakeCtx.device(finalFills(ctx).get('THING')!).y).toBeLessThan(before - 300)
+  })
+
+  it('keeps the emoji clear of the words', () => {
+    for (const id of ['bold', 'box', 'marker', 'comic'] as const) {
+      const fills = finalFills(draw(presetStyle(id), 2.6))
+      const emoji = fills.get('💰')!
+      const px = Number(/([\d.]+)px/.exec(emoji.font)?.[1])
+      // Drawn on its alphabetic baseline: the fake's ink reaches 0.2em below it.
+      const emojiBottom = FakeCtx.device(emoji).y + 0.2 * px
+      const firstLineTop = Math.min(
+        ...[...fills.values()].filter((c) => c.text !== '💰').map((c) => FakeCtx.device(c).y - 0.7 * Number(/([\d.]+)px/.exec(c.font)?.[1])),
+      )
+      expect(emojiBottom).toBeLessThan(firstLineTop)
+    }
+  })
+
+  it('pushes neighbours aside as a word pops, never overlapping them', () => {
+    const style = presetStyle('bold')
+    const page = { ...PAGE, emoji: null, words: [word('a', 'one', 1, 1.5), word('b', 'two', 1.5, 2), word('c', 'six', 2, 2.5)] }
+    for (let t = 1.5; t < 1.75; t += 0.01) {
+      const fills = finalFills(draw(style, t, page))
+      const spans = [...fills.values()]
+        .map((c) => {
+          const px = Number(/([\d.]+)px/.exec(c.font)?.[1])
+          const left = FakeCtx.device(c).x
+          return [left, left + [...c.text].length * 0.6 * px * c.m[0]]
+        })
+        .sort((a, b) => a[0] - b[0])
+      for (let i = 1; i < spans.length; i++) expect(spans[i][0]).toBeGreaterThan(spans[i - 1][1])
+    }
   })
 
   it('looks the same through a scaled context (a retina preview) as at full size', () => {
