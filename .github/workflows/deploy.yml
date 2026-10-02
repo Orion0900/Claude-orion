@@ -116,6 +116,19 @@ jobs:
           mkdir -p dist/sanas-cre-game
           cp -r sanas-cre-game/dist/. dist/sanas-cre-game/
 
+      - name: Build Facet
+        working-directory: facet
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Facet to the site
+        run: |
+          mkdir -p dist/facet
+          cp -r facet/dist/. dist/facet/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5

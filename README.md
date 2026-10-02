@@ -43,6 +43,11 @@ end at your door.
 > equity firm: underwrite and bid on deals, renovate and re-lease buildings,
 > survive the cycle, and raise ever-bigger funds through a real waterfall.
 > Ships at `/sanas-cre-game/`. See [sanas-cre-game/README.md](sanas-cre-game/README.md).
+> [Facet](facet/) — a QOVES-style facial analysis for the phone: thirty
+> measurements of proportion, symmetry and face shape against their ideal
+> ranges, a side-profile analysis and styling ideas, all worked out on the
+> device — photos never leave it. Ships at `/facet/`. See
+> [facet/README.md](facet/README.md).
 
 ## What it does
 
