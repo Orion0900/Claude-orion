@@ -13,7 +13,7 @@
 // Needs ffmpeg and ffprobe on PATH and Playwright's Chromium. Chromium here
 // has no H.264/AAC, so the WebCodecs path writes VP9/Opus WebM; on iPhone it
 // writes H.264/AAC MP4.
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -796,6 +796,65 @@ await check('in-app recording (raw MediaRecorder WebM)', async () => {
   assert(r.thumb && r.audio && near(r.audio.duration, r.info.duration, 0.3), 'thumbnail and audio decode work on it')
   const s = streams(join(OUT, r.file))
   assert(near(s.duration, 2, 0.05) && !!s.audio, `exporting 2 s of it works (${s.duration.toFixed(3)} s)`)
+})
+
+await check('MP4 output through the collector', async () => {
+  // Chromium can't encode H.264 here, so exportVideo never writes MP4 in these checks; on iPhone
+  // it does, through ChunkCollector in append-only mode. Drive that muxing path with VP9 + Opus.
+  const r = await page.evaluate(async () => {
+    const code = await (await fetch('/src/media/probe.ts')).text()
+    const url = code.match(/from\s+["']([^"']*mediabunny[^"']*)["']/)[1]
+    const mb = await import(url)
+    const { ChunkCollector } = await import('/src/media/collector.ts')
+    const collector = new ChunkCollector(true)
+    const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new mb.StreamTarget(collector.writable) })
+    const canvas = document.createElement('canvas')
+    canvas.width = 1080
+    canvas.height = 1920
+    const g = canvas.getContext('2d')
+    const video = new mb.CanvasSource(canvas, { codec: 'vp9', quality: new mb.Quality({ bitrate: 40_000_000 }) })
+    const audio = new mb.AudioSampleSource({ codec: 'opus', quality: new mb.Quality({ bitrate: 96_000 }) })
+    output.addVideoTrack(video, { frameRate: 30 })
+    output.addAudioTrack(audio)
+    await output.start()
+    for (let k = 0; k < 120; k++) {
+      // Noise, so the encoder can't squeeze it small: the file should pass the 16 MB hand-over point.
+      const img = g.createImageData(1080, 1920)
+      const d = new Uint32Array(img.data.buffer)
+      let x = k * 2654435761
+      for (let i = 0; i < d.length; i++) d[i] = ((x = (x * 1103515245 + 12345) >>> 0) & 0xffffff) | 0xff000000
+      g.putImageData(img, 0, 0)
+      await video.add(k / 30, 1 / 30)
+      if (k % 15 === 0) {
+        const data = new Float32Array(24000).map((_, i) => 0.2 * Math.sin((2 * Math.PI * 440 * (i + k * 1600)) / 48000))
+        const sample = new mb.AudioSample({ data, format: 'f32-planar', numberOfChannels: 1, sampleRate: 48000, timestamp: k / 30 })
+        await audio.add(sample)
+        sample.close()
+      }
+    }
+    await output.finalize()
+    const blob = collector.toBlob('video/mp4')
+    await T.save('collector.mp4', blob)
+    return { bytes: blob.size }
+  })
+  const file = join(OUT, 'collector.mp4')
+  const s = streams(file)
+  const frames = videoFrameCount(file)
+  console.log(`    ${(r.bytes / 1e6).toFixed(1)} MB MP4: ${s.video.codec_name} ${s.video.width}x${s.video.height}, ${s.audio?.codec_name}, ${frames} frames, ${s.duration.toFixed(3)} s`)
+  // Top-level boxes in order: fast start puts the index (moov) before the media (mdat).
+  const bytes = readFileSync(file)
+  const boxes = []
+  for (let pos = 0; pos + 8 <= bytes.length; ) {
+    let size = bytes.readUInt32BE(pos)
+    if (size === 1) size = Number(bytes.readBigUInt64BE(pos + 8))
+    boxes.push(bytes.toString('latin1', pos + 4, pos + 8))
+    if (size < 8) break
+    pos += size
+  }
+  console.log(`    boxes: ${boxes.join(' ')}`)
+  assert(r.bytes > 16 * 1024 * 1024, 'big enough to be handed over to Blobs in pieces')
+  assert(boxes.indexOf('moov') >= 0 && boxes.indexOf('moov') < boxes.indexOf('mdat'), 'fast start: moov before mdat')
+  assert(s.video.codec_name === 'vp9' && !!s.audio && frames === 120 && near(s.duration, 4, 0.05), 'a valid MP4 with every frame and the sound')
 })
 
 await check('abort', async () => {

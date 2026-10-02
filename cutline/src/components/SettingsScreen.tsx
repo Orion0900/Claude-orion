@@ -19,7 +19,7 @@ const MODEL_ORDER: ModelSize[] = ['tiny', 'base', 'small']
 const MODEL_NOTES: Record<ModelSize, string> = {
   tiny: 'Fastest. Fine for clear speech.',
   base: 'The best balance on a phone.',
-  small: 'Most accurate. Slower, and a bigger download.',
+  small: 'Most accurate, but slow, and heavy for older iPhones.',
 }
 
 export function SettingsScreen({ settings, onChange, onBack }: Props) {

@@ -16,6 +16,7 @@ import { drawFrame, newScratch } from '../render/compose'
 import type { RenderPlan } from '../render/plan'
 import type { AppSettings } from '../services/settings'
 import { useObjectUrl } from '../hooks/useObjectUrl'
+import { releaseModel } from '../transcribe/client'
 import { Segmented, Sheet } from './Controls'
 import { CaptionsIcon, DownloadIcon, ShareIcon } from './Icons'
 
@@ -55,7 +56,12 @@ export function ExportSheet({ project, plan, source, music, settings, onClose }:
       wakeLock = await (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock
         ?.request('screen')
         .catch(() => null) ?? null
-      await Promise.all([ensureFont(project.style.font, project.style.weight), ensureFont('montserrat', 800)]).catch(() => {})
+      // The speech model holds a few hundred MB; an export needs that memory more.
+      if (project.transcript.status !== 'running') releaseModel()
+      const text = plan.pages.map((p) => p.words.map((w) => w.text).join(' ')).join(' ')
+      await Promise.all([ensureFont(project.style.font, project.style.weight, text), ensureFont('montserrat', 800, project.hook.text)]).catch(
+        () => {},
+      )
       const musicAudio = project.music && music ? await decodeAudio(music, { signal: ac.signal }).catch(() => null) : null
       const scratch = newScratch()
       const result = await exportVideo({

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
@@ -36,6 +37,15 @@ export default defineConfig({
   // GitHub Pages sub-path like /Claude-orion/cutline/.
   base: './',
   plugins: [react(), onnxRuntimeWasm()],
+  resolve: {
+    // transformers.js imports ONNX Runtime's WebGPU bundle, which drags a
+    // 27 MB WebAssembly build into the output. Whisper runs on the plain
+    // WebAssembly backend here, so point it at the build that loads its
+    // runtime from the files served above instead.
+    alias: [
+      { find: /^onnxruntime-web\/webgpu$/, replacement: join(dirname(ortPath('ort-wasm-simd-threaded.mjs')), 'ort.wasm.min.mjs') },
+    ],
+  },
   worker: { format: 'es' },
   test: { globals: true, environment: 'node', include: ['src/**/*.test.ts'] },
 })
