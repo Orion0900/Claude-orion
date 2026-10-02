@@ -1,30 +1,35 @@
 import { useState, type ReactNode } from 'react'
 import { fromBackup } from '../lib/backup'
 import type { AppState, Totals } from '../lib/challenge'
-import { TASKS } from '../lib/tasks'
+import { FAIL_RULE, RULES } from '../lib/tasks'
 import { useConfirm, type ConfirmRequest } from './Confirm'
 
-/** The four rules, as written. */
+/** The rules, as written on the board, and the one that makes them hard. */
 export function RulesList() {
   return (
-    <ol className="rules">
-      {TASKS.map((task, i) => (
-        <li key={task.id}>
-          <span className="rule-n">{i + 1}</span>
-          <span className="rule-text">{task.rule}</span>
-        </li>
-      ))}
-    </ol>
+    <div className="rules-wrap">
+      <ol className="rules">
+        {RULES.map((rule, i) => (
+          <li key={rule}>
+            <span className="rule-n">{i + 1}</span>
+            <span className="rule-text">{rule}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="fail-rule">
+        <span aria-hidden="true">✱</span> {FAIL_RULE}
+      </p>
+    </div>
   )
 }
 
 export function StatTiles({ totals }: { totals: Totals }) {
   const tiles: Array<[string, number]> = [
     ['Days done', totals.daysDone],
+    ['Lifts', totals.lifts],
     ['Sets', totals.sets],
     ['Hyperextensions', totals.hyperextensions],
     ['Maker School', totals.makerSchool],
-    ['Vlogs', totals.vlogs],
     ['Half marathons', totals.halfMarathons],
   ]
   return (

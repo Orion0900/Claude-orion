@@ -44,6 +44,14 @@ export function daysBetween(from: DateKey, to: DateKey): number {
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / DAY_MS)
 }
 
+export const SATURDAY = 6
+
+/** Day of the week, 0 for Sunday to 6 for Saturday, read off the date alone. */
+export function weekday(key: DateKey): number {
+  const [y, m, d] = parts(key)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
 /** Noon on the day, local time: safe to format in any time zone. */
 export function toDate(key: DateKey): Date {
   const [y, m, d] = parts(key)
@@ -59,6 +67,9 @@ export const shortDate = (key: DateKey) => formatDate(key, { weekday: 'short', m
 
 /** "Oct 1" */
 export const monthDay = (key: DateKey) => formatDate(key, { month: 'short', day: 'numeric' })
+
+/** "Wed" */
+export const dayName = (key: DateKey) => formatDate(key, { weekday: 'short' })
 
 /** Milliseconds until the next local midnight, when "today" changes. */
 export function msUntilMidnight(now: Date): number {

@@ -4,31 +4,54 @@ import {
   bestStreak,
   canLog,
   dayState,
+  dayTasks,
   EMPTY_STATE,
   endAttempt,
   finishDate,
   getStatus,
+  hyperextensionsDue,
+  isDayDone,
+  logFor,
   newAttempt,
   normalizeState,
+  restDay,
   streak,
   summarize,
   totals,
   updateLog,
+  weekHyperextensions,
+  weekLifts,
   type AppState,
   type Attempt,
 } from './challenge'
-import { addDays } from './dates'
+import { SATURDAY, addDays, weekday, type DateKey } from './dates'
 import { emptyLog, type DayLog } from './tasks'
 
+// A Thursday.
 const START = '2026-10-01'
-const full: DayLog = { ...emptyLog(), sets: 15, neck: true, hyperextensions: 100, makerSchool: true, vlog: true }
+const lifted: DayLog = { ...emptyLog(), sets: 15, split: 'lower', hyperextensions: 15, makerSchool: true }
 
-/** An attempt from START with the first `days` days done. */
+/** A day done the plain way: a lift, Maker School, 15 hyperextensions, and the half marathon on a Saturday. */
+function fullDay(date: DateKey): DayLog {
+  return weekday(date) === SATURDAY ? { ...lifted, halfMarathon: true } : lifted
+}
+
+/** An attempt from its start with the first `days` days done. */
 function doneThrough(days: number, attempt = newAttempt(START)): Attempt {
   const logs = { ...attempt.logs }
-  for (let i = 0; i < days; i++) logs[addDays(attempt.start, i)] = full
+  for (let i = 0; i < days; i++) {
+    const date = addDays(attempt.start, i)
+    logs[date] = fullDay(date)
+  }
   return { ...attempt, logs }
 }
+
+function withLog(attempt: Attempt, date: DateKey, change: Partial<DayLog>): Attempt {
+  return { ...attempt, logs: { ...attempt.logs, [date]: { ...logFor(attempt, date), ...change } } }
+}
+
+const restInstead: Partial<DayLog> = { sets: 0, split: null, rest: true }
+const ids = (attempt: Attempt, day: number) => dayTasks(attempt, day).map((task) => task.id)
 
 describe('the count', () => {
   it('runs Day 1 on October 1st to Day 92 on December 31st', () => {
@@ -47,25 +70,119 @@ describe('the count', () => {
   })
 })
 
+describe('what a day asks for', () => {
+  const attempt = newAttempt(START)
+
+  it('is a lift and Maker School on a weekday', () => {
+    expect(ids(attempt, 1)).toEqual(['lift', 'makerSchool'])
+  })
+
+  it('adds the half marathon on a Saturday', () => {
+    expect(ids(attempt, 3)).toEqual(['lift', 'halfMarathon', 'makerSchool'])
+  })
+
+  it("adds the week's hundred hyperextensions on its last day", () => {
+    expect(ids(attempt, 7)).toEqual(['lift', 'hyperextensions', 'makerSchool'])
+    expect(ids(attempt, 14)).toEqual(['lift', 'hyperextensions', 'makerSchool'])
+  })
+
+  it('asks no hyperextensions of Day 92, a week of one day', () => {
+    expect(ids(attempt, 92)).toEqual(['lift', 'makerSchool'])
+    expect(hyperextensionsDue(attempt, 14)).toBe(false)
+  })
+
+  it('asks all four of a Saturday that ends a week', () => {
+    // A run begun on a Sunday ends its weeks on Saturdays.
+    expect(ids(newAttempt('2026-10-04'), 7)).toEqual(['lift', 'halfMarathon', 'hyperextensions', 'makerSchool'])
+  })
+})
+
+describe('lifting', () => {
+  it('takes fifteen sets with upper or lower picked', () => {
+    const fifteen = withLog(newAttempt(START), START, { sets: 15, makerSchool: true })
+    expect(isDayDone(fifteen, 1)).toBe(false)
+    expect(isDayDone(withLog(fifteen, START, { split: 'upper' }), 1)).toBe(true)
+    expect(isDayDone(withLog(fifteen, START, { sets: 14, split: 'upper' }), 1)).toBe(false)
+  })
+
+  it('takes one rest day a week in place of a lift', () => {
+    const attempt = withLog(doneThrough(3), '2026-10-03', restInstead)
+    expect(isDayDone(attempt, 3)).toBe(true)
+    expect(restDay(attempt, 1)).toBe(3)
+  })
+
+  it('does not count a second rest day in the same week', () => {
+    const attempt = withLog(withLog(doneThrough(5), '2026-10-02', restInstead), '2026-10-04', restInstead)
+    expect(isDayDone(attempt, 2)).toBe(true)
+    expect(isDayDone(attempt, 4)).toBe(false)
+    expect(getStatus(attempt, '2026-10-06')).toEqual({ kind: 'missed', day: 6, missed: 4 })
+  })
+
+  it('gives every week its own rest day', () => {
+    const attempt = withLog(withLog(doneThrough(10), '2026-10-03', restInstead), '2026-10-10', restInstead)
+    expect(isDayDone(attempt, 3)).toBe(true)
+    expect(isDayDone(attempt, 10)).toBe(true)
+  })
+
+  it('makes six lifts a week', () => {
+    expect(weekLifts(withLog(doneThrough(7), '2026-10-03', restInstead), 1)).toBe(6)
+  })
+})
+
+describe('hyperextensions', () => {
+  it("add up across the week and fall due on the week's last day", () => {
+    const attempt = doneThrough(7)
+    expect(weekHyperextensions(attempt, 1)).toBe(105)
+    expect(isDayDone(attempt, 7)).toBe(true)
+    const short = withLog(attempt, '2026-10-07', { hyperextensions: 9 })
+    expect(weekHyperextensions(short, 1)).toBe(99)
+    expect(isDayDone(short, 6)).toBe(true)
+    expect(isDayDone(short, 7)).toBe(false)
+  })
+
+  it('can all come on one day', () => {
+    let attempt = doneThrough(7)
+    for (let i = 0; i < 7; i++) attempt = withLog(attempt, addDays(START, i), { hyperextensions: 0 })
+    expect(isDayDone(attempt, 7)).toBe(false)
+    expect(isDayDone(withLog(attempt, '2026-10-02', { hyperextensions: 100 }), 7)).toBe(true)
+  })
+
+  it('are not owed in a week begun before the app was counting', () => {
+    const attempt = attemptOnDay('2026-10-12', 12)
+    expect(hyperextensionsDue(attempt, 2)).toBe(false)
+    expect(ids(attempt, 14)).toEqual(['lift', 'makerSchool'])
+    expect(hyperextensionsDue(attempt, 3)).toBe(true)
+  })
+})
+
 describe('missing a day', () => {
   it('ends the run on the first day not done', () => {
     expect(getStatus(doneThrough(3), '2026-10-06')).toEqual({ kind: 'missed', day: 6, missed: 4 })
   })
 
-  it('treats a day with one task short as missed', () => {
-    const attempt = doneThrough(1)
-    const shortDay = { ...attempt, logs: { ...attempt.logs, '2026-10-02': { ...full, vlog: false } } }
-    expect(getStatus(shortDay, '2026-10-03')).toEqual({ kind: 'missed', day: 3, missed: 2 })
+  it('counts a Saturday with no half marathon as missed', () => {
+    const attempt = withLog(doneThrough(3), '2026-10-03', { halfMarathon: false })
+    expect(getStatus(attempt, '2026-10-04')).toEqual({ kind: 'missed', day: 4, missed: 3 })
+  })
+
+  it('ends the run on the last day of a week short of a hundred', () => {
+    const attempt = withLog(doneThrough(8), '2026-10-07', { hyperextensions: 0 })
+    expect(getStatus(attempt, '2026-10-09')).toEqual({ kind: 'missed', day: 9, missed: 7 })
+    expect(dayTasks(attempt, 7).filter((task) => !task.done)).toEqual([{ id: 'hyperextensions', done: false }])
   })
 
   it('lets a forgotten tick be logged afterwards', () => {
     const state: AppState = { attempt: doneThrough(3), history: [] }
-    const logged = updateLog(state, '2026-10-04', () => full)
+    const logged = updateLog(state, '2026-10-04', () => fullDay('2026-10-04'))
     expect(getStatus(logged.attempt, '2026-10-05')).toEqual({ kind: 'active', day: 5 })
   })
 
   it('does not end the run while today is still open', () => {
     expect(getStatus(doneThrough(4), '2026-10-05')).toEqual({ kind: 'active', day: 5 })
+    // The week's hundred is due by the end of Day 7, not before.
+    let light = doneThrough(6)
+    for (let i = 0; i < 6; i++) light = withLog(light, addDays(START, i), { hyperextensions: 0 })
+    expect(getStatus(light, '2026-10-07')).toEqual({ kind: 'active', day: 7 })
   })
 })
 
@@ -160,25 +277,18 @@ describe('days on the board', () => {
 
 describe('totals', () => {
   it('adds up the run so far, today included', () => {
-    const attempt = doneThrough(2)
-    const withToday = {
-      ...attempt,
-      logs: {
-        ...attempt.logs,
-        '2026-10-02': { ...full, sets: 0, neck: false, halfMarathon: true },
-        '2026-10-03': { ...emptyLog(), sets: 6, hyperextensions: 45, note: 'half way' },
-        // Ahead of today, so not counted.
-        '2026-10-04': full,
-      },
-    }
-    expect(totals(withToday, '2026-10-03')).toEqual({
+    let attempt = doneThrough(2)
+    attempt = withLog(attempt, '2026-10-02', { ...restInstead, halfMarathon: true })
+    attempt = withLog(attempt, '2026-10-03', { ...emptyLog(), sets: 6, hyperextensions: 45 })
+    // Ahead of today, so not counted.
+    attempt = withLog(attempt, '2026-10-04', lifted)
+    expect(totals(attempt, '2026-10-03')).toEqual({
       daysDone: 2,
+      lifts: 1,
       sets: 21,
-      neck: 1,
-      halfMarathons: 1,
-      hyperextensions: 245,
+      hyperextensions: 75,
       makerSchool: 2,
-      vlogs: 2,
+      halfMarathons: 1,
     })
   })
 
@@ -195,7 +305,7 @@ describe('updateLog', () => {
     expect(state.attempt!.logs[START]).toBeUndefined()
   })
   it('does nothing without a run', () => {
-    expect(updateLog(EMPTY_STATE, START, () => full)).toBe(EMPTY_STATE)
+    expect(updateLog(EMPTY_STATE, START, () => lifted)).toBe(EMPTY_STATE)
   })
 })
 
@@ -208,9 +318,24 @@ describe('normalizeState', () => {
     expect(normalizeState(JSON.parse(JSON.stringify(state)))).toEqual(state)
   })
 
+  it('reads a run saved by the first version', () => {
+    const saved = {
+      version: 1,
+      attempt: {
+        start: START,
+        carried: 0,
+        logs: { [START]: { sets: 15, neck: true, halfMarathon: false, hyperextensions: 40, makerSchool: true, vlog: true, note: '' } },
+      },
+      history: [],
+    }
+    const state = normalizeState(saved)!
+    expect(state.attempt!.logs[START]).toEqual({ ...lifted, split: 'upper', hyperextensions: 40 })
+    expect(isDayDone(state.attempt!, 1)).toBe(true)
+  })
+
   it('drops what it cannot read', () => {
     const state = normalizeState({
-      attempt: { start: START, carried: -3, logs: { 'not-a-date': full, '2026-10-01': { sets: 'many' } } },
+      attempt: { start: START, carried: -3, logs: { 'not-a-date': lifted, '2026-10-01': { sets: 'many' } } },
       history: [{ start: 'yesterday' }, { start: '2026-09-01', end: '2026-09-02', completed: 400, outcome: '?' }],
     })
     expect(state).toEqual({
