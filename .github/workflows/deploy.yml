@@ -129,6 +129,19 @@ jobs:
           mkdir -p dist/facet
           cp -r facet/dist/. dist/facet/
 
+      - name: Build Cutline
+        working-directory: cutline
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Cutline to the site
+        run: |
+          mkdir -p dist/cutline
+          cp -r cutline/dist/. dist/cutline/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
