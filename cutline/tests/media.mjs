@@ -97,7 +97,7 @@ await page.goto(`http://localhost:${port}/__media-test`)
 // edited time across the bottom, so frames can be told apart and the bar
 // left out of picture comparisons).
 const BAR = 96
-await page.evaluate((BAR) => {
+const installHelpers = (target) => target.evaluate((BAR) => {
   window.T = {
     async fixture(name) {
       const res = await fetch(`/__fixtures/${name}`)
@@ -132,6 +132,7 @@ await page.evaluate((BAR) => {
     },
   }
 }, BAR)
+await installHelpers(page)
 
 /* ---------- Check plumbing ---------- */
 
@@ -855,6 +856,34 @@ await check('MP4 output through the collector', async () => {
   assert(r.bytes > 16 * 1024 * 1024, 'big enough to be handed over to Blobs in pieces')
   assert(boxes.indexOf('moov') >= 0 && boxes.indexOf('moov') < boxes.indexOf('mdat'), 'fast start: moov before mdat')
   assert(s.video.codec_name === 'vp9' && !!s.audio && frames === 120 && near(s.duration, 4, 0.05), 'a valid MP4 with every frame and the sound')
+})
+
+await check('Apple browsers get MP4/AAC or the recorder', async () => {
+  // Photos won't take WebM or Opus, so where Safari lacks the H.264/AAC encoders the export
+  // records instead (MP4/AAC on Safari). Chromium here has neither: posing as Safari, it must
+  // record; posing as an iPhone by user agent only (as the app smoke test does), it must not.
+  const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1'
+  const results = {}
+  for (const [name, vendor] of [['safari', 'Apple Computer, Inc.'], ['chromium as iPhone', null]]) {
+    const ctx = await browser.newContext({ userAgent: IPHONE_UA })
+    if (vendor) await ctx.addInitScript((v) => Object.defineProperty(Navigator.prototype, 'vendor', { get: () => v }), vendor)
+    const p = await ctx.newPage()
+    await p.goto(`http://localhost:${port}/__media-test`)
+    await installHelpers(p)
+    results[name] = await p.evaluate(async () => {
+      const { exportSupport, exportVideo } = await import('/src/media/export.ts')
+      const support = await exportSupport()
+      const result = await exportVideo({ source: await T.fixture('talk.webm'), ranges: [{ start: 1, end: 2.5 }], width: 360, height: 640, draw: T.draw() })
+      return { vendor: navigator.vendor, support, method: result.method, mimeType: result.mimeType }
+    })
+    await ctx.close()
+  }
+  console.log(`    ${JSON.stringify(results)}`)
+  const safari = results.safari
+  assert(safari.vendor === 'Apple Computer, Inc.' && safari.support.webcodecs === false && safari.support.video === null, 'posing as Safari without AAC/H.264 encoders: no WebCodecs plan (no WebM, no Opus)')
+  assert(safari.method === 'recorder' && safari.mimeType === 'video/mp4' && safari.support.recorder?.startsWith('video/mp4'), 'so the export records instead, and as MP4 (H.264/AAC on a real Safari)')
+  const rig = results['chromium as iPhone']
+  assert(rig.support.webcodecs === true && rig.method === 'webcodecs' && rig.mimeType === 'video/webm', 'Chromium with an iPhone user agent still takes the fast WebM path')
 })
 
 await check('abort', async () => {

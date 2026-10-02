@@ -1,4 +1,5 @@
 import { Conversion, Mp4OutputFormat, Output, StreamTarget, WebMOutputFormat } from 'mediabunny'
+import { isAppleBrowser } from './codecs'
 import { ChunkCollector } from './collector'
 import { abortError, MediaError, videoCodecError } from './errors'
 import { openInput, withTimeout } from './probe'
@@ -47,11 +48,12 @@ export function recorderAvailable(): boolean {
  * (Safari, Chrome with its proprietary codecs), since its MP4 recorder then
  * writes H.264/AAC that Photos and TikTok take; otherwise WebM, because
  * Chromium builds without H.264 still claim "video/mp4" and fill it with VP9.
+ * Apple browsers only ever get MP4: Photos won't take a WebM.
  */
 export function recorderMimeType(): string | null {
   if (typeof MediaRecorder === 'undefined' || typeof document === 'undefined') return null
   const h264 = document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"') !== ''
-  const order = h264 ? [...MP4_TYPES, ...WEBM_TYPES] : [...WEBM_TYPES, ...MP4_TYPES]
+  const order = isAppleBrowser() ? MP4_TYPES : h264 ? [...MP4_TYPES, ...WEBM_TYPES] : [...WEBM_TYPES, ...MP4_TYPES]
   return order.find((type) => MediaRecorder.isTypeSupported(type)) ?? null
 }
 

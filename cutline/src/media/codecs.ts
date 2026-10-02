@@ -70,7 +70,7 @@ async function encodableRate(codec: AudioCodec, preferred: number, channels: num
   return null
 }
 
-interface Candidate {
+export interface Candidate {
   container: Container
   video: VideoCodec[]
   audio: AudioCodec
@@ -85,12 +85,37 @@ const CANDIDATES: Candidate[] = [
   { container: 'mp4', video: ['avc', 'hevc'], audio: 'opus' },
 ]
 
+/**
+ * Safari, and every browser on iOS (they're all WebKit). The vendor string
+ * decides when there is one, since a user-agent override doesn't touch it
+ * (test rigs pose Chromium as an iPhone); the user agent only when it's blank.
+ */
+export function isAppleBrowser(nav: { vendor?: string; userAgent?: string } | undefined = typeof navigator === 'undefined' ? undefined : navigator): boolean {
+  if (!nav) return false
+  if (nav.vendor) return nav.vendor === 'Apple Computer, Inc.'
+  const ua = nav.userAgent ?? ''
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Firefox|Edg|Android/.test(ua))
+}
+
+/**
+ * The pairings worth trying, best first. On Apple browsers only MP4 with AAC
+ * (H.264, else HEVC, which mediabunny tags hvc1 as Apple's players want):
+ * "Save Video" won't put WebM or Opus into Photos, so there a slower realtime
+ * recording (MP4/AAC on Safari) beats a fast file that can't be kept.
+ */
+export function encodeCandidates(apple: boolean): Candidate[] {
+  return apple ? CANDIDATES.filter((c) => c.container === 'mp4' && c.audio === 'aac') : CANDIDATES
+}
+
 export function hasWebCodecsEncoders(needAudio: boolean): boolean {
   return typeof VideoEncoder !== 'undefined' && (!needAudio || typeof AudioEncoder !== 'undefined')
 }
 
 /** The first container/codec pairing this browser can encode at this size, or null for none (use the recorder). */
-export async function planEncode(o: { width: number; height: number; fps: number; audio: { sampleRate: number; channels: number } | null }): Promise<EncodePlan | null> {
+export async function planEncode(
+  o: { width: number; height: number; fps: number; audio: { sampleRate: number; channels: number } | null },
+  apple = isAppleBrowser(),
+): Promise<EncodePlan | null> {
   if (!hasWebCodecsEncoders(o.audio !== null)) return null
   const videoOk = new Map<VideoCodec, { bitrate: number; codecString?: string } | null>()
   const tryVideo = async (codec: VideoCodec) => {
@@ -110,7 +135,7 @@ export async function planEncode(o: { width: number; height: number; fps: number
     return videoOk.get(codec) ?? null
   }
 
-  for (const candidate of CANDIDATES) {
+  for (const candidate of encodeCandidates(apple)) {
     let audio: { codec: AudioCodec; sampleRate: number } | null = null
     if (o.audio) {
       const sampleRate = await encodableRate(candidate.audio, o.audio.sampleRate, o.audio.channels)

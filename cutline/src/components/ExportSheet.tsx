@@ -10,7 +10,7 @@ import { formatBytes, formatClock } from '../lib/project'
 import { toSrt } from '../lib/subtitles'
 import type { Project } from '../lib/types'
 import { decodeAudio } from '../media/audio'
-import { exportVideo, type ExportResult } from '../media/export'
+import { exportVideo, prepareExport, type ExportResult } from '../media/export'
 import { shareOrDownload } from '../media/share'
 import { drawFrame, newScratch } from '../render/compose'
 import type { RenderPlan } from '../render/plan'
@@ -46,6 +46,9 @@ export function ExportSheet({ project, plan, source, music, settings, onClose }:
   useEffect(() => () => controller.current?.abort(), [])
 
   const start = async () => {
+    // Where the export has to record in real time it needs an audio context,
+    // which iOS only starts during a tap: so this comes before any await.
+    prepareExport()
     const ac = new AbortController()
     controller.current = ac
     const started = performance.now()

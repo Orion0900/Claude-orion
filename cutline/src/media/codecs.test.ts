@@ -1,5 +1,5 @@
 import { ChunkCollector } from './collector'
-import { audioBitrate, avcCodecString, videoBitrate } from './codecs'
+import { audioBitrate, avcCodecString, encodeCandidates, isAppleBrowser, videoBitrate } from './codecs'
 import { decodeFrameSize } from './export'
 
 describe('videoBitrate', () => {
@@ -22,6 +22,36 @@ describe('avcCodecString', () => {
     expect(avcCodecString(2160, 3840, 30, 24e6)).toBe('avc1.640033') // 5.1
     expect(avcCodecString(2160, 3840, 60, 24e6)).toBe('avc1.640034') // 5.2
     expect(avcCodecString(1080, 1920, 30, 10e6, '42e0')).toBe('avc1.42e028') // Constrained Baseline 4.0
+  })
+})
+
+describe('choosing what to encode', () => {
+  const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1'
+  const MAC_SAFARI_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15'
+  const MAC_CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+
+  it('knows Safari and iOS browsers by their vendor, even when Chromium wears an iPhone user agent', () => {
+    expect(isAppleBrowser({ vendor: 'Apple Computer, Inc.', userAgent: IPHONE_UA })).toBe(true)
+    expect(isAppleBrowser({ vendor: 'Apple Computer, Inc.', userAgent: MAC_SAFARI_UA })).toBe(true)
+    expect(isAppleBrowser({ vendor: 'Google Inc.', userAgent: IPHONE_UA })).toBe(false) // a test rig
+    expect(isAppleBrowser({ vendor: 'Google Inc.', userAgent: MAC_CHROME_UA })).toBe(false)
+    expect(isAppleBrowser({ vendor: '', userAgent: IPHONE_UA })).toBe(true)
+    expect(isAppleBrowser({ vendor: '', userAgent: MAC_SAFARI_UA })).toBe(true)
+    expect(isAppleBrowser({ vendor: '', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:131.0) Gecko/20100101 Firefox/131.0' })).toBe(false)
+    expect(isAppleBrowser(undefined)).toBe(false)
+  })
+
+  it('offers Apple browsers only MP4 with AAC, so the file always goes into Photos', () => {
+    const apple = encodeCandidates(true)
+    expect(apple.length).toBeGreaterThan(0)
+    expect(apple.every((c) => c.container === 'mp4' && c.audio === 'aac')).toBe(true)
+    expect(apple[0].video[0]).toBe('avc')
+  })
+
+  it('keeps the WebM fallback everywhere else, after H.264/AAC', () => {
+    const others = encodeCandidates(false)
+    expect(others[0]).toEqual({ container: 'mp4', video: ['avc'], audio: 'aac' })
+    expect(others.some((c) => c.container === 'webm' && c.audio === 'opus')).toBe(true)
   })
 })
 
