@@ -70,9 +70,16 @@ Settings.
 The audio is decoded with WebCodecs, mixed to 16 kHz mono and fed to OpenAI's
 Whisper running in a Web Worker on ONNX Runtime's WebAssembly build, through
 transformers.js. Word-level timestamps come from the model's cross-attention
-(dynamic time warping over the alignment heads). Long recordings are split at
-the quietest moment near each 28-second mark, so no word is cut in half and
-progress can be shown per chunk.
+(dynamic time warping over the alignment heads); transformers.js stamps each
+word one token late, so the times are shifted back, and word edges are then
+trimmed against the loudness so pauses aren't swallowed into the words around
+them. Long recordings are split at the quietest moment near each 28-second
+mark, so no word is cut in half and progress can be shown per chunk.
+
+Whisper invents words over silence and noise — "you", "Thank you for
+watching!" — so windows with no speech in them are skipped, stock phrases over
+quiet audio are dropped, and runaway repeats are cut off. The language is
+detected from the first window that clearly holds speech.
 
 English uses Whisper's English-only weights, which are more accurate for
 English. Model files come from Hugging Face the first time and are kept in the
@@ -88,6 +95,11 @@ nearby moment of the loudness envelope measured at import. A pause longer than
 the limit keeps that limit, split so the beat falls naturally between the
 words.
 
+The loudness thresholds are read from each recording's own room tone and
+speech level, not fixed. That's also how the ums Whisper didn't write down get
+cut: a short sound standing alone between words, which no transcribed word
+accounts for, goes with the fillers.
+
 Everything stored is on the recording's own clock; the edited timeline is
 derived from it whenever an edit changes, so edits never have to be re-timed.
 
@@ -100,10 +112,12 @@ progress bar. What you see while editing is what lands in the file.
 
 Export decodes source frames with WebCodecs (via mediabunny), only at the size
 the composition needs, draws each output frame, and encodes H.264 and AAC into
-an MP4 — faster than real time on a recent iPhone. Audio is cut with short
-fades at every join so cuts don't click, and music is mixed and ducked under
-speech. Where WebCodecs encoding isn't available, the edit is played through
-in real time and captured with MediaRecorder instead.
+an MP4 with the phone's own encoders — the format Photos, TikTok and Reels all
+take. Speech is joined with a 10 ms crossfade at every cut so nothing clicks,
+and music is looped, mixed and ducked under the voice. Where WebCodecs
+encoding isn't available (iOS before 26), the edit is played through in real
+time and captured with MediaRecorder instead, which also writes MP4 on an
+iPhone.
 
 ## Layout
 
@@ -151,4 +165,8 @@ npm run icons          # redraws the icons with Playwright's Chromium
 Edit, changes styles and framing, exports and checks the file with ffprobe,
 then records a take with Chromium's fake camera. It serves a copy of
 `Xenova/whisper-tiny` from a local stand-in for Hugging Face, so it runs
-offline.
+offline. `tests/transcribe.mjs` and `tests/media.mjs` check Whisper and the
+export on their own; see [tests/README.md](tests/README.md).
+
+Things only a real iPhone can confirm: export speed, lip sync after the AAC
+encoder's start-up delay, and how HDR clips look once drawn on a canvas.
