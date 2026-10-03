@@ -59,7 +59,6 @@ export class PartyScene extends Modal<PartyResult | null> {
     this.t++
     if (!top || this.busy) return
     const n = this.party.length
-    const cancelSlot = this.mode === 'forced' ? -1 : n
     const count = this.mode === 'forced' ? n : n + 1
     const audio = this.game.audio
     if (pad.repeat('up')) {
@@ -83,36 +82,59 @@ export class PartyScene extends Modal<PartyResult | null> {
       if (this.mode === 'forced') return
       audio.sfx('cancel')
       this.finish(null)
-    } else if (pad.pressed('a')) {
-      if (this.index === cancelSlot) {
-        audio.sfx('cancel')
-        this.finish(null)
-        return
-      }
-      audio.sfx('select')
-      if (this.swapFrom !== null) {
-        const a = this.swapFrom
-        const b = this.index
-        if (a !== b) [this.party[a], this.party[b]] = [this.party[b], this.party[a]]
-        this.swapFrom = null
-        this.note = 'Choose a beast.'
-        return
-      }
-      if (this.subMenu) {
-        this.busy = true
-        void this.subMenu(this.index).then((action) => {
-          this.busy = false
-          if (action === 'switch' && this.mode === 'field') {
-            this.swapFrom = this.index
-            this.note = 'Move to where?'
-            return
-          }
-          if (action) this.finish({ index: this.index, action })
-        })
-        return
-      }
-      this.finish({ index: this.index, action: 'use' })
+    } else if (pad.pressed('a')) this.activate()
+  }
+
+  /** What A does on the highlighted slot (or CANCEL). */
+  private activate(): void {
+    const audio = this.game.audio
+    const cancelSlot = this.mode === 'forced' ? -1 : this.party.length
+    if (this.index === cancelSlot) {
+      audio.sfx('cancel')
+      this.finish(null)
+      return
     }
+    audio.sfx('select')
+    if (this.swapFrom !== null) {
+      const a = this.swapFrom
+      const b = this.index
+      if (a !== b) [this.party[a], this.party[b]] = [this.party[b], this.party[a]]
+      this.swapFrom = null
+      this.note = 'Choose a beast.'
+      return
+    }
+    if (this.subMenu) {
+      this.busy = true
+      void this.subMenu(this.index).then((action) => {
+        this.busy = false
+        if (action === 'switch' && this.mode === 'field') {
+          this.swapFrom = this.index
+          this.note = 'Move to where?'
+          return
+        }
+        if (action) this.finish({ index: this.index, action })
+      })
+      return
+    }
+    this.finish({ index: this.index, action: 'use' })
+  }
+
+  /** Tapping a beast's panel picks it; tapping CANCEL backs out. */
+  tap(x: number, y: number): boolean {
+    if (this.busy) return true
+    const inside = (r: { x: number; y: number; w: number; h: number }) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h
+    for (let i = 0; i < this.party.length; i++) {
+      if (inside(this.slotRect(i))) {
+        this.index = i
+        this.activate()
+        return true
+      }
+    }
+    if (this.mode !== 'forced' && inside({ x: 188, y: 132, w: 50, h: 24 })) {
+      this.index = this.party.length
+      this.activate()
+    }
+    return true
   }
 
   /** Where each slot's panel is, for placing sub-menus. */

@@ -185,6 +185,12 @@ class FakeContext {
     this.state = 'running'
     return Promise.resolve()
   }
+  suspended = 0
+  suspend() {
+    this.suspended++
+    this.state = 'suspended'
+    return Promise.resolve()
+  }
   close() {
     this.state = 'closed'
     return Promise.resolve()
@@ -288,6 +294,37 @@ describe('the engine on a fake context', () => {
     const r = rig('suspended')
     r.audio.unlock()
     expect(r.ctx.resumed).toBe(1)
+    r.audio.dispose()
+  })
+
+  it('unlocks again on later taps, for a phone that interrupted it', () => {
+    const r = rig('running')
+    r.audio.unlock()
+    r.ctx.state = 'suspended'
+    r.audio.unlock()
+    expect(r.ctx.resumed).toBe(1)
+    expect(r.ctx.state).toBe('running')
+    r.audio.dispose()
+  })
+
+  it('goes quiet in the background and comes back on return', () => {
+    const r = rig('running')
+    r.audio.unlock()
+    r.audio.setHidden(true)
+    expect(r.ctx.suspended).toBe(1)
+    expect(r.ctx.state).toBe('suspended')
+    // A stray tap while hidden doesn't wake it.
+    r.audio.unlock()
+    expect(r.ctx.state).toBe('suspended')
+    r.audio.setHidden(false)
+    expect(r.ctx.state).toBe('running')
+    r.audio.dispose()
+  })
+
+  it('ignores backgrounding before sound has ever started', () => {
+    const r = rig('running')
+    expect(() => r.audio.setHidden(true)).not.toThrow()
+    expect(() => r.audio.setHidden(false)).not.toThrow()
     r.audio.dispose()
   })
 

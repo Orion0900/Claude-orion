@@ -97,11 +97,10 @@ async function rivalAmbush(s: ScriptCtx): Promise<void> {
   const rival = s.npc('rival')
   s.music('rival')
   await s.emote(rival, 'exclaim')
-  await s.walk(rival, 'l')
+  // Over to the column beside the player's, then along it to them.
+  await s.walk(rival, 'l2')
   const dy = s.player.y - rival.y
   if (dy !== 0) await s.walk(rival, (dy < 0 ? 'u' : 'd') + Math.abs(dy))
-  const dx = s.player.x - rival.x + 1
-  if (dx < 0) await s.walk(rival, 'l' + -dx)
   s.faceEach(rival, s.player)
   await s.say("{RIVAL}: There you are, {PLAYER}! I've already caught a bunch of new beasts.\fLet's see if you've been training, or just wandering around!")
   const won = await s.battle({
@@ -123,7 +122,8 @@ async function rivalAmbush(s: ScriptCtx): Promise<void> {
   if (!won) return
   s.faceEach(rival, s.player)
   await s.say("{RIVAL}: Glimmer Cave is just ahead. The larvae in there are so pretty when they glow!\fI'm heading straight through to BASALT TOWN. The WARDEN there uses STONE beasts. Better get ready!")
-  await s.walk(rival, `r3u${rival.y - 9}`, true)
+  // Off into GLIMMER CAVE, whose mouth is at (40, 9).
+  await s.walk(rival, rival.y >= 10 ? `r3u${rival.y - 9}` : `d${10 - rival.y}r3u`, true)
   s.hide(rival)
   s.setFlag('rival2Done')
   s.music('route')
@@ -171,7 +171,8 @@ export const ROUTE2_MAPS: MapDef[] = [
         text: '{RIVAL}: Hmm? Oh, it\'s you!',
       },
     ],
-    triggers: [{ x: 36, y: 10, w: 1, h: 2, when: (sv) => !sv.flags.rival2Done, script: rivalAmbush }],
+    // A wall across the route: however you head for the cave, SKYE sees you.
+    triggers: [{ x: 36, y: 2, w: 1, h: 18, when: (sv) => !sv.flags.rival2Done, script: rivalAmbush }],
     encounters: {
       grass: {
         rate: 12,

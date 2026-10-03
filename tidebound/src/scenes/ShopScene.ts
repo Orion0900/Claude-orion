@@ -58,21 +58,53 @@ export class ShopScene extends Modal<void> {
       audio.sfx('cancel')
       this.finish()
     } else if (pad.pressed('a')) {
-      if (this.index === this.stock.length) {
-        audio.sfx('cancel')
-        this.finish()
-        return
-      }
-      const price = item(this.stock[this.index]).price
-      if (this.save.money < price) {
-        audio.sfx('error')
-        void this.message("You don't have enough money.")
-        return
-      }
-      audio.sfx('select')
-      this.qty = 1
+      this.pick()
+      return
     }
     this.top = scrollTop(this.index, this.top, ROWS, count)
+  }
+
+  private pick(): void {
+    const audio = this.game.audio
+    if (this.index === this.stock.length) {
+      audio.sfx('cancel')
+      this.finish()
+      return
+    }
+    const price = item(this.stock[this.index]).price
+    if (this.save.money < price) {
+      audio.sfx('error')
+      void this.message("You don't have enough money.")
+      return
+    }
+    audio.sfx('select')
+    this.qty = 1
+  }
+
+  /**
+   * Tapping an item highlights it so its description shows; tapping it again
+   * asks how many. CANCEL leaves at once. While choosing how many, tapping
+   * the count buys (the D-pad changes it).
+   */
+  tap(x: number, y: number): boolean {
+    if (this.busy || this.done) return true
+    if (this.qty !== null) {
+      if (x < 100 && y >= 60 && y < 110) void this.buy(this.stock[this.index], this.qty)
+      return true
+    }
+    if (x < 100 || y >= 112) return true
+    const k = Math.floor((y - 4) / 16)
+    const i = this.top + k
+    if (k < 0 || k >= ROWS || i > this.stock.length) return true
+    if (i === this.index || i === this.stock.length) {
+      this.index = i
+      this.pick()
+    } else {
+      this.index = i
+      this.game.audio.sfx('cursor')
+    }
+    this.top = scrollTop(this.index, this.top, ROWS, this.stock.length + 1)
+    return true
   }
 
   private async message(text: string): Promise<void> {

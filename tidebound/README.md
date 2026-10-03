@@ -32,6 +32,21 @@ home screen to play offline.
 Tap a direction to turn on the spot; hold it to walk. Hold B to run once Mum
 gives you the SPRINT SHOES.
 
+### On iPhone
+
+1. Open the link above in **Safari**.
+2. Tap **Share**, then **Add to Home Screen**.
+3. Open Tidebound from its icon. It runs full screen, upright or sideways,
+   clear of the notch and the home bar, and works offline from then on.
+
+Tap the screen to start; sound comes on with that first tap and plays even
+with the silent switch on. Tapping the game screen works as A, and in menus
+picks the item you tap (in the bag, shop and Beastiary, tap once to look and
+again to choose). The game saves by itself whenever you're out exploring and
+when you leave the app, so closing it never loses your place; SAVE in the
+START menu still works too. The home-screen app keeps its own save, separate
+from Safari's.
+
 ## What's in it
 
 - **43 original beasts** across 17 types, with evolutions, front and back

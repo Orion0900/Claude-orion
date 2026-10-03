@@ -24,7 +24,23 @@ body {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  /* No long-press menus or magnifier over the buttons on iPhone. */
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Reads back the notch / Dynamic Island / home-bar margins for the layout. */
+.safe-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
 }
 
 #game {
@@ -38,8 +54,10 @@ body {
 
 .lcd {
   display: block;
-  image-rendering: pixelated;
+  flex: none;
   image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  -webkit-user-drag: none;
   background: #000;
   border-radius: 4px;
   box-shadow:
@@ -92,25 +110,39 @@ body {
   right: 5%;
   top: 16%;
 }
+/* The narrowest phones (320pt wide): smaller controls so they don't touch. */
+@media (max-width: 359px) {
+  .touch.portrait .dpad {
+    --arm: 40px;
+    width: 120px;
+    height: 120px;
+  }
+  .touch.portrait .face {
+    width: 140px;
+    height: 112px;
+  }
+  .touch.portrait .btn {
+    width: 58px;
+    height: 58px;
+    font-size: 19px;
+  }
+}
+/* Upright, the page is already padded clear of the home bar. */
 .touch.portrait .meta {
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  bottom: 16px;
   transform: translateX(-50%);
 }
 
 /* Sideways the controls fit in the columns beside the screen, with SELECT
    and START tucked into the bottom corners so nothing covers the game. */
 .touch.landscape .dpad {
+  --arm: 43px;
   left: calc(env(safe-area-inset-left) + 14px);
   top: 50%;
   width: 128px;
   height: 128px;
   transform: translateY(-55%);
-}
-.touch.landscape .dpad-cross {
-  background-size:
-    43px 100%,
-    100% 43px;
 }
 .touch.landscape .face {
   right: calc(env(safe-area-inset-right) + 12px);
@@ -139,19 +171,29 @@ body {
 }
 
 .dpad {
+  --arm: 50px;
   width: 150px;
   height: 150px;
   touch-action: none;
 }
 
+/* The cross is two bars; the pressed arm is a third, lighter square on top. */
 .dpad-cross {
   position: absolute;
   inset: 0;
+  --hi-at: center;
   background:
-    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+    linear-gradient(var(--btn-hi), var(--btn-hi)) var(--hi-at) / var(--arm) var(--arm) no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / var(--arm) 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% var(--arm) no-repeat;
   border-radius: 10px;
   filter: drop-shadow(0 4px 0 #080c18);
+}
+
+.dpad-cross:not([data-dir='up']):not([data-dir='down']):not([data-dir='left']):not([data-dir='right']) {
+  background:
+    linear-gradient(var(--btn), var(--btn)) center / var(--arm) 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% var(--arm) no-repeat;
 }
 
 .dpad-cross::after {
@@ -167,28 +209,16 @@ body {
 }
 
 .dpad-cross[data-dir='up'] {
-  background:
-    linear-gradient(var(--btn-hi), var(--btn-hi)) center top / 50px 50px no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+  --hi-at: center top;
 }
 .dpad-cross[data-dir='down'] {
-  background:
-    linear-gradient(var(--btn-hi), var(--btn-hi)) center bottom / 50px 50px no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+  --hi-at: center bottom;
 }
 .dpad-cross[data-dir='left'] {
-  background:
-    linear-gradient(var(--btn-hi), var(--btn-hi)) left center / 50px 50px no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+  --hi-at: left center;
 }
 .dpad-cross[data-dir='right'] {
-  background:
-    linear-gradient(var(--btn-hi), var(--btn-hi)) right center / 50px 50px no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 50px 100% no-repeat,
-    linear-gradient(var(--btn), var(--btn)) center / 100% 50px no-repeat;
+  --hi-at: right center;
 }
 
 .face {

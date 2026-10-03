@@ -38,6 +38,8 @@ interface Effect {
 
 const PLAYER_X = 112
 const PLAYER_Y = 72
+/** Time per tick spent baking the maps next door ahead of need. */
+const PREBAKE_MS = 3
 
 /**
  * Walking around: the map, the player and everyone on it. Handles movement,
@@ -74,7 +76,7 @@ export class Overworld implements Scene {
 
   enter(): void {
     this.load(this.save.map, this.save.x, this.save.y, this.save.facing)
-    this.game.audio.playMusic(this.map.def.music)
+    this.game.audio.playMusic(this.player.surfing ? 'surf' : this.map.def.music)
     this.showPopup()
     void this.runEnterScript()
   }
@@ -161,6 +163,23 @@ export class Overworld implements Scene {
     this.save.surfing = this.player.surfing
   }
 
+  /** Free to walk, with no script, step or event under way: safe to autosave. */
+  restingSave(): SaveData | null {
+    if (this.busy || this.player.busy) return null
+    this.syncSave()
+    return this.save
+  }
+
+  /** The maps joined seamlessly to this one, which can slide into view at any step. */
+  private neighborMaps(): WorldMap[] {
+    const out: WorldMap[] = []
+    for (const side of ['north', 'south', 'east', 'west'] as const) {
+      const n = this.world.neighbor(this.map, side)
+      if (n) out.push(n.map)
+    }
+    return out
+  }
+
   // ─── Queries ─────────────────────────────────────────────────────────
 
   npcAt(x: number, y: number): Npc | null {
@@ -194,6 +213,8 @@ export class Overworld implements Scene {
   // ─── Update ──────────────────────────────────────────────────────────
 
   update(pad: Pad, top: boolean): void {
+    // A few milliseconds a tick to get the next maps along ready to draw.
+    this.painter.prebake(this.neighborMaps(), performance.now() + PREBAKE_MS)
     this.player.update()
     for (const n of this.npcs) {
       n.actor.update()
@@ -554,16 +575,24 @@ export class Overworld implements Scene {
 
   // ─── Scripts ─────────────────────────────────────────────────────────
 
-  /** Runs a script with the player held still; nested runs share control. */
+  /** Scripts under way, and whether something else held the player when the first began. */
+  private scripts = 0
+  private heldBefore = false
+
+  /**
+   * Runs a script with the player held still. Scripts that overlap (a map's
+   * arrival script and a trigger on the same step) share control, and the
+   * player is let go only once the last of them ends.
+   */
   async run(script: Script): Promise<void> {
-    const outer = this.busy
+    if (this.scripts++ === 0) this.heldBefore = this.busy
     this.busy = true
     try {
       await script(this.ctx())
     } catch (e) {
       console.error('script failed', e)
     } finally {
-      if (!outer) this.busy = false
+      if (--this.scripts === 0 && !this.heldBefore) this.busy = false
     }
     this.syncSave()
   }

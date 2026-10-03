@@ -86,3 +86,12 @@ export function parsePath(path: string): Facing[] {
   }
   return out
 }
+
+/** The way back along a path: "ul5" becomes "rrrrrd". */
+export function reversePath(path: string): string {
+  const back: Record<Facing, string> = { up: 'd', down: 'u', left: 'r', right: 'l' }
+  return parsePath(path)
+    .reverse()
+    .map((d) => back[d])
+    .join('')
+}

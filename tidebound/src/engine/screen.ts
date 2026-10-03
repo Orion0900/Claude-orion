@@ -1,5 +1,6 @@
 import { SCREEN_H, SCREEN_W } from './gfx'
 import type { Button, InputHub } from './input'
+import { computeLayout, type Insets } from './layout'
 
 /**
  * The page layout: the 240×160 screen scaled up crisp, and on touch devices
@@ -11,6 +12,8 @@ export class Screen {
   readonly ctx: CanvasRenderingContext2D
   private readonly root: HTMLElement
   private readonly pad: HTMLElement | null
+  /** An invisible element padded by the safe-area insets, to read them back. */
+  private readonly probe: HTMLElement
 
   constructor(root: HTMLElement, hub: InputHub, touch: boolean) {
     this.root = root
@@ -24,34 +27,50 @@ export class Screen {
     this.ctx.imageSmoothingEnabled = false
     this.pad = touch ? buildTouchPad(root, hub) : null
     if (touch) root.classList.add('touch')
+    this.probe = document.createElement('div')
+    this.probe.className = 'safe-probe'
+    document.body.appendChild(this.probe)
     const relayout = () => this.layout()
     window.addEventListener('resize', relayout)
-    window.addEventListener('orientationchange', relayout)
+    window.visualViewport?.addEventListener('resize', relayout)
+    // iOS reports the new size a moment after it says the phone turned.
+    window.addEventListener('orientationchange', () => {
+      relayout()
+      setTimeout(relayout, 250)
+      setTimeout(relayout, 600)
+    })
     this.layout()
+  }
+
+  /** The notch, Dynamic Island and home-bar margins, in CSS pixels. */
+  private insets(): Insets {
+    const cs = getComputedStyle(this.probe)
+    const px = (v: string) => Number.parseFloat(v) || 0
+    return { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) }
   }
 
   /** Picks the biggest crisp scale that fits, leaving room for the touch pad. */
   layout(): void {
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const portrait = vh > vw
-    this.root.classList.toggle('portrait', !!this.pad && portrait)
-    this.root.classList.toggle('landscape', !!this.pad && !portrait)
-    let availW = vw
-    let availH = vh
-    if (this.pad) {
-      // Upright: the buttons live below. Sideways: a column either side.
-      if (portrait) availH = vh * 0.58
-      else availW = vw - 2 * Math.min(210, Math.max(160, vw * 0.2))
-    }
-    const fit = Math.min(availW / SCREEN_W, availH / SCREEN_H)
-    // On ordinary screens whole-number scales keep every pixel the same size.
-    // High-density screens have pixels to spare, so a fractional scale stays
-    // crisp there and the game can use all the room it has.
-    const dpr = window.devicePixelRatio || 1
-    const scale = dpr >= 2 || fit < 2 ? fit : Math.floor(fit)
-    this.canvas.style.width = `${Math.floor(SCREEN_W * scale)}px`
-    this.canvas.style.height = `${Math.floor(SCREEN_H * scale)}px`
+    const l = computeLayout({
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+      touch: !!this.pad,
+      insets: this.insets(),
+    })
+    this.root.classList.toggle('portrait', !!this.pad && l.portrait)
+    this.root.classList.toggle('landscape', !!this.pad && !l.portrait)
+    this.canvas.style.width = `${l.width}px`
+    this.canvas.style.height = `${l.height}px`
+  }
+
+  /** Converts a page position to a game pixel, or null when it misses the screen. */
+  toGame(clientX: number, clientY: number): { x: number; y: number } | null {
+    const r = this.canvas.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) return null
+    const x = Math.floor(((clientX - r.left) / r.width) * SCREEN_W)
+    const y = Math.floor(((clientY - r.top) / r.height) * SCREEN_H)
+    return x >= 0 && y >= 0 && x < SCREEN_W && y < SCREEN_H ? { x, y } : null
   }
 }
 

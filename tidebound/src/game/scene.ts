@@ -1,5 +1,6 @@
 import type { Gfx } from '../engine/gfx'
 import type { Pad } from '../engine/input'
+import type { SaveData } from './state'
 
 /**
  * One layer of the game: the overworld, a menu, a battle, a text box. Scenes
@@ -11,6 +12,16 @@ export interface Scene {
   readonly opaque: boolean
   update(pad: Pad, top: boolean): void
   draw(g: Gfx): void
+  /**
+   * A tap or click on the screen at game pixel (x, y), for the top scene.
+   * Return true when handled; otherwise the tap counts as pressing A.
+   */
+  tap?(x: number, y: number): boolean
+  /**
+   * For autosave: the save, brought up to date, when this scene is on top
+   * and it's a moment the player could save by hand; otherwise null.
+   */
+  restingSave?(): SaveData | null
   /** Called once when the scene is pushed. */
   enter?(): void
   /** Called once when the scene is removed. */
@@ -41,4 +52,5 @@ export abstract class Modal<T> implements Scene {
 
   abstract update(pad: Pad, top: boolean): void
   abstract draw(g: Gfx): void
+  tap?(x: number, y: number): boolean
 }

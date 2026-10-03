@@ -103,4 +103,10 @@ export interface Audio {
   cry(species: SpeciesId, faint?: boolean): Promise<void>
   /** 0–1 volumes; the game stores them in the save. */
   setVolumes(music: number, sfx: number): void
+  /**
+   * The app went to the background (true) or came back (false). Sound is
+   * suspended while hidden; coming back it resumes, or waits for the next
+   * tap where the browser insists on one (iOS after a call or a lock).
+   */
+  setHidden(hidden: boolean): void
 }

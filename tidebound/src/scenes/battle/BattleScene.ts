@@ -598,6 +598,36 @@ export class BattleScene implements Scene {
     }
   }
 
+  /**
+   * Taps on the menus: a command or a move is chosen directly; tapping the
+   * battlefield above the move list goes back. Otherwise a tap is A, which
+   * moves the messages along.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.menu === 'none') return false
+    if (this.menu === 'action') {
+      if (x < 120 || y < BOX_Y) return true
+      const i = (y < BOX_Y + 24 ? 0 : 2) + (x < 186 ? 0 : 1)
+      this.actionIndex = i
+      this.game.audio.sfx('select')
+      this.closeMenu((['fight', 'bag', 'beasts', 'run'] as const)[i])
+      return true
+    }
+    if (y < BOX_Y) {
+      this.game.audio.sfx('cancel')
+      this.closeMenu(null)
+      return true
+    }
+    if (x >= 160) return true
+    const i = (y < BOX_Y + 24 ? 0 : 2) + (x < 86 ? 0 : 1)
+    if (i < this.engine.view().moves.length) {
+      this.moveIndex = i
+      this.game.audio.sfx('select')
+      this.closeMenu(i)
+    }
+    return true
+  }
+
   private moveCursor(f: () => void): void {
     f()
     this.game.audio.sfx('cursor')

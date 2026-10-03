@@ -13,6 +13,15 @@ import { hpBar, statusBadge, typeBadge } from '../ui/widgets'
 const PAGES = ['INFO', 'SKILLS', 'MOVES'] as const
 
 /**
+ * Where move row `i` of `rows` sits on the MOVES page. Five rows (choosing a
+ * move to forget) sit closer so the new one stays clear of the details box.
+ */
+function moveRow(i: number, rows: number): { y: number; h: number } {
+  const h = rows > 4 ? 18 : 22
+  return { y: (rows > 4 ? 22 : 24) + i * h, h }
+}
+
+/**
  * A beast's summary: who it is, its stats and its moves. Left and right turn
  * the page, up and down step through the party. In 'forget' mode it opens on
  * the moves with a fifth, new move, and returns the slot to forget.
@@ -88,6 +97,44 @@ export class SummaryScene extends Modal<number | null> {
     }
   }
 
+  /**
+   * Tapping a tab turns to that page and tapping a move shows its details
+   * (or, when forgetting, highlights it and then picks it). Other taps do
+   * nothing; B closes.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.done) return true
+    const audio = this.game.audio
+    if (y < 18 && !this.inspecting) {
+      const p = Math.floor((x - 8) / 60)
+      if (x >= 8 && p >= 0 && p < PAGES.length && p !== this.page) {
+        this.page = p
+        audio.sfx('cursor')
+      }
+      return true
+    }
+    if (this.page !== 2 || x < 100) return true
+    const n = this.c.moves.length + (this.forget ? 1 : 0)
+    const first = moveRow(0, n)
+    const i = Math.floor((y - first.y + 2) / first.h)
+    if (y < first.y - 2 || i >= n) {
+      if (this.inspecting && !this.forget && y >= 112) {
+        audio.sfx('cancel')
+        this.inspecting = false
+      }
+      return true
+    }
+    if (this.forget && this.moveCursor === i) {
+      audio.sfx('select')
+      this.finish(i < this.c.moves.length ? i : null)
+      return true
+    }
+    if (!this.inspecting || this.moveCursor !== i) audio.sfx(this.inspecting ? 'cursor' : 'select')
+    this.inspecting = true
+    this.moveCursor = i
+    return true
+  }
+
   draw(g: Gfx): void {
     const c = this.c
     const d = dex(c.species)
@@ -156,10 +203,11 @@ export class SummaryScene extends Modal<number | null> {
       if (this.forget) ids.push(this.forget.move)
       ids.forEach((id, i) => {
         const m = moveData(id)
-        const y = 24 + i * 22
+        const { y, h } = moveRow(i, ids.length)
         const sel = this.inspecting && i === this.moveCursor
-        if (sel) g.rect(x - 4, y - 2, 140, 20, '#f8e8b0')
-        if (i === c.moves.length) g.rect(x - 4, y - 3, 140, 1, '#a0a0a0')
+        if (sel) g.rect(x - 4, y - 2, 140, Math.min(20, h), '#f8e8b0')
+        // A line above the move being learned, clear of the PP text over it.
+        if (i === c.moves.length) g.rect(x - 4, y - 1, 140, 1, '#a0a0a0')
         typeBadge(g, x, y + 2, m.type)
         g.text(m.name, x + 40, y)
         const pp = i < c.moves.length ? c.moves[i].pp : m.pp

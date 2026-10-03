@@ -50,6 +50,9 @@ async function finalRival(s: ScriptCtx): Promise<void> {
   const rival = s.npc('rival')
   s.music('rival')
   await s.emote(rival, 'exclaim')
+  // Along the row to wherever the player crossed it, never into the sea.
+  const to = Math.max(2, Math.min(27, s.player.x < rival.x ? s.player.x + 1 : s.player.x - 1))
+  if (to !== rival.x) await s.walk(rival, `${to < rival.x ? 'l' : 'r'}${Math.abs(to - rival.x)}`)
   s.faceEach(rival, s.player)
   await s.say("{RIVAL}: {PLAYER}! I knew you'd make it here.\fThree CRESTS each, and the CHAMPION right up those stairs…\fBut only one of us is climbing first. Let's settle it, once and for all!")
   const won = await s.battle({
@@ -77,7 +80,7 @@ async function finalRival(s: ScriptCtx): Promise<void> {
   s.heal()
   await s.jingle('heal')
   await s.say("{RIVAL} rested your beasts!")
-  await s.walk(rival, 'l2', true)
+  await s.walk(rival, rival.x < s.player.x ? 'l2' : 'r2', true)
   s.hide(rival)
   s.setFlag('rival3Done')
   s.music('beacon')
@@ -194,7 +197,8 @@ export const BEACON_MAPS: MapDef[] = [
         },
       },
     ],
-    triggers: [{ x: 14, y: 12, when: (sv) => !sv.flags.rival3Done, script: finalRival }],
+    // Right across the isle, water too: nobody reaches the lighthouse unseen.
+    triggers: [{ x: 0, y: 12, w: 30, h: 1, when: (sv) => !sv.flags.rival3Done, script: finalRival }],
     encounters: {
       grass: {
         rate: 12,

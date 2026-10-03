@@ -1,8 +1,17 @@
 import type { Gfx } from '../engine/gfx'
 import type { Pad } from '../engine/input'
-import { Modal } from '../game/scene'
+import { Modal, type Scene } from '../game/scene'
 
 export type WipeKind = 'bars' | 'spiral' | 'blinds'
+
+/** A plain black screen, so text can show between scenes (after a blackout). */
+export class Curtain implements Scene {
+  readonly opaque = true
+  update(): void {}
+  draw(g: Gfx): void {
+    g.clear('#000')
+  }
+}
 
 /**
  * The cut into battle: two white flashes, then the screen is eaten by black

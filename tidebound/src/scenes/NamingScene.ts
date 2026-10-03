@@ -54,24 +54,43 @@ export class NamingScene extends Modal<string> {
     } else if (pad.pressed('select')) this.flip()
     else if (pad.pressed('b')) this.back()
     else if (pad.pressed('start')) this.done_()
-    else if (pad.pressed('a')) {
-      if (this.cx === 9) {
-        if (this.cy === 0) this.flip()
-        else if (this.cy === 1) this.back()
-        else this.done_()
-        return
-      }
-      const ch = PAGES[this.page][this.cy][this.cx]
-      if (ch === ' ' && this.name.length === 0) return
-      if (this.name.length < NAME_MAX) {
-        this.name += ch
-        this.audio.sfx('select')
-        if (this.name.length === NAME_MAX) {
-          this.cx = 9
-          this.cy = 2
-        }
-      } else this.audio.sfx('error')
+    else if (pad.pressed('a')) this.press()
+  }
+
+  /** A on the highlighted key: type it, or flip, delete or finish. */
+  private press(): void {
+    if (this.cx === 9) {
+      if (this.cy === 0) this.flip()
+      else if (this.cy === 1) this.back()
+      else this.done_()
+      return
     }
+    const ch = PAGES[this.page][this.cy][this.cx]
+    if (ch === ' ' && this.name.length === 0) return
+    if (this.name.length < NAME_MAX) {
+      this.name += ch
+      this.audio.sfx('select')
+      if (this.name.length === NAME_MAX) {
+        this.cx = 9
+        this.cy = 2
+      }
+    } else this.audio.sfx('error')
+  }
+
+  /** Tap a letter to type it, or the side keys to flip, delete or finish. */
+  tap(x: number, y: number): boolean {
+    const row = Math.floor((y - 59) / 26)
+    if (row < 0 || row > 2) return true
+    // Each key's hit box is centred on its letter (drawn at 26 + col * 18).
+    if (x >= 180 && x < 232) this.cx = 9
+    else if (x >= 20 && x < 180) {
+      const col = Math.floor((x - 20) / 18)
+      if (PAGES[this.page][row][col] === ' ') return true
+      this.cx = col
+    } else return true
+    this.cy = row
+    this.press()
+    return true
   }
 
   private flip(): void {

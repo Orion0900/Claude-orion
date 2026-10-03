@@ -5,13 +5,14 @@ import { ITEM_IDS, type ItemId } from '../data/items'
 import { IntroScene } from '../scenes/IntroScene'
 import { OptionsScene } from '../scenes/OptionsScene'
 import { TitleScene } from '../scenes/TitleScene'
+import { isIOS, isStandalone, isTouchDevice } from '../engine/platform'
 import { MAPS } from '../world/maps'
 import { Overworld } from '../world/Overworld'
 import { installFieldHooks, setCurrentOverworld } from './field'
 import { warmUpCreatures } from './art'
 import { endingHooks } from '../world/maps/beacon'
 import type { Game } from './Game'
-import { addItem, loadGame, loadOptions, markCaught, newGame, writeOptions, type SaveData } from './state'
+import { addItem, hasSave, loadGame, loadOptions, markCaught, newGame, writeOptions, type SaveData } from './state'
 
 /**
  * From power-on to play: the title screen, then either the professor's
@@ -39,12 +40,14 @@ export function applyOptions(game: Game): void {
 }
 
 export async function titleLoop(game: Game): Promise<void> {
+  const title = new TitleScene(game, { touch: isTouchDevice(), install: isIOS() && !isStandalone() })
+  game.setFade(1)
+  game.reset(title)
+  await game.fadeIn(24)
+  let menu = false
   for (;;) {
-    const title = new TitleScene(game)
-    game.setFade(1)
-    game.reset(title)
-    await game.fadeIn(24)
-    const choice = await title.choose()
+    const choice = await title.choose(menu)
+    menu = true
     if (choice === 'options') {
       await game.run(new OptionsScene(game))
       writeOptions(game.options)
@@ -52,11 +55,16 @@ export async function titleLoop(game: Game): Promise<void> {
     }
     if (choice === 'continue') {
       const save = loadGame()
-      if (!save) continue
+      if (!save) {
+        await game.say("The saved game couldn't be read.")
+        continue
+      }
       await game.fadeOut(20)
       startGame(game, save)
       return
     }
+    // The game saves by itself, so a new game soon replaces the old one.
+    if (hasSave() && !(await game.ask('Start a new game? It will replace your saved game.', { careful: true }))) continue
     await game.fadeOut(24)
     game.audio.stopMusic(0.5)
     const intro = new IntroScene(game)

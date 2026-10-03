@@ -63,6 +63,17 @@ export class ChoiceMenu extends Modal<number> {
     }
   }
 
+  /** Tapping an option chooses it; taps elsewhere are ignored so nothing is picked by accident. */
+  tap(x: number, y: number): boolean {
+    const row = Math.floor((y - this.y - 3) / ROW_H)
+    if (x >= this.x && x < this.x + this.w && row >= 0 && row < this.items.length) {
+      this.index = row
+      this.o.sound?.('select')
+      this.finish(row)
+    }
+    return true
+  }
+
   draw(g: Gfx): void {
     if (this.o.prompt !== undefined) drawBoxText(g, this.o.prompt)
     g.window(this.x, this.y, this.w, this.h)

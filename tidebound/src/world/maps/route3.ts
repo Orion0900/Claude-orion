@@ -1,5 +1,6 @@
 import type { MapDef } from '../mapTypes'
 import { PEOPLE } from '../people'
+import { reversePath } from '../script'
 import { haven, house, market } from './interiors'
 import { Paint } from './paint'
 
@@ -231,6 +232,10 @@ export const ROUTE3_MAPS: MapDef[] = [
     border: 'water',
     rows: sparkwharfRows(),
     connections: { west: { map: 'route3', offset: 2 }, south: { map: 'route4', offset: 0 } },
+    // A save from inside the town that somehow missed the raid still finds its aftermath.
+    onEnter: async (s) => {
+      if (!s.flag('raidSeen') && s.player.x > 0) s.setFlag('raidSeen')
+    },
     buildings: [
       { kind: 'haven', x: 2, y: 1, to: { map: 'spark_haven', x: 5, y: 8 } },
       { kind: 'market', x: 11, y: 2, to: { map: 'spark_market', x: 4, y: 7 } },
@@ -305,12 +310,13 @@ export const ROUTE3_MAPS: MapDef[] = [
         text: 'VOLTA can make her LEMURGE glow so bright you see it from the lighthouse!',
       },
     ],
+    // Whichever row you arrive on from ROUTE 3, you see the raid.
     triggers: [
       {
         x: 0,
-        y: 8,
+        y: 1,
         w: 1,
-        h: 2,
+        h: 15,
         when: (sv) => !sv.flags.raidSeen,
         script: async (s) => {
           const a = s.npc('raider1')
@@ -324,12 +330,14 @@ export const ROUTE3_MAPS: MapDef[] = [
           s.setFlag('raidSeen')
           const aide = s.npc('aide')
           await s.emote(aide, 'exclaim')
-          // Round the office and up the west side to the player.
-          await s.walk(aide, 'ul5u6')
-          await s.walk(aide, `u${aide.y - s.player.y}l`)
+          // Round the office and up the west side to the player, keeping
+          // clear of the HAVEN (rows 1-5) and the town sign at (1, 7).
+          const py = s.player.y
+          const path = `ul5${py === 7 ? 'u9' : py >= 6 ? `u${16 - py}l` : `u10lu${6 - py}`}`
+          await s.walk(aide, path)
           s.faceEach(aide, s.player)
           await s.say("AIDE: {PLAYER}! Did you see them? The TIDEWRACK CREW!\fThey broke into the PROFESSOR's field office and stole her research on the ATOLL legend!\fThey're heading for the old wreck on ROUTE 4, but it's across open water…\fWe need a TIDE beast that can carry us. The PROFESSOR is on her way.")
-          await s.walk(aide, `r${aide.x < 2 ? 1 : 0}d${16 - s.player.y}r5d`)
+          await s.walk(aide, reversePath(path))
           s.face(aide, 'left')
           s.music('city')
         },

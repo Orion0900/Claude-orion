@@ -61,6 +61,23 @@ export class StartMenu extends Modal<StartItem | null> {
     }
   }
 
+  /** Tap an entry to open it; tap anywhere else to close the menu. */
+  tap(x: number, y: number): boolean {
+    const w = 84
+    const row = Math.floor((y - 3) / 16)
+    if (x >= 240 - w && row >= 0 && row < this.items.length) {
+      this.index = row
+      this.game.audio.sfx('select')
+      StartMenu.last = row
+      const id = this.items[row].id
+      this.finish(id === 'exit' ? null : id)
+    } else {
+      this.game.audio.sfx('cancel')
+      this.finish(null)
+    }
+    return true
+  }
+
   draw(g: Gfx): void {
     const w = 84
     const h = this.items.length * 16 + 10

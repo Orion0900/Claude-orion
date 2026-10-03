@@ -76,15 +76,36 @@ export class DexScene extends Modal<void> {
     } else if (pad.pressed('b')) {
       audio.sfx('cancel')
       this.finish()
-    } else if (pad.pressed('a')) {
-      const d = DEX[this.index]
-      if (this.save.seen.includes(d.id)) {
-        audio.sfx('select')
-        this.open = d
-        void audio.cry(d.id)
-      } else audio.sfx('error')
-    }
+    } else if (pad.pressed('a')) this.openEntry()
     this.top = scrollTop(this.index, this.top, ROWS, DEX.length)
+  }
+
+  private openEntry(): void {
+    const audio = this.game.audio
+    const d = DEX[this.index]
+    if (this.save.seen.includes(d.id)) {
+      audio.sfx('select')
+      this.open = d
+      void audio.cry(d.id)
+    } else audio.sfx('error')
+  }
+
+  /**
+   * In the list, tapping a beast shows its picture and tapping it again opens
+   * its entry. On an entry, a tap closes it as A does.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.open) return false
+    if (x < 88 || y < 26) return true
+    const k = Math.floor((y - 26) / 16)
+    const i = this.top + k
+    if (k >= ROWS || i >= DEX.length) return true
+    if (i === this.index) this.openEntry()
+    else {
+      this.index = i
+      this.game.audio.sfx('cursor')
+    }
+    return true
   }
 
   draw(g: Gfx): void {

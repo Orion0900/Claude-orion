@@ -42,5 +42,6 @@ export function silentAudio(): Audio {
       return Promise.resolve()
     },
     setVolumes() {},
+    setHidden() {},
   }
 }
