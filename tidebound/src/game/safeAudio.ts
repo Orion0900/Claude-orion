@@ -32,6 +32,13 @@ export function safeAudio(inner: Audio): Audio {
     },
     cry: (species, faint) => capped(safely(() => inner.cry(species, faint)), 2500),
     setVolumes: (m, s) => inner.setVolumes(m, s),
+    setHidden: (hidden) => {
+      try {
+        inner.setHidden(hidden)
+      } catch {
+        // Backgrounding must never throw.
+      }
+    },
   }
 }
 

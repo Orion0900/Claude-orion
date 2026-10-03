@@ -69,18 +69,56 @@ export class BagScene extends Modal<ItemId | null> {
     } else if (pad.pressed('b')) {
       audio.sfx('cancel')
       this.finish(null)
-    } else if (pad.pressed('a')) {
-      const i = Math.min(this.index[p], list.length)
-      if (i === list.length) {
-        audio.sfx('cancel')
-        this.finish(null)
-      } else {
-        audio.sfx('select')
-        this.finish(list[i])
-      }
-    }
+    } else if (pad.pressed('a')) this.activate()
+    this.settle()
+  }
+
+  /** Keeps the cursor on the list and the list scrolled to it. */
+  private settle(): void {
     this.index[this.pocket] = Math.min(this.index[this.pocket], this.items().length)
     this.top[this.pocket] = scrollTop(this.index[this.pocket], this.top[this.pocket], ROWS, this.items().length + 1)
+  }
+
+  private activate(): void {
+    const list = this.items()
+    const i = Math.min(this.index[this.pocket], list.length)
+    if (i === list.length) {
+      this.game.audio.sfx('cancel')
+      this.finish(null)
+    } else {
+      this.game.audio.sfx('select')
+      this.finish(list[i])
+    }
+  }
+
+  /**
+   * Tapping the pocket name's left or right half turns the pocket. Tapping an
+   * item highlights it so its description shows; tapping it again picks it.
+   * CLOSE BAG closes at once. The D-pad scrolls longer lists.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.done) return true
+    const audio = this.game.audio
+    if (x < 96 && y < 24) {
+      this.pocket = (this.pocket + (x < 48 ? POCKETS.length - 1 : 1)) % POCKETS.length
+      audio.sfx('cursor')
+      this.settle()
+      return true
+    }
+    if (x < 98 || y >= 112) return true
+    const k = Math.floor((y - 4) / 16)
+    const count = this.items().length + 1
+    const i = this.top[this.pocket] + k
+    if (k < 0 || k >= ROWS || i >= count) return true
+    if (i === this.index[this.pocket] || i === count - 1) {
+      this.index[this.pocket] = i
+      this.activate()
+    } else {
+      this.index[this.pocket] = i
+      audio.sfx('cursor')
+    }
+    this.settle()
+    return true
   }
 
   draw(g: Gfx): void {

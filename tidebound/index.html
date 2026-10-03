@@ -13,6 +13,14 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <!-- Dark from the very first paint, so the home-screen app never flashes white. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #10182c;
+      }
+    </style>
   </head>
   <body>
     <div id="game"></div>

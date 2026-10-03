@@ -85,6 +85,24 @@ export class OptionsScene extends Modal<void> {
     }
   }
 
+  /** Tapping a setting steps it to its next value; tapping CANCEL closes. */
+  tap(_x: number, y: number): boolean {
+    if (this.done) return true
+    const i = Math.floor((y - 36) / 20)
+    if (i < 0 || i > ROWS.length || y < 36) return true
+    this.index = i
+    if (i === ROWS.length) {
+      this.game.audio.sfx('cancel')
+      this.finish()
+      return true
+    }
+    const row = ROWS[i]
+    row.set(this.game.options, (row.get(this.game.options) + 1) % row.values.length)
+    this.apply()
+    this.game.audio.sfx('cursor')
+    return true
+  }
+
   private apply(): void {
     const o = this.game.options
     this.game.gfx.frameStyle = o.frame

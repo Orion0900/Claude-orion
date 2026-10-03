@@ -9,7 +9,7 @@ import type { Pad } from '../engine/input'
 import { CH } from '../ui/font'
 import { menuBackdrop, scrollTop } from '../ui/widgets'
 
-const ROWS = 7
+const ROWS = 6
 
 /**
  * The Haven PC: move beasts between your party and storage. Left shows the
@@ -56,6 +56,25 @@ export class StorageScene extends Modal<void> {
       this.finish()
     } else if (pad.pressed('a') && n > 0) void this.move()
     this.top = scrollTop(this.index, this.top, ROWS, this.list().length)
+  }
+
+  /**
+   * Tapping a beast in either column picks it and asks whether to move it
+   * across; a yes/no always follows, so a stray tap changes nothing.
+   */
+  tap(x: number, y: number): boolean {
+    if (this.busy || this.done) return true
+    const side = x < 120 ? 'party' : 'box'
+    const k = Math.floor((y - 38) / 14)
+    const top = side === this.side ? this.top : 0
+    const i = top + k
+    const list = side === 'party' ? this.save.party : this.save.box
+    if (y < 38 || y >= 138 || k >= ROWS || i >= list.length) return true
+    this.side = side
+    this.index = i
+    this.top = scrollTop(i, top, ROWS, list.length)
+    void this.move()
+    return true
   }
 
   private async move(): Promise<void> {
@@ -105,7 +124,7 @@ export class StorageScene extends Modal<void> {
     g.window(x, 22, 120, 116)
     g.text(title, x + 10, 28, { color: active ? '#d04040' : '#788088' })
     const top = active ? this.top : 0
-    list.slice(top, top + ROWS - 1).forEach((c, k) => {
+    list.slice(top, top + ROWS).forEach((c, k) => {
       const y = 42 + k * 14
       g.imagePart(Art.icon(c.species, 0), 4, 8, 24, 16, x + 6, y - 3)
       g.text(displayName(c), x + 30, y)

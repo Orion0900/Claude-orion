@@ -78,6 +78,10 @@ export class ChipAudio implements Audio {
   private lastPump = -1
   private lookahead = LOOKAHEAD
   private readonly scratch: Scheduled[] = []
+  /** The app is in the background: stay suspended until it returns. */
+  private hidden = false
+  /** Older iOS: a looping silent <audio> that moves the page into the playback session. */
+  private silentLoop: HTMLAudioElement | null = null
   private readonly lastSfx = new Map<SfxId, number>()
   private xpStreak = 0
 
@@ -100,15 +104,37 @@ export class ChipAudio implements Audio {
         this.applyVolumes()
         this.timer = setInterval(() => this.pump(), PUMP_MS)
         if (this.wanted && this.jingles === 0) this.start(this.wanted, 0, 0)
+        this.silentLoop = playbackSession()
       }
+      if (this.hidden) return
       const ac = this.graph.ac as AudioContext
       // Suspended until a gesture, or 'interrupted' (Safari) after a call or a lock screen.
       if (ac.state !== 'running' && ac.state !== 'closed' && typeof ac.resume === 'function') {
         ac.resume().catch(() => undefined)
         primeSilence(ac)
       }
+      // Has to start inside the gesture, like the context.
+      if (this.silentLoop?.paused) this.silentLoop.play().catch(() => undefined)
     } catch {
       if (!this.graph) this.dead = true
+    }
+  }
+
+  setHidden(hidden: boolean): void {
+    this.hidden = hidden
+    const ac = this.graph?.ac as AudioContext | undefined
+    if (!ac) return
+    try {
+      if (hidden) {
+        if (ac.state === 'running' && typeof ac.suspend === 'function') ac.suspend().catch(() => undefined)
+        this.silentLoop?.pause()
+      } else if (ac.state !== 'running' && ac.state !== 'closed' && typeof ac.resume === 'function') {
+        // Some browsers allow this without a fresh tap; where not, the next tap's unlock() does it.
+        ac.resume().catch(() => undefined)
+        if (this.silentLoop?.paused) this.silentLoop.play().catch(() => undefined)
+      }
+    } catch {
+      // Sound simply stays as it was.
     }
   }
 
@@ -436,6 +462,63 @@ function fadeAndDrop(g: Graph, band: Band, seconds: number): void {
       }
     }
   }, (seconds + 2) * 1000)
+}
+
+type AudioSessionNavigator = Navigator & { audioSession?: { type: string } }
+
+/**
+ * iPhones mute web audio while the ring/silent switch is on silent, which
+ * makes a game seem broken. Asking for the 'playback' session (Safari 16.4+)
+ * plays through the switch, like a music app; older iOS gets there by
+ * looping a silent <audio> element, which this returns for unlock() to play.
+ */
+function playbackSession(): HTMLAudioElement | null {
+  try {
+    if (typeof navigator === 'undefined') return null
+    const nav = navigator as AudioSessionNavigator
+    if (nav.audioSession) {
+      try {
+        nav.audioSession.type = 'playback'
+      } catch {
+        // Older builds expose the object but refuse the type.
+      }
+      return null
+    }
+    if (!/iP(hone|ad|od)/.test(nav.userAgent) || typeof window.Audio !== 'function') return null
+    const el = new window.Audio(silentWavUrl())
+    el.loop = true
+    el.setAttribute('playsinline', '')
+    return el
+  } catch {
+    return null
+  }
+}
+
+let silentUrl: string | null = null
+
+/** A tenth of a second of 8-bit silence as a WAV blob URL. */
+function silentWavUrl(): string {
+  if (silentUrl) return silentUrl
+  const rate = 8000
+  const samples = rate / 10
+  const view = new DataView(new ArrayBuffer(44 + samples))
+  const text = (at: number, s: string) => [...s].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)))
+  text(0, 'RIFF')
+  view.setUint32(4, 36 + samples, true)
+  text(8, 'WAVE')
+  text(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, rate, true)
+  view.setUint32(28, rate, true)
+  view.setUint16(32, 1, true)
+  view.setUint16(34, 8, true)
+  text(36, 'data')
+  view.setUint32(40, samples, true)
+  for (let i = 0; i < samples; i++) view.setUint8(44 + i, 128)
+  silentUrl = URL.createObjectURL(new Blob([view.buffer], { type: 'audio/wav' }))
+  return silentUrl
 }
 
 /** iOS only really unlocks once something has played inside the gesture. */

@@ -16,7 +16,7 @@ import { StartMenu } from '../scenes/StartMenu'
 import { StorageScene } from '../scenes/StorageScene'
 import { SummaryScene } from '../scenes/SummaryScene'
 import { TrainerCard, playTime } from '../scenes/TrainerCard'
-import { Wipe } from '../scenes/transitions'
+import { Curtain, Wipe } from '../scenes/transitions'
 import { CH } from '../ui/font'
 import { overworldHooks } from '../world/hooks'
 import type { TrainerDef } from '../world/mapTypes'
@@ -290,16 +290,21 @@ async function blackout(game: Game, s: ScriptCtx, ow: Overworld): Promise<void> 
   const save = s.save
   const lost = Math.floor(save.money / 2)
   save.money -= lost
-  game.setFade(1)
-  await game.say(`{PLAYER} has no beasts left who can battle!`.replace('{PLAYER}', save.name))
+  // The text goes on a black screen of its own: under the fade it couldn't be read.
+  const curtain = new Curtain()
+  game.push(curtain)
+  game.setFade(0)
+  await game.say(`${save.name} has no beasts left who can battle!`)
   if (lost > 0) await game.say(`${save.name} dropped ${CH.shell}${lost} in the scramble…`)
-  await game.say(`${save.name} hurried back to the HAVEN with the tired beasts…`)
+  await game.say(`${save.name} hurried back to safety with the tired beasts…`)
   save.party.forEach(healFull)
   const h = save.lastHaven
   ow.player.surfing = false
   save.surfing = false
   ow.load(h.map, h.x, h.y, 'down')
   ow.syncSave()
+  game.setFade(1)
+  game.pop(curtain)
   game.audio.playMusic(ow.map.def.music)
   await game.fadeIn(24)
   const keeper = ow.npcs.find((n) => n.def.id === 'keeper')

@@ -101,12 +101,22 @@ export class IntroScene implements Scene {
     if (pad.pressed('left') || pad.pressed('right')) {
       this.pick = 1 - this.pick
       this.game.audio.sfx('cursor')
-    } else if (pad.pressed('a')) {
-      this.game.audio.sfx('select')
-      const f = this.onPick
-      this.onPick = null
-      f?.(this.pick)
-    }
+    } else if (pad.pressed('a')) this.choose()
+  }
+
+  private choose(): void {
+    this.game.audio.sfx('select')
+    const f = this.onPick
+    this.onPick = null
+    f?.(this.pick)
+  }
+
+  /** While choosing a look, tapping either figure picks it (a yes/no follows). */
+  tap(x: number): boolean {
+    if (!this.picking) return false
+    this.pick = x < 120 ? 0 : 1
+    this.choose()
+    return true
   }
 
   draw(g: Gfx): void {

@@ -91,10 +91,10 @@ export class Game {
     )
   }
 
-  /** Asks a question with YES / NO; B answers NO. */
-  async ask(text: string): Promise<boolean> {
+  /** Asks a question with YES / NO; B answers NO. `careful` starts the cursor on NO. */
+  async ask(text: string, o: { careful?: boolean } = {}): Promise<boolean> {
     await this.say(text, { hold: true })
-    const i = await this.choose(['YES', 'NO'], { prompt: text, cancel: 1 })
+    const i = await this.choose(['YES', 'NO'], { prompt: text, cancel: 1, start: o.careful ? 1 : 0 })
     return i === 0
   }
 
@@ -136,6 +136,15 @@ export class Game {
       }
       this.fadeTween = { from: this.fadeLevel, to, t: 0, frames, resolve }
     })
+  }
+
+  /**
+   * Offers a tap at game pixel (x, y) to the top scene. False means nobody
+   * claimed it, and the caller treats it as a press of A.
+   */
+  tap(x: number, y: number): boolean {
+    const top = this.top
+    return !!top?.tap?.(x, y)
   }
 
   /** One 60 Hz tick. */
