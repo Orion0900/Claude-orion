@@ -225,6 +225,193 @@ describe('snapToSpeech', () => {
     const words = [{ text: 'quiet', start: 1, end: 2 }]
     expect(snapToSpeech(words, profileWith(5, []), 0, 5)).toEqual(words)
   })
+
+  /** No word may cover any part of [from, to). */
+  const uncovered = (words: { start: number; end: number }[], from: number, to: number) =>
+    words.every((w) => w.end <= from || w.start >= to)
+
+  it("leaves out an um Whisper counted into the word that opens the next sentence", () => {
+    // "...the channel. [umm] So today" with "So" timed from the start of the umm.
+    const profile = profileWith(8, [
+      [0.5, 2.47],
+      [4.07, 4.41],
+      [4.91, 6.95],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'channel.', start: 1.9, end: 4.2 },
+        { text: 'So', start: 4.2, end: 5.1 },
+        { text: 'today', start: 5.1, end: 5.5 },
+      ],
+      profile,
+      0,
+      8,
+    )
+    expect(out[1].start).toBeCloseTo(4.81, 5)
+    expect(uncovered(out, 4.07, 4.41)).toBe(true)
+  })
+
+  it('leaves out an uh Whisper counted into the word that ends a phrase', () => {
+    // "...talk about, [uhh] the three" with "about," running on over the uhh.
+    const profile = profileWith(10, [
+      [4.91, 6.95],
+      [7.25, 7.51],
+      [8.01, 9.5],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'talk', start: 6.2, end: 6.5 },
+        { text: 'about,', start: 6.5, end: 7.6 },
+        { text: 'the', start: 7.6, end: 8.2 },
+      ],
+      profile,
+      0,
+      10,
+    )
+    expect(out[1].end).toBeCloseTo(7.1, 5)
+    expect(uncovered(out, 7.25, 7.51)).toBe(true)
+  })
+
+  it('keeps a short word whose time only reaches a sliver into the next one', () => {
+    // "done. Then [pause] we" without a comma: the sliver of "we" isn't "Then".
+    const profile = profileWith(4, [
+      [1.0, 1.3],
+      [1.62, 2.4],
+    ])
+    const [then] = snapToSpeech(
+      [
+        { text: 'done.', start: 0.2, end: 1.0 },
+        { text: 'Then', start: 1.0, end: 1.75 },
+        { text: 'we', start: 1.75, end: 2.0 },
+      ],
+      profile,
+      0,
+      4,
+    ).slice(1)
+    expect(then.start).toBeCloseTo(1.0, 5)
+    expect(then.end).toBeCloseTo(1.45, 5)
+  })
+
+  it('moves a word Whisper timed onto an um back to its own sound', () => {
+    // "channel. [umm] So today" with "So" over the umm and "today" over "so today".
+    const profile = profileWith(8, [
+      [0.5, 2.47],
+      [4.07, 4.41],
+      [4.91, 6.95],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'channel.', start: 2.1, end: 2.62 },
+        { text: 'So', start: 3.89, end: 4.56 },
+        { text: 'today', start: 4.8, end: 5.48 },
+        { text: 'I', start: 5.48, end: 5.74 },
+      ],
+      profile,
+      0,
+      8,
+    )
+    expect(out[1].start).toBeCloseTo(4.81, 5)
+    expect(out[1].end).toBeLessThan(out[2].end)
+    expect(out[2].start).toBeCloseTo(out[1].end, 5)
+    expect(uncovered(out, 4.07, 4.41)).toBe(true)
+  })
+
+  it('does the same mid-phrase, where Whisper left the pauses unpunctuated', () => {
+    // "talk about [uhh] the three" with "the" over the uhh.
+    const profile = profileWith(10, [
+      [4.91, 6.95],
+      [7.25, 7.51],
+      [8.01, 9.5],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'about', start: 6.52, end: 7.19 },
+        { text: 'the', start: 7.24, end: 7.84 },
+        { text: 'three', start: 8.04, end: 8.46 },
+      ],
+      profile,
+      0,
+      10,
+    )
+    expect(out[1].start).toBeCloseTo(7.91, 5)
+    expect(uncovered(out, 7.25, 7.51)).toBe(true)
+  })
+
+  it('leaves a lone word alone when punctuation says the pause is real', () => {
+    const profile = profileWith(8, [
+      [0.5, 2.47],
+      [4.07, 4.41],
+      [4.91, 6.95],
+    ])
+    const words = [
+      { text: 'channel.', start: 2.1, end: 2.62 },
+      { text: 'So,', start: 3.97, end: 4.56 },
+      { text: 'today', start: 4.81, end: 5.48 },
+    ]
+    const out = snapToSpeech(words, profile, 0, 8)
+    expect(out[1].start).toBeCloseTo(3.97, 5)
+    expect(out[1].end).toBeCloseTo(4.56, 5)
+  })
+
+  it('leaves a word alone that shares its stretch of sound with the one before', () => {
+    // "ask not [pause] what": "not" runs straight on from "ask".
+    const profile = profileWith(8, [
+      [3.3, 5.0],
+      [5.9, 7.0],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'ask', start: 3.3, end: 4.4 },
+        { text: 'not', start: 4.4, end: 5.06 },
+        { text: 'what', start: 5.8, end: 6.3 },
+      ],
+      profile,
+      0,
+      8,
+    )
+    expect(out[1].start).toBeCloseTo(4.4, 5)
+    expect(out[2].start).toBeCloseTo(5.8, 5)
+  })
+
+  it('leaves a lone word alone when the next one is far off', () => {
+    const profile = profileWith(10, [
+      [0.5, 2.0],
+      [3.0, 3.4],
+      [5.5, 7.0],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'done.', start: 1.5, end: 2.0 },
+        { text: 'Okay', start: 2.9, end: 3.5 },
+        { text: 'so', start: 5.4, end: 5.8 },
+      ],
+      profile,
+      0,
+      10,
+    )
+    expect(out[1].start).toBeCloseTo(2.9, 5)
+  })
+
+  it('takes the main sound for a word that is a whole phrase on its own', () => {
+    // "up. Honestly, [uhh] it" — the longer stretch is the word.
+    const profile = profileWith(26, [
+      [21.47, 22.04],
+      [22.34, 22.59],
+      [23.19, 25],
+    ])
+    const out = snapToSpeech(
+      [
+        { text: 'up.', start: 19.0, end: 21.47 },
+        { text: 'Honestly,', start: 21.47, end: 22.6 },
+        { text: 'it', start: 23.1, end: 23.4 },
+      ],
+      profile,
+      0,
+      26,
+    )
+    expect(out[1].end).toBeCloseTo(22.19, 5)
+    expect(uncovered(out, 22.34, 22.59)).toBe(true)
+  })
 })
 
 describe('spreadSegments', () => {

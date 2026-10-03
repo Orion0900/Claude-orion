@@ -12,8 +12,14 @@ export const FRAME_SECONDS = 0.01
 // Mean square below this (-90 dBFS) is digital silence: padding or a muted
 // stretch, which says nothing about how noisy the room is.
 const DIGITAL_SILENCE = 1e-9
-// Speech has to stand this far above the room's noise floor...
+// Speech has to stand at least this far above the room's noise floor, or a
+// quarter of the way from the floor up to the speech level if that's more:
+// frame-to-frame, room noise wanders a few dB, and a margin it can reach
+// fills every pause with "speech".
 const SPEECH_ABOVE_FLOOR_DB = 6
+const SPEECH_SHARE_OF_RANGE = 0.25
+// Loud for less than this is a blip of noise, not a syllable.
+const MIN_LOUD_SECONDS = 0.03
 // ...and above this absolute level, so a near-silent file isn't read as speech.
 const MIN_SPEECH_DB = -60
 // Less sound than this in a window is a click or a bump, not words.
@@ -78,8 +84,10 @@ export function analyse(audio: Float32Array, sampleRate = SAMPLE_RATE): SpeechPr
 export function speechThreshold(power: Float32Array): number {
   const sounding = power.filter((p) => p > DIGITAL_SILENCE).sort()
   if (sounding.length === 0) return Infinity
-  const floor = sounding[Math.floor(sounding.length * 0.1)]
-  const db = Math.max(MIN_SPEECH_DB, 10 * Math.log10(floor) + SPEECH_ABOVE_FLOOR_DB)
+  const floorDb = 10 * Math.log10(sounding[Math.floor(sounding.length * 0.1)])
+  const speechDb = 10 * Math.log10(sounding[Math.floor(sounding.length * 0.95)])
+  const margin = Math.max(SPEECH_ABOVE_FLOOR_DB, SPEECH_SHARE_OF_RANGE * (speechDb - floorDb))
+  const db = Math.max(MIN_SPEECH_DB, floorDb + margin)
   return 10 ** (db / 10)
 }
 
@@ -106,11 +114,24 @@ export function speechIslands(profile: SpeechProfile, start: number, end: number
   const { power, threshold, frameSeconds } = profile
   const [from, to] = frameRange(profile, start, end)
   const gapFrames = Math.max(1, Math.round(gap / frameSeconds))
+  const blip = Math.max(1, Math.round(MIN_LOUD_SECONDS / frameSeconds))
+  // A run of loud frames too short to be a syllable doesn't break a pause.
+  const voiced = new Uint8Array(to - from)
+  for (let i = from; i < to; ) {
+    if (power[i] < threshold) {
+      i++
+      continue
+    }
+    let j = i
+    while (j < to && power[j] >= threshold) j++
+    if (j - i >= blip || i === from || j === to) voiced.fill(1, i - from, j - from)
+    i = j
+  }
   const islands: Island[] = []
   let current: Island | null = null
   let quiet = 0
   for (let i = from; i < to; i++) {
-    if (power[i] < threshold) {
+    if (!voiced[i - from]) {
       quiet++
       continue
     }

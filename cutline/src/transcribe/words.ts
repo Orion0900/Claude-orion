@@ -6,7 +6,7 @@
  */
 
 import type { Word } from '../lib/types.ts'
-import { isSteady, loudUntil, speechIslands, speechSeconds } from './chunking.ts'
+import { isSteady, loudUntil, speechIslands, speechSeconds, type Island } from './chunking.ts'
 import type { SpeechProfile } from './chunking.ts'
 
 /** A word or segment as transformers.js returns it: seconds from the start of the audio it heard. */
@@ -53,6 +53,14 @@ const SNAP_MIN_SECONDS = 0.2
 const WORD_GAP = 0.25
 // How far a word may grow to take in sound just past its edges.
 const REACH = 0.3
+// A stretch of sound this long or more can be a word, not a sliver of the next one.
+const OWN_SOUND = 0.15
+// A lone stretch of sound no longer than this can be an um a word was timed onto,
+// when the next word starts no further away than SHIFT_REACH.
+const LONE_SOUND = 0.6
+const SHIFT_REACH = 1.2
+// Punctuation that ends a phrase, give or take a closing quote or bracket.
+const PHRASE_END = /[,.!?;:…—–]["'”’)\]]*$/u
 // With less speech-loud audio than this under it, a stock phrase was made up.
 const INVENTED_SPEECH_SHARE = 0.25
 const LONGEST_REPEATED_PHRASE = 8
@@ -284,15 +292,16 @@ function fixTimes(words: readonly Draft[], duration: number): Timed[] {
  * to take in sound running on just past its edges, up to its neighbours.
  */
 export function snapToSpeech(words: readonly Timed[], profile: SpeechProfile, low: number, high: number): Timed[] {
-  const out = words.map((word) => {
+  const out = words.map((word, i) => {
     if (word.end - word.start < SNAP_MIN_SECONDS) return { ...word }
     const islands = speechIslands(profile, word.start, word.end, WORD_GAP)
     if (islands.length === 0) return { ...word }
-    const main = islands.reduce((best, island) => (island.loud > best.loud ? island : best))
+    const main = ownSound(islands, word, i > 0 ? words[i - 1] : null, i + 1 < words.length ? words[i + 1] : null, profile)
     const start = Math.max(word.start, main.start - LEAD_IN)
     const end = Math.min(word.end, main.end + TAIL_OUT)
     return end - start >= MIN_WORD_SECONDS ? { ...word, start, end } : { ...word }
   })
+  reclaimShifted(out, profile)
   out.forEach((word, i) => {
     const before = i > 0 ? out[i - 1].end : low
     const after = i + 1 < out.length ? out[i + 1].start : high
@@ -303,6 +312,93 @@ export function snapToSpeech(words: readonly Timed[], profile: SpeechProfile, lo
   })
   return out
 }
+
+/**
+ * Which stretch of sound inside a word's time is the word itself.
+ *
+ * Whisper writes down hardly any ums, and the time an um took gets counted
+ * into the word beside it: "channel. [umm] So today" times "So" from the
+ * start of the umm. The longest stretch is often the um, so loudness alone
+ * picks wrong. Punctuation says where the pause was: a word that ends a
+ * phrase comes before it, so the word is its first stretch of sound; a
+ * word that opens a phrase comes after it, so it's the last. A stretch too
+ * short to be a word is a sliver of a neighbour, never the word.
+ *
+ * Mid-phrase, Whisper often leaves the pauses around an um unpunctuated:
+ * "about [uhh] the three" with "the" timed over the uhh, the pause and the
+ * word. There, a short stretch standing alone at the front, then a
+ * word-length stretch running straight on into the next word, means the
+ * word is the second one. Anything else keeps the loudest stretch.
+ */
+export function ownSound(
+  islands: readonly Island[],
+  word: Timed,
+  previous: Timed | null,
+  next: Timed | null,
+  profile: SpeechProfile,
+): Island {
+  const loudest = islands.reduce((best, island) => (island.loud > best.loud ? island : best))
+  if (islands.length < 2) return loudest
+  const ends = PHRASE_END.test(word.text.trim())
+  const opens = previous === null || PHRASE_END.test(previous.text.trim())
+  const first = islands[0]
+  const last = islands[islands.length - 1]
+  if (ends && !opens) return first.end - first.start >= OWN_SOUND ? first : loudest
+  if (opens && !ends) return last.end - last.start >= OWN_SOUND ? last : loudest
+  if (ends || opens || !next) return loudest
+  const loneFirst = first.end - first.start <= LONE_SOUND && standsAlone(profile, first) && (!previous || previous.end <= first.start)
+  const runsOn = last.end >= word.end - 0.01 && next.start <= word.end + 0.05 && last.end - last.start >= OWN_SOUND
+  return loneFirst && runsOn ? last : loudest
+}
+
+/** Whether a stretch of sound has at least WORD_GAP of quiet before it. */
+function standsAlone(profile: SpeechProfile, island: Island): boolean {
+  const before = speechIslands(profile, island.start - WORD_GAP - 0.02, island.end, WORD_GAP)
+  const own = before[before.length - 1]
+  return !own || own.start >= island.start - 0.015
+}
+
+/**
+ * Whisper sometimes times a word onto an um just before it: "channel.
+ * [umm] So today" with "So" over the umm and "today" over "so today". The
+ * um then passes for speech and the word's own sound goes to its
+ * neighbour. The tell is a pause Whisper didn't punctuate: a short, lone
+ * stretch of sound holding a single unpunctuated word, quiet either side,
+ * then the next word opening the next stretch. A real word stranded like
+ * that nearly always gets a comma or a full stop. So the word moves to the
+ * front of the next stretch, sharing it with its neighbour by length, and
+ * the lone sound is left untranscribed for the filler remover.
+ */
+function reclaimShifted(words: Timed[], profile: SpeechProfile): void {
+  for (let i = 0; i + 1 < words.length; i++) {
+    const word = words[i]
+    const next = words[i + 1]
+    if (PHRASE_END.test(word.text.trim())) continue
+    // Stretches of sound are at least WORD_GAP of quiet apart, so "lone" means
+    // nothing else is said in the stretch this word sits on.
+    const around = speechIslands(profile, word.start - WORD_GAP, next.end, WORD_GAP)
+    const mine = around.filter((island) => island.end > word.start && island.start < word.end)
+    if (mine.length !== 1) continue
+    const lone = mine[0]
+    if (lone.end - lone.start > LONE_SOUND) continue
+    if (i > 0 && words[i - 1].end > lone.start) continue
+    const following = around.find((island) => island.start > lone.end)
+    if (!following || following.start - lone.end > SHIFT_REACH) continue
+    // Only when the next word claims the very start of its stretch: its
+    // timing then took in the sound this word lost. A next word timed from
+    // part-way in leaves room for this one to be a real word said alone.
+    if (next.start > following.start + 0.05 || next.end <= following.start) continue
+    const start = Math.max(following.start - LEAD_IN, lone.end)
+    const share = (next.end - start) * (letters(word.text) / (letters(word.text) + letters(next.text)))
+    const end = start + Math.max(MIN_WORD_SECONDS, share)
+    if (next.end - end < MIN_WORD_SECONDS) continue
+    word.start = start
+    word.end = end
+    next.start = end
+  }
+}
+
+const letters = (text: string) => Math.max(1, text.replace(/[^\p{L}\p{N}]/gu, '').length)
 
 /**
  * Whisper fills silence and noise with stock phrases like "Thank you." Drops

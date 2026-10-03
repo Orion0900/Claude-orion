@@ -98,7 +98,10 @@ words.
 The loudness thresholds are read from each recording's own room tone and
 speech level, not fixed. That's also how the ums Whisper didn't write down get
 cut: a short sound standing alone between words, which no transcribed word
-accounts for, goes with the fillers.
+accounts for, goes with the fillers. Whisper often stretches the word before
+or after an um over it, or slides a word onto it, so each word is first given
+back its own sound — punctuation says which side of a pause a word belongs
+to — and only then is the um left standing alone.
 
 Everything stored is on the recording's own clock; the edited timeline is
 derived from it whenever an edit changes, so edits never have to be re-timed.
@@ -165,8 +168,10 @@ npm run icons          # redraws the icons with Playwright's Chromium
 Edit, changes styles and framing, exports and checks the file with ffprobe,
 then records a take with Chromium's fake camera. It serves a copy of
 `Xenova/whisper-tiny` from a local stand-in for Hugging Face, so it runs
-offline. `tests/transcribe.mjs` and `tests/media.mjs` check Whisper and the
-export on their own; see [tests/README.md](tests/README.md).
+offline. `tests/site.mjs` runs it under its Pages sub-path and then with the
+server gone, `tests/older-safari.mjs` as on iPhones before iOS 26, and
+`tests/transcribe.mjs` and `tests/media.mjs` check Whisper and the export on
+their own; see [tests/README.md](tests/README.md).
 
 Things only a real iPhone can confirm: export speed, lip sync after the AAC
 encoder's start-up delay, and how HDR clips look once drawn on a canvas.
