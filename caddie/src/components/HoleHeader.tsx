@@ -5,6 +5,10 @@ import { toUnit, type Unit } from '../lib/units'
 
 interface HoleHeaderProps {
   hole: Hole | null
+  /** The hole being played, even before it has a flag; null with no course. */
+  number: number | null
+  /** False when there's no other hole to move to. */
+  canStep: boolean
   distance: number | null
   green: { front: number; back: number } | null
   unit: Unit
@@ -23,26 +27,26 @@ interface HoleHeaderProps {
  * attention. Hole number, par, yardage, and the two green edges — that's the
  * whole vocabulary.
  */
-export function HoleHeader({ hole, distance, green, unit, accuracy, live, onPrev, onNext, onFrame }: HoleHeaderProps) {
+export function HoleHeader({ hole, number, canStep, distance, green, unit, accuracy, live, onPrev, onNext, onFrame }: HoleHeaderProps) {
   const shown = distance === null ? null : Math.round(toUnit(distance, unit))
   const flash = useFlashOnChange(shown)
 
   return (
     <div className="hud">
       <div className="hud-top">
-        <button type="button" className="round ghost" onClick={onPrev} aria-label="Previous hole" disabled={!hole}>
+        <button type="button" className="round ghost" onClick={onPrev} aria-label="Previous hole" disabled={!canStep}>
           ‹
         </button>
         <button type="button" className="hole-chip" onClick={onFrame} title="Centre the hole">
-          <strong>{hole ? hole.number : '–'}</strong>
+          <strong>{hole?.number ?? number ?? '–'}</strong>
           {hole?.par ? <span>par {hole.par}</span> : <span>hole</span>}
         </button>
-        <button type="button" className="round ghost" onClick={onNext} aria-label="Next hole" disabled={!hole}>
+        <button type="button" className="round ghost" onClick={onNext} aria-label="Next hole" disabled={!canStep}>
           ›
         </button>
       </div>
 
-      <button type="button" className="yardage" onClick={onFrame} aria-label="Distance to the flag">
+      <button type="button" className="yardage" onClick={onFrame} aria-label={shown === null ? 'Distance to the flag unknown' : `${shown} ${unit === 'yd' ? 'yards' : 'meters'} to the flag`}>
         <span className={`yardage-big${flash ? ' flash' : ''}`}>{shown === null ? '–' : shown}</span>
         <span className="yardage-unit">{unit}</span>
       </button>

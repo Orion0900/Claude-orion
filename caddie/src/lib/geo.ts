@@ -5,6 +5,12 @@ export interface LatLng {
   lng: number
 }
 
+/** True for anything shaped like a point, e.g. when reading an old save back. */
+export function isLatLng(value: unknown): value is LatLng {
+  const p = value as Partial<LatLng> | null
+  return typeof p === 'object' && p !== null && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+}
+
 const R_EARTH = 6371008.8 // mean Earth radius (meters), IUGG
 const toRad = (deg: number) => (deg * Math.PI) / 180
 const toDeg = (rad: number) => (rad * 180) / Math.PI

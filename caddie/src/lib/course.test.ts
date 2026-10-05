@@ -4,10 +4,13 @@ import {
   greenDepth,
   hazardsAlongLine,
   manualCourse,
+  holeNumbers,
   nearestHole,
+  normalizeCourse,
   parseOverpass,
   parseOverpassCourses,
   setHoleTarget,
+  stepHole,
   targetOf,
   type OverpassResponse,
 } from './course'
@@ -145,5 +148,58 @@ describe('nearestHole', () => {
     })
     expect(nearestHole(courses[0], destination(TEE, 90, 780))?.number).toBe(2)
     expect(nearestHole(courses[0], TEE)?.number).toBe(1)
+  })
+})
+
+describe('holeNumbers and stepHole', () => {
+  const flag = destination(TEE, 0, 300)
+
+  it('steps through every hole of a hand-built course, flag or not', () => {
+    const course = setHoleTarget(manualCourse(), 1, flag)
+    expect(holeNumbers(course)).toHaveLength(18)
+    expect(stepHole(course, 1, 1)).toBe(2)
+    expect(stepHole(course, 18, 1)).toBe(1)
+    expect(stepHole(course, 1, -1)).toBe(18)
+  })
+
+  it('keeps holes added past eighteen on a hand-built course', () => {
+    const course = setHoleTarget(manualCourse(), 19, flag)
+    expect(holeNumbers(course)).toHaveLength(19)
+    expect(stepHole(course, 18, 1)).toBe(19)
+  })
+
+  it('only visits mapped holes on a mapped course, wrapping round', () => {
+    const course = { ...setHoleTarget(setHoleTarget(manualCourse(), 3, flag), 7, flag), source: 'osm' as const }
+    expect(holeNumbers(course)).toEqual([3, 7])
+    expect(stepHole(course, 3, 1)).toBe(7)
+    expect(stepHole(course, 7, 1)).toBe(3)
+    expect(stepHole(course, 3, -1)).toBe(7)
+    expect(stepHole({ ...course, holes: [] }, 5, 1)).toBe(5)
+  })
+})
+
+describe('normalizeCourse', () => {
+  it('passes a good save through unchanged', () => {
+    const course = setHoleTarget(manualCourse(), 1, TEE)
+    expect(normalizeCourse(JSON.parse(JSON.stringify(course)))).toEqual(course)
+  })
+
+  it('rejects saves that are not a course', () => {
+    expect(normalizeCourse(null)).toBeNull()
+    expect(normalizeCourse('course')).toBeNull()
+    expect(normalizeCourse({ name: 'No holes' })).toBeNull()
+  })
+
+  it('drops holes and hazards it cannot draw, and fills in what an old save lacks', () => {
+    const course = normalizeCourse({
+      id: 'osm-way-1',
+      name: 'Old save',
+      holes: [{ number: 2, green: TEE }, { number: 1 }, null, { number: 'x', green: TEE }],
+      hazards: [{ kind: 'water', polygon: [TEE, TEE, TEE] }, { kind: 'lava', polygon: [] }, { kind: 'bunker' }],
+    })
+    expect(course?.source).toBe('osm')
+    expect(course?.holes).toEqual([{ number: 2, par: null, length: null, tee: null, green: TEE, outline: null, pin: null }])
+    expect(course?.hazards).toHaveLength(1)
+    expect(normalizeCourse({ id: 'manual-abc', holes: [] })?.source).toBe('manual')
   })
 })

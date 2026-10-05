@@ -12,17 +12,33 @@ import { defaultBag, type ClubId, type SkillLevel } from './lib/clubs'
 import {
   greenDepth,
   hazardsAlongLine,
+  holeNumbers,
   manualCourse,
   nearestHole,
+  normalizeCourse,
   setHolePar,
   setHoleTarget,
   setHoleTee,
+  stepHole,
   targetOf,
   type Course,
 } from './lib/course'
 import { haversine, type LatLng } from './lib/geo'
 import { DEFAULT_PROFILE, normalizeProfile, type Aggressiveness, type Profile } from './lib/profile'
-import { holeOut, markShot, newId, setManualDistance, shotsOnHole, undoLastShot, type Lie, type Round, type Shot } from './lib/shots'
+import {
+  deleteShot,
+  holeOut,
+  markShot,
+  newId,
+  normalizeRound,
+  normalizeShots,
+  setManualDistance,
+  shotsOnHole,
+  undoLastShot,
+  type Lie,
+  type Round,
+  type Shot,
+} from './lib/shots'
 import { readJson, writeJson } from './lib/storage'
 import { useGeolocation } from './services/geolocation'
 import { findNearbyCourses, type NearbyCourse } from './services/overpass'
@@ -49,10 +65,14 @@ function newRound(courseName: string | null): Round {
 
 export default function App() {
   const [profile, setProfile] = useState<Profile>(() => normalizeProfile(readJson(KEYS.profile, DEFAULT_PROFILE)))
-  const [course, setCourse] = useState<Course | null>(() => readJson<Course | null>(KEYS.course, null))
-  const [shots, setShots] = useState<Shot[]>(() => readJson<Shot[]>(KEYS.shots, []))
-  const [round, setRound] = useState<Round>(() => readJson<Round | null>(KEYS.round, null) ?? newRound(null))
-  const [holeNumber, setHoleNumber] = useState<number>(() => readJson<number>(KEYS.hole, 1))
+  // Saves are checked on the way in: an old or half-written one mustn't stop the app opening.
+  const [course, setCourse] = useState<Course | null>(() => normalizeCourse(readJson<unknown>(KEYS.course, null)))
+  const [shots, setShots] = useState<Shot[]>(() => normalizeShots(readJson<unknown>(KEYS.shots, [])))
+  const [round, setRound] = useState<Round>(() => normalizeRound(readJson<unknown>(KEYS.round, null)) ?? newRound(null))
+  const [holeNumber, setHoleNumber] = useState<number>(() => {
+    const stored = readJson<unknown>(KEYS.hole, 1)
+    return typeof stored === 'number' && Number.isInteger(stored) && stored > 0 ? stored : 1
+  })
   const [tab, setTab] = useState<Tab>('play')
   const [tapMode, setTapMode] = useState<TapMode>('none')
   const [manualPosition, setManualPosition] = useState<LatLng | null>(null)
@@ -62,9 +82,7 @@ export default function App() {
   const [frameKey, setFrameKey] = useState(0)
   // Setup asks two questions before play: which course, then which hole. It
   // opens itself when there's no course yet, and can be re-entered later.
-  const [setupStep, setSetupStep] = useState<SetupStep | null>(() =>
-    readJson<Course | null>(KEYS.course, null) === null ? 'course' : null,
-  )
+  const [setupStep, setSetupStep] = useState<SetupStep | null>(() => (course === null ? 'course' : null))
   const [candidates, setCandidates] = useState<NearbyCourse[] | null>(null)
   const [searching, setSearching] = useState(false)
   // Bumped to fire confetti. Reserved for a hole worth celebrating, because
@@ -111,16 +129,10 @@ export default function App() {
     setLie(null)
     setPickedClub(null)
   }
-  const nextHole = () => {
-    if (!course) return
-    const after = course.holes.find((h) => h.number > holeNumber)
-    goToHole(after ? after.number : course.holes[0]?.number ?? 1)
-  }
-  const prevHole = () => {
-    if (!course) return
-    const before = [...course.holes].reverse().find((h) => h.number < holeNumber)
-    goToHole(before ? before.number : course.holes[course.holes.length - 1]?.number ?? 1)
-  }
+  // A hand-built course steps through all eighteen, flag or not, so the next
+  // hole's flag can be set when the player gets there.
+  const nextHole = () => course && goToHole(stepHole(course, holeNumber, 1))
+  const prevHole = () => course && goToHole(stepHole(course, holeNumber, -1))
 
   const onTap = useCallback(
     (point: LatLng) => {
@@ -222,6 +234,8 @@ export default function App() {
         {setupStep === null && (
           <HoleHeader
             hole={hole}
+            number={course ? holeNumber : null}
+            canStep={course !== null && holeNumbers(course).length > 1}
             distance={distance}
             green={green}
             unit={profile.unit}
@@ -273,7 +287,7 @@ export default function App() {
                 shots={holeShots}
                 unit={profile.unit}
                 onDistance={(id, meters) => setShots((s) => s.map((shot) => (shot.id === id ? setManualDistance(shot, meters) : shot)))}
-                onDeleteShot={(id) => setShots((s) => s.filter((shot) => shot.id !== id))}
+                onDeleteShot={(id) => setShots((s) => deleteShot(s, id))}
               />
             </div>
           )}
@@ -314,7 +328,13 @@ export default function App() {
         {setupStep === null && tab === 'play' && dock}
         <nav className="tabs" hidden={setupStep !== null}>
           {TABS.map((t) => (
-            <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+            <button
+              key={t.id}
+              type="button"
+              className={tab === t.id ? 'on' : ''}
+              aria-current={tab === t.id ? 'page' : undefined}
+              onClick={() => setTab(t.id)}
+            >
               <span aria-hidden="true">{t.icon}</span>
               {t.label}
             </button>

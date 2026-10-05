@@ -1,4 +1,4 @@
-import type { Course } from '../lib/course'
+import { holeNumbers, type Course } from '../lib/course'
 import type { NearbyCourse } from '../services/overpass'
 import { formatAway, type Unit } from '../lib/units'
 
@@ -24,8 +24,6 @@ interface SetupViewProps {
   onBack: () => void
   onCancel: () => void
 }
-
-const MANUAL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1)
 
 export function SetupView(p: SetupViewProps) {
   return p.step === 'course' ? <CourseStep {...p} /> : <HoleStep {...p} />
@@ -106,8 +104,8 @@ function CourseStep(p: SetupViewProps) {
 
 function HoleStep(p: SetupViewProps) {
   const holes = p.course?.holes ?? []
-  const manual = holes.length === 0
-  const numbers = manual ? MANUAL_HOLES : holes.map((h) => h.number)
+  // A hand-built course offers every hole, including ones whose flag is still to be set.
+  const numbers = p.course ? holeNumbers(p.course) : []
   const byNumber = new Map(holes.map((h) => [h.number, h]))
 
   return (

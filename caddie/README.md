@@ -39,7 +39,8 @@ EasyPedal. Merging is the only step.
 - **Courses from the map, or by hand.** Tees, greens, bunkers, water and pins
   come from OpenStreetMap. Not every course is mapped, so **Set it up by hand**
   gives you eighteen holes to fill in: pick a number and tap where the flag is,
-  as you play.
+  as you play. The hole arrows walk all eighteen, so the next hole's flag is
+  one tap away when you get there.
 - **GPS and the line.** A live dot for you, a flag for the hole, a dashed line
   between them with the distance written on it. Front and back of the green
   too, when the green's outline is known. Yards or meters.
@@ -53,7 +54,8 @@ EasyPedal. Merging is the only step.
 - **Tracks every shot.** Mark a shot standing over the ball; the next mark
   measures how far it went. Pick the club (it starts on the caddie's
   suggestion), hit **Holed out** at the end. Type a distance if the GPS was
-  off. Undo is one tap.
+  off. Undo is one tap, and deleting a shot from the middle of a hole
+  closes the gap: the shot before it lands where the deleted one did.
 - **Learns you.** Three tracked shots with a club start moving its number;
   eight and the caddie trusts your average over the chart. Every plan says
   where its number came from.

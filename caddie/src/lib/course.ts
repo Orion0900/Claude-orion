@@ -6,7 +6,7 @@
  * `natural=water`, and the occasional `golf=pin` node. Not every course has
  * all of it, so anything can be missing and the app still has to work.
  */
-import { centroid, haversine, pointInPolygon, polygonCrossings, type LatLng } from './geo'
+import { centroid, haversine, isLatLng, pointInPolygon, polygonCrossings, type LatLng } from './geo'
 import type { HazardInterval, HazardKind } from './advisor'
 
 export interface Hole {
@@ -299,4 +299,61 @@ export function setHoleTee(course: Course, number: number, tee: LatLng): Course 
 
 export function setHolePar(course: Course, number: number, par: number | null): Course {
   return { ...course, holes: course.holes.map((h) => (h.number === number ? { ...h, par } : h)) }
+}
+
+/** A hand-built course offers this many holes to fill in, more if the player adds them. */
+export const MANUAL_HOLE_COUNT = 18
+
+/**
+ * The hole numbers the player can move between. A mapped course has the holes
+ * the map knows; a hand-built one has all eighteen, flag or not, because the
+ * next hole's flag can only be dropped once the player is on it.
+ */
+export function holeNumbers(course: Course): number[] {
+  const mapped = course.holes.map((h) => h.number)
+  if (course.source !== 'manual') return mapped
+  const last = Math.max(MANUAL_HOLE_COUNT, ...mapped)
+  return Array.from({ length: last }, (_, i) => i + 1)
+}
+
+/** The next (or previous) hole after `current`, wrapping round the course. */
+export function stepHole(course: Course, current: number, direction: 1 | -1): number {
+  const numbers = holeNumbers(course)
+  if (numbers.length === 0) return current
+  if (direction === 1) return numbers.find((n) => n > current) ?? numbers[0]
+  return [...numbers].reverse().find((n) => n < current) ?? numbers[numbers.length - 1]
+}
+
+/**
+ * A stored course, checked before it's trusted: a save from an older version,
+ * or one cut short by a full disk, mustn't stop the app from opening. Holes and
+ * hazards that can't be drawn are dropped; anything else unusable gives null.
+ */
+export function normalizeCourse(raw: unknown): Course | null {
+  const c = raw as Partial<Course> | null
+  if (typeof c !== 'object' || c === null || !Array.isArray(c.holes)) return null
+  const id = typeof c.id === 'string' ? c.id : `manual-${Date.now().toString(36)}`
+  const holes = c.holes
+    .filter((h): h is Hole => typeof h === 'object' && h !== null && Number.isInteger(h.number) && h.number > 0 && isLatLng(h.green))
+    .map((h) => ({
+      number: h.number,
+      par: Number.isInteger(h.par) ? h.par : null,
+      length: Number.isFinite(h.length) ? h.length : null,
+      tee: isLatLng(h.tee) ? h.tee : null,
+      green: h.green,
+      outline: Array.isArray(h.outline) && h.outline.length > 2 && h.outline.every(isLatLng) ? h.outline : null,
+      pin: isLatLng(h.pin) ? h.pin : null,
+    }))
+    .sort((a, b) => a.number - b.number)
+  const hazards = (Array.isArray(c.hazards) ? c.hazards : []).filter(
+    (z): z is Hazard =>
+      typeof z === 'object' && z !== null && (z.kind === 'bunker' || z.kind === 'water') && Array.isArray(z.polygon) && z.polygon.every(isLatLng),
+  )
+  return {
+    id,
+    name: typeof c.name === 'string' ? c.name : 'My course',
+    holes,
+    hazards,
+    source: c.source === 'osm' || c.source === 'manual' ? c.source : id.startsWith('manual-') ? 'manual' : 'osm',
+  }
 }

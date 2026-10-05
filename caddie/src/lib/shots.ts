@@ -5,7 +5,7 @@
  * next one (or hole out), because that is the moment the ball's resting
  * place is known. The distance is GPS unless the player types one in.
  */
-import { haversine, type LatLng } from './geo'
+import { haversine, isLatLng, type LatLng } from './geo'
 import type { ClubId } from './clubs'
 
 export type Lie = 'tee' | 'fairway' | 'rough' | 'sand' | 'green'
@@ -133,6 +133,69 @@ export function undoLastShot(shots: Shot[], roundId: string, hole: number): Shot
   return shots
     .filter((s) => s.id !== last.id)
     .map((s) => (previous && s.id === previous.id ? { ...s, end: null, distance: s.manual ? s.distance : null } : s))
+}
+
+/**
+ * Delete one shot from anywhere on the hole. The shots after it move up a
+ * number, and the shot before it now lands where the deleted one did, so the
+ * chain from tee to cup stays unbroken. Deleting the last shot is an undo.
+ */
+export function deleteShot(shots: Shot[], id: string): Shot[] {
+  const target = shots.find((s) => s.id === id)
+  if (!target) return shots
+  const onHole = shotsOnHole(shots, target.roundId, target.hole)
+  const index = onHole.findIndex((s) => s.id === id)
+  const previous = onHole[index - 1]
+  return shots
+    .filter((s) => s.id !== id)
+    .map((s) => {
+      if (s.roundId !== target.roundId || s.hole !== target.hole) return s
+      if (previous && s.id === previous.id) {
+        if (target.end === null) return { ...s, end: null, distance: s.manual ? s.distance : null }
+        return closeShot(s, target.end)
+      }
+      return s.number > target.number ? { ...s, number: s.number - 1 } : s
+    })
+}
+
+/**
+ * The shot log as stored, checked before it's trusted. Anything that isn't a
+ * whole shot is dropped rather than letting one bad record break the app.
+ */
+export function normalizeShots(raw: unknown): Shot[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter(
+    (s): s is Shot =>
+      typeof s === 'object' &&
+      s !== null &&
+      typeof s.id === 'string' &&
+      typeof s.roundId === 'string' &&
+      Number.isInteger(s.hole) &&
+      Number.isInteger(s.number) &&
+      typeof s.club === 'string' &&
+      isLatLng(s.start) &&
+      (s.end === undefined || s.end === null || isLatLng(s.end)) &&
+      (s.distance === undefined || s.distance === null || Number.isFinite(s.distance)),
+  ).map((s) => ({
+    ...s,
+    lie: LIES.some((l) => l.id === s.lie) ? s.lie : 'fairway',
+    end: s.end ?? null,
+    distance: s.distance ?? null,
+    manual: s.manual === true,
+    toHole: Number.isFinite(s.toHole) ? s.toHole : null,
+    plan: s.plan ?? null,
+    timestamp: Number.isFinite(s.timestamp) ? s.timestamp : 0,
+  }))
+}
+
+export function normalizeRound(raw: unknown): Round | null {
+  const r = raw as Partial<Round> | null
+  if (typeof r !== 'object' || r === null || typeof r.id !== 'string') return null
+  return {
+    id: r.id,
+    courseName: typeof r.courseName === 'string' ? r.courseName : null,
+    startedAt: Number.isFinite(r.startedAt) ? (r.startedAt as number) : Date.now(),
+  }
 }
 
 export function updateShot(shots: Shot[], id: string, patch: Partial<Shot>): Shot[] {

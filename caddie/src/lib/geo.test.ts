@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bearingTo, centroid, destination, haversine, pointInPolygon, polygonCrossings } from './geo'
+import { bearingTo, centroid, destination, haversine, isLatLng, pointInPolygon, polygonCrossings } from './geo'
 
 const TEE = { lat: 42.3601, lng: -71.0589 }
 
@@ -62,5 +62,15 @@ describe('polygonCrossings', () => {
       destination(TEE, 45, 80),
     ]
     expect(polygonCrossings(TEE, destination(TEE, 0, 200), pond)).toEqual([])
+  })
+})
+
+describe('isLatLng', () => {
+  it('accepts points and rejects anything else', () => {
+    expect(isLatLng({ lat: 1, lng: 2 })).toBe(true)
+    expect(isLatLng({ lat: 1 })).toBe(false)
+    expect(isLatLng({ lat: NaN, lng: 2 })).toBe(false)
+    expect(isLatLng(null)).toBe(false)
+    expect(isLatLng('1,2')).toBe(false)
   })
 })
