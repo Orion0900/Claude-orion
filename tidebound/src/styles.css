@@ -102,13 +102,17 @@ body {
   pointer-events: auto;
 }
 
+/* Upright, the D-pad and A/B are centred in the room between the screen and
+   SELECT/START (which take the bottom 49px), where thumbs rest. */
 .touch.portrait .dpad {
   left: 6%;
-  top: 14%;
+  top: calc(50% - 24px);
+  transform: translateY(-50%);
 }
 .touch.portrait .face {
   right: 5%;
-  top: 16%;
+  top: calc(50% - 24px);
+  transform: translateY(-50%);
 }
 /* The narrowest phones (320pt wide): smaller controls so they don't touch. */
 @media (max-width: 359px) {

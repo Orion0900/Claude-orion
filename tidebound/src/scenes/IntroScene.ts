@@ -2,6 +2,7 @@ import { PLAYER_LOOKS } from '../art/look'
 import { Art } from '../game/art'
 import type { Game } from '../game/Game'
 import type { Scene } from '../game/scene'
+import { drawBoxText } from '../ui/Dialog'
 import { CH } from '../ui/font'
 import type { Gfx } from '../engine/gfx'
 import type { Pad } from '../engine/input'
@@ -13,6 +14,9 @@ interface Figure {
   x: number
   alpha: number
 }
+
+/** Kept on screen while the player chooses. */
+const LOOK_QUESTION = 'Which of these looks like you?'
 
 const SUGGESTED = ['KAI', 'REEF', 'NOA', 'MARLO', 'SUNNY', 'ISLA', 'CORBIN', 'WREN']
 
@@ -59,7 +63,7 @@ export class IntroScene implements Scene {
     await g.say('This little one is a NARLET. It squeaks a song whenever the tide comes in.')
     await g.say('People and beasts share these islands. Some are friends, some are partners, and some train together to battle!\fAs for me, I study how beasts move with the tides. The sea has so many secrets…')
     this.figures = [{ kind: 'prof', x: 88, alpha: 1 }]
-    await g.say('But enough about me! Tell me about yourself. Which of these looks like you?')
+    await g.say(`But enough about me! Tell me about yourself. ${LOOK_QUESTION}`)
     this.figures = [
       { kind: 'player0', x: 40, alpha: 1 },
       { kind: 'player1', x: 136, alpha: 1 },
@@ -144,6 +148,7 @@ export class IntroScene implements Scene {
     if (this.picking) {
       const x = this.pick === 0 ? 40 : 136
       g.text(CH.down, x + 28, 20 + (Math.floor(this.t / 12) % 2), { color: '#f8e070', shadow: '#604010' })
+      drawBoxText(g, LOOK_QUESTION)
     }
   }
 }
