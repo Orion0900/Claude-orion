@@ -91,6 +91,31 @@ export function renameRoute(routes: SavedRoute[], id: string, name: string): Sav
 
 const STORAGE_KEY = 'easypedal.savedRides.v1'
 
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
+/**
+ * Whether a stored ride has everything the list, map and navigation read
+ * straight off it. An empty path has no start to put a pin on, and a missing
+ * profile breaks the list row before the rider can even remove it — so a ride
+ * clipped by a full quota or written by an older build is dropped, not opened.
+ */
+export function isUsableRoute(route: unknown): route is RouteResult {
+  if (typeof route !== 'object' || route === null) return false
+  const candidate = route as Partial<RouteResult>
+  return (
+    Array.isArray(candidate.path) &&
+    candidate.path.length >= 2 &&
+    candidate.path.every((point) => isFiniteNumber(point?.lat) && isFiniteNumber(point?.lng)) &&
+    isFiniteNumber(candidate.distance) &&
+    typeof candidate.profile === 'object' &&
+    candidate.profile !== null &&
+    isFiniteNumber(candidate.profile.gain) &&
+    Array.isArray(candidate.profile.distances) &&
+    Array.isArray(candidate.profile.elevations) &&
+    Array.isArray(candidate.steps)
+  )
+}
+
 /** A saved route is only useful if it survives a reload, and only that. */
 export function createLocalStore(key = STORAGE_KEY): RouteStore {
   return {
@@ -107,7 +132,7 @@ export function createLocalStore(key = STORAGE_KEY): RouteStore {
             item !== null &&
             typeof (item as SavedRoute).id === 'string' &&
             typeof (item as SavedRoute).name === 'string' &&
-            Array.isArray((item as SavedRoute).route?.path),
+            isUsableRoute((item as SavedRoute).route),
         )
       } catch {
         return []

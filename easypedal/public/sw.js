@@ -22,9 +22,49 @@ const LIVE_ONLY_HOSTS = [
   'nominatim.openstreetmap.org',
 ]
 
+/**
+ * The page and everything it loads directly: the built index.html names its
+ * script, stylesheet, manifest and icons with relative paths.
+ */
+function shellAssets(html) {
+  const found = new Set()
+  for (const match of html.matchAll(/\b(?:src|href)="(\.\/[^"#?]+)"/g)) found.add(match[1])
+  return [...found]
+}
+
+/**
+ * Cache the shell up front. The worker registers after the first page has
+ * finished loading, so caching "as it's used" alone would miss that whole
+ * first visit — and an app added to the Home Screen straight away would then
+ * open to a browser error the first time it had no signal.
+ */
+async function precacheShell() {
+  const cache = await caches.open(SHELL_CACHE)
+  const response = await fetch('./', { cache: 'no-cache' })
+  if (!response.ok) return
+  const html = await response.clone().text()
+  await cache.put('./', response)
+  // One missing icon must not cost the rider the rest of the shell.
+  await Promise.all(
+    shellAssets(html).map(async (path) => {
+      try {
+        const asset = await fetch(path)
+        if (asset.ok) await cache.put(path, asset)
+      } catch {
+        // Picked up the next time the page asks for it.
+      }
+    }),
+  )
+}
+
 self.addEventListener('install', (event) => {
-  // The shell is cached as it's used; take over as soon as we're ready.
-  event.waitUntil(self.skipWaiting())
+  // Precaching is best effort: a worker that fails to install would leave the
+  // app with no offline support at all, so take over as soon as we're ready.
+  event.waitUntil(
+    precacheShell()
+      .catch(() => undefined)
+      .then(() => self.skipWaiting()),
+  )
 })
 
 self.addEventListener('activate', (event) => {

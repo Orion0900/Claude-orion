@@ -46,21 +46,46 @@ interface PlaceSearchProps {
   placeholder: string
   /** Bias results toward here, so a street name finds the nearby one. */
   near: LatLng | null
+  /** Where this end is currently set, however it got there. */
+  point: LatLng | null
   onPick: (point: LatLng, label: string) => void
 }
 
+/**
+ * Whether the text in a search box still describes its end. Once the end is
+ * set some other way — a tap on the map, GPS, a swap, a saved ride — the old
+ * text names a place the pin is no longer on.
+ */
+export function searchTextStillApplies(picked: LatLng | null, current: LatLng | null): boolean {
+  if (!picked || !current) return false
+  return picked.lat === current.lat && picked.lng === current.lng
+}
+
 /** A search box that offers places as you pause typing. */
-function PlaceSearch({ id, placeholder, near, onPick }: PlaceSearchProps) {
+function PlaceSearch({ id, placeholder, near, point, onPick }: PlaceSearchProps) {
   const [query, setQuery] = useState('')
   const [places, setPlaces] = useState<Place[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [noMatches, setNoMatches] = useState(false)
   const querySelected = useRef(false)
+  // Whether the box holds a picked place's name rather than the rider's typing.
+  const querySelectedText = useRef(false)
   // A moving bias must not itself re-run the search, or dropping a pin would
   // fire a fresh request for text the rider typed a minute ago.
   const nearRef = useRef(near)
   nearRef.current = near
+  // The point this box last set, so a pin set any other way can clear it.
+  const pickedRef = useRef<LatLng | null>(null)
+
+  useEffect(() => {
+    if (searchTextStillApplies(pickedRef.current, point)) return
+    pickedRef.current = null
+    // Text typed but never picked is the rider's own, still in progress.
+    if (!querySelectedText.current) return
+    querySelectedText.current = false
+    setQuery('')
+  }, [point])
 
   // Debounced: one request per typing pause, never one per keystroke.
   useEffect(() => {
@@ -110,7 +135,18 @@ function PlaceSearch({ id, placeholder, near, onPick }: PlaceSearchProps) {
         autoCorrect="off"
         autoCapitalize="words"
         spellCheck={false}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          querySelectedText.current = false
+          setQuery(event.target.value)
+        }}
+        onKeyDown={(event) => {
+          // Escape dismisses the suggestions without losing what was typed.
+          if (event.key === 'Escape' && places.length > 0) {
+            event.preventDefault()
+            setPlaces([])
+            setNoMatches(false)
+          }
+        }}
         aria-label={placeholder}
       />
       {places.length > 0 ? (
@@ -120,11 +156,14 @@ function PlaceSearch({ id, placeholder, near, onPick }: PlaceSearchProps) {
               <button
                 type="button"
                 onClick={() => {
+                  const picked = { lat: place.lat, lng: place.lng }
                   querySelected.current = true
+                  querySelectedText.current = true
+                  pickedRef.current = picked
                   setQuery(place.label)
                   setPlaces([])
                   setNoMatches(false)
-                  onPick({ lat: place.lat, lng: place.lng }, place.detail ? `${place.label}, ${place.detail}` : place.label)
+                  onPick(picked, place.detail ? `${place.label}, ${place.detail}` : place.label)
                 }}
               >
                 <span className="suggestion-name">{place.label}</span>
@@ -210,6 +249,7 @@ export function ControlPanel({
               id="from-search"
               placeholder="Search an address or place"
               near={to ?? from}
+              point={from}
               onPick={(point, label) => onPickPlace('from', point, label)}
             />
             <button type="button" className="btn btn-secondary" onClick={onLocate} disabled={locating}>
@@ -238,6 +278,7 @@ export function ControlPanel({
               id="to-search"
               placeholder="Search where you're going"
               near={from ?? to}
+              point={to}
               onPick={(point, label) => onPickPlace('to', point, label)}
             />
             <p className="hint">{describe(to, toLabel, 'Not set yet.')}</p>

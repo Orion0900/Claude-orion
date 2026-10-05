@@ -6,6 +6,7 @@ import {
   addRoute,
   createLocalStore,
   findSaved,
+  isUsableRoute,
   isSaved,
   MAX_SAVED,
   removeRoute,
@@ -187,6 +188,19 @@ describe('createLocalStore', () => {
     expect(createLocalStore('test-key').read()).toEqual([])
   })
 
+  it('drops rides that are missing what the list and map read off them', () => {
+    const good = addRoute([], makeRoute(), 'Keep')[0]
+    const broken = [
+      { ...good, id: 'empty-path', route: { ...good.route, path: [] } },
+      { ...good, id: 'no-profile', route: { ...good.route, profile: undefined } },
+      { ...good, id: 'bad-point', route: { ...good.route, path: [{ lat: 'x', lng: 1 }, good.route.path[1]] } },
+      { ...good, id: 'no-distance', route: { ...good.route, distance: null } },
+      { ...good, id: 'no-steps', route: { ...good.route, steps: undefined } },
+    ]
+    stubStorage({ 'test-key': JSON.stringify([...broken, good]) })
+    expect(createLocalStore('test-key').read().map((s) => s.name)).toEqual(['Keep'])
+  })
+
   it('reports a full browser store as such', () => {
     stubStorage({}, true)
     expect(() => createLocalStore('test-key').write([])).toThrow(StorageFullError)
@@ -202,5 +216,16 @@ describe('createLocalStore', () => {
       },
     })
     expect(createLocalStore('test-key').read()).toEqual([])
+  })
+})
+
+describe('isUsableRoute', () => {
+  it('accepts a route as a search returns it', () => {
+    expect(isUsableRoute(makeRoute())).toBe(true)
+  })
+
+  it('refuses a route with nowhere to put the start pin', () => {
+    expect(isUsableRoute(makeRoute({ path: [] }))).toBe(false)
+    expect(isUsableRoute(null)).toBe(false)
   })
 })

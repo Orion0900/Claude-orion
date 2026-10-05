@@ -100,9 +100,25 @@ export default function App() {
     pinLookup.current[which] = null
   }, [])
 
+  // Routes answer the question "from these two pins". Once a pin moves they
+  // answer a question nobody is asking: the map would draw a ride that starts
+  // somewhere else, and Start ride would navigate it. A search still in flight
+  // is cancelled for the same reason, or it would land on the new pins later.
+  const clearRoutes = useCallback(() => {
+    searchRef.current?.abort()
+    searchRef.current = null
+    setSearching(false)
+    setProgress(null)
+    setRoutes([])
+    setSelectedId(null)
+    setScrub(null)
+    setError(null)
+  }, [])
+
   const setEndpoint = useCallback((which: Endpoint, point: LatLng, label: string | null) => {
     const apply = which === 'from' ? setFrom : setTo
     apply({ point, label })
+    clearRoutes()
     if (which === 'from') {
       // Having set the start, the next tap is almost certainly the finish.
       setPicking('to')
@@ -125,7 +141,7 @@ export default function App() {
       .catch(() => {
         // The pin still works without a name; the map shows where it is.
       })
-  }, [cancelLookup])
+  }, [cancelLookup, clearRoutes])
 
   // A lookup in flight when the app closes has nowhere to deliver its answer.
   useEffect(() => {
@@ -286,6 +302,9 @@ export default function App() {
               // drag an end of this saved ride back to a pin dropped earlier.
               cancelLookup('from')
               cancelLookup('to')
+              // Likewise a search still running would replace this ride with
+              // routes between the old pins when it finished.
+              clearRoutes()
               setRoutes([route])
               setSelectedId(route.id)
               setFrom({ point: route.path[0], label: 'Start of a saved ride' })
@@ -308,6 +327,8 @@ export default function App() {
             onSwap={() => {
               cancelLookup('from')
               cancelLookup('to')
+              // The way back is a different ride: what was downhill is now a climb.
+              clearRoutes()
               setFrom(to)
               setTo(from)
             }}
