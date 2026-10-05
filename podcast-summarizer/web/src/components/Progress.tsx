@@ -24,7 +24,7 @@ export function Progress({ stage, message }: { stage: Stage; message: string }) 
         })}
       </ol>
       {!done && stage !== 'failed' && !waiting && (
-        <p className="muted status">
+        <p className="muted status" role="status" aria-live="polite">
           <span className="spinner" /> {message}
         </p>
       )}

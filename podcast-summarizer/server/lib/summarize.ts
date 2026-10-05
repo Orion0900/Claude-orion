@@ -16,9 +16,12 @@ export function supportsEffort(model: string): boolean {
   return !/haiku|claude-3|sonnet-4-5|opus-4-[01]\b/.test(model)
 }
 
-/** Server-side refusal fallbacks are a Fable / Opus 5 feature. */
+/**
+ * Server-side refusal fallbacks (the `fallbacks: 'default'` form) exist on
+ * Fable, Opus 5+ and Sonnet 5.5. Sonnet 5 and older reject the parameter.
+ */
 export function supportsFallbacks(model: string): boolean {
-  return /fable|mythos|opus-5/.test(model)
+  return /fable|mythos|opus-5|sonnet-5-5/.test(model)
 }
 
 const TimestampedPoint = z.object({
@@ -101,7 +104,14 @@ export function createSummarizer(opts: { apiKey?: string; model?: string } = {})
         ],
         output_config: { ...(supportsEffort(model) ? { effort: 'high' as const } : {}), format: betaZodOutputFormat(SummarySchema) },
       })
-      stream.on('text', () => onProgress?.('Writing the summary…'))
+      // Text deltas arrive by the thousand; the job only needs to hear once
+      // that writing has started (every progress update is a save to disk).
+      let writing = false
+      stream.on('text', () => {
+        if (writing) return
+        writing = true
+        onProgress?.('Writing the summary…')
+      })
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') {
         throw new Error(`Claude declined to summarize this episode${message.stop_details?.explanation ? `: ${message.stop_details.explanation}` : '.'}`)

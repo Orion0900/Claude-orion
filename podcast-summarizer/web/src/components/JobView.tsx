@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { isActive, type Job } from '../types'
 import { EpisodeCard } from './EpisodeCard'
@@ -20,6 +20,11 @@ export function JobView({
 }) {
   const [job, setJob] = useState<Job | undefined>(initial)
   const [error, setError] = useState<string | undefined>()
+  // Bumped when the user hands over a source or transcript, so polling picks
+  // the job back up from a stage (needs_source, failed) it had stopped at.
+  const [resumed, setResumed] = useState(0)
+  const latest = useRef(job)
+  latest.current = job
 
   // Poll while the job is running. Also re-fetch when the app comes back to
   // the foreground, because iOS pauses timers in a backgrounded PWA.
@@ -36,8 +41,10 @@ export function JobView({
         if (isActive(fresh.stage) || fresh.stage === 'needs_transcript') timer = setTimeout(tick, isActive(fresh.stage) ? 2500 : 6000)
       } catch (err) {
         if (cancelled) return
-        // A saved summary is still readable when the server is unreachable.
-        if (!job?.summary) setError((err as Error).message)
+        // A saved summary is still readable when the server is unreachable,
+        // and there is nothing left to wait for.
+        if (latest.current?.summary) return
+        setError((err as Error).message)
         timer = setTimeout(tick, 8000)
       }
     }
@@ -55,12 +62,13 @@ export function JobView({
       document.removeEventListener('visibilitychange', onVisible)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, resumed])
 
   const provideTranscript = useCallback(
     async (text: string, format: string | undefined, source: 'phone' | 'manual') => {
       const updated = await api.provideTranscript(id, text, format, source)
       setJob(updated)
+      setResumed((n) => n + 1)
     },
     [id],
   )
@@ -72,8 +80,8 @@ export function JobView({
   const provide = async (source: { feedUrl?: string; audioUrl?: string }) => {
     const updated = await api.provideSource(id, source)
     setJob(updated)
+    setResumed((n) => n + 1)
   }
-
 
   return (
     <div className="job">

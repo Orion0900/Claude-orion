@@ -17,7 +17,7 @@ export function History({ jobs, onOpen, onDelete }: { jobs: Job[]; onOpen: (id: 
                 {isActive(job.stage) ? 'Working…' : job.stage === 'done' ? 'Ready' : isWaiting(job.stage) ? 'Needs input' : 'Failed'}
               </span>
             </button>
-            <button className="link danger small" onClick={() => void onDelete(job.id)} aria-label="Delete">
+            <button className="link danger small" onClick={() => void onDelete(job.id)} aria-label={`Delete ${job.episode?.title ?? job.input}`}>
               ✕
             </button>
           </li>

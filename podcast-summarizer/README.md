@@ -107,7 +107,7 @@ secure origins (and `localhost`).
 | Variable | Purpose |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | Required. Claude writes the summaries. |
-| `CLAUDE_MODEL` | Defaults to `claude-haiku-4-5` (~$0.06 per two-hour episode). Set `claude-opus-5` for the most thorough summaries (~$0.30). |
+| `CLAUDE_MODEL` | Defaults to `claude-haiku-4-5` (~$0.06 per two-hour episode). Set `claude-sonnet-5-5` for a step up (~$0.12), or `claude-opus-5-5` for the most thorough summaries (~$0.25). |
 | `ASSEMBLYAI_API_KEY` | Optional, Spotify links only. Transcription from the audio URL; no size limit. |
 | `OPENAI_API_KEY` | Optional, Spotify links only. Whisper transcription; needs ffmpeg over 25 MB. |
 | `YOUTUBE_MIRRORS` | Optional. Comma-separated Invidious/Piped origins to try when YouTube blocks the server. |
@@ -170,4 +170,4 @@ web/
   page, which Spotify can change. Credentials make it robust.
 - Transcription is the slow part: budget a few minutes per hour of audio.
   AssemblyAI gives signup credits, then charges per hour. The Claude call on a
-  two-hour transcript costs a few cents on Haiku and about thirty on Opus.
+  two-hour transcript costs a few cents on Haiku and about a quarter on Opus.

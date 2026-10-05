@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -228,6 +228,59 @@ describe('JobStore pipeline', () => {
     expect((await waitFor(store, show.id, ['failed'])).error).toMatch(/whole show/)
     const junk = await store.create('https://example.com/nothing')
     expect((await waitFor(store, junk.id, ['failed'])).error).toMatch(/YouTube or Spotify link/)
+  })
+
+  it('refuses a transcript while the job is still running', async () => {
+    let release!: () => void
+    const hung = new Promise<void>((r) => (release = r))
+    const store = mk({
+      summarizer,
+      fetch: (async () => {
+        await hung
+        throw new Error('network down')
+      }) as typeof fetch,
+    })
+    const job = await store.create(`https://open.spotify.com/episode/${EP}`)
+    await waitFor(store, job.id, ['resolving'])
+    const vtt = 'WEBVTT\n\n' + Array.from({ length: 80 }, (_, i) => `00:${String(i).padStart(2, '0')}:00.000 --> 00:${String(i).padStart(2, '0')}:04.000\nSleep fact number ${i}.\n`).join('\n')
+    await expect(store.provideTranscript(job.id, vtt, 'vtt', 'manual')).rejects.toThrow(/still working/)
+    release()
+    expect((await waitFor(store, job.id, ['failed'])).error).toMatch(/network down/)
+  })
+
+  it('does not touch the job for a progress line it already shows', async () => {
+    const ref: { id?: string; stamps: string[] } = { stamps: [] }
+    const store = mk({
+      youtubeMirrors: [],
+      summarizer: {
+        async summarize(input, onProgress) {
+          for (let i = 0; i < 3; i++) {
+            onProgress?.('Writing the summary…')
+            ref.stamps.push((await store.get(ref.id!))!.updatedAt)
+            await new Promise((r) => setTimeout(r, 5))
+          }
+          return summarizer.summarize(input)
+        },
+      },
+      fetch: fakeFetch({
+        'https://www.youtube.com/watch': `<script>var ytInitialPlayerResponse = ${JSON.stringify(ytPlayer)};</script>`,
+        'https://www.youtube.com/api/timedtext': ytJson3,
+      }),
+    })
+    const job = await store.create(`https://youtu.be/${YT}`)
+    ref.id = job.id
+    expect((await waitFor(store, job.id, ['done', 'failed'])).stage).toBe('done')
+    expect(new Set(ref.stamps).size).toBe(1)
+  })
+
+  it('keeps a copy of an unreadable jobs file instead of overwriting it', async () => {
+    await writeFile(join(dir, 'jobs.json'), '[{"id": "half-writ')
+    const store = mk({ summarizer, fetch: fakeFetch({}) })
+    expect(await store.list()).toEqual([])
+    const files = await readdir(dir)
+    const backup = files.find((f) => f.startsWith('jobs.json.corrupt-'))
+    expect(backup).toBeDefined()
+    expect(await readFile(join(dir, backup!), 'utf8')).toBe('[{"id": "half-writ')
   })
 
   it('fails when there is no transcript and no transcription service', async () => {

@@ -74,6 +74,8 @@ export function App() {
   }
 
   const remove = async (id: string) => {
+    const title = jobs.find((j) => j.id === id)?.episode?.title
+    if (!confirm(title ? `Delete the summary of “${title}”?` : 'Delete this summary?')) return
     savedJobs.remove(id)
     setJobs((prev) => prev.filter((j) => j.id !== id))
     try {
@@ -122,7 +124,7 @@ export function App() {
           </>
         )}
         {route.name === 'job' && (
-          <JobView id={route.id} initial={jobs.find((j) => j.id === route.id) ?? savedJobs.get(route.id)} onUpdate={onJobUpdate} onDelete={remove} />
+          <JobView key={route.id} id={route.id} initial={jobs.find((j) => j.id === route.id) ?? savedJobs.get(route.id)} onUpdate={onJobUpdate} onDelete={remove} />
         )}
         {route.name === 'settings' && <Settings />}
       </main>

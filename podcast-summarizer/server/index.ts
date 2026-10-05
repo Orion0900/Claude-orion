@@ -142,6 +142,20 @@ app.delete('/api/jobs/:id', async (req, res) => {
   res.status((await store.remove(req.params.id)) ? 204 : 404).end()
 })
 
+// Body-parser failures (a transcript over the limit, malformed JSON) would
+// otherwise come back as an HTML page the app can't show; answer in JSON.
+app.use('/api', (err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) return next(err)
+  const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 500
+  const error =
+    err.type === 'entity.too.large' ? 'That is too large to send; the limit is 8 MB.'
+    : err.type === 'entity.parse.failed' ? 'The request body was not valid JSON.'
+    : status === 500 ? 'Something went wrong on the server.'
+    : err.message
+  if (status === 500) console.error('[api]', err)
+  res.status(status).json({ error })
+})
+
 // In production the built web app is served from the same origin, which is
 // what lets iOS install it as a standalone app with no CORS or config.
 const webDir = join(here, '..', 'web')

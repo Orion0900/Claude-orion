@@ -10,7 +10,7 @@
  * Finished jobs are written to a JSON file so summaries survive a restart.
  */
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { expandShortLink, fetchEpisodeMeta, isSpotifyShortLink, parseSpotifyUrl, type SpotifyCredentials } from './lib/spotify.js'
 import { fetchFeed, matchEpisode, pickFeed, searchFeeds, type FeedItem } from './lib/feeds.js'
@@ -84,8 +84,15 @@ export class JobStore {
   }
 
   private async load() {
+    let text: string
     try {
-      const raw = JSON.parse(await readFile(this.opts.file, 'utf8')) as Job[]
+      text = await readFile(this.opts.file, 'utf8')
+    } catch {
+      return /* first run */
+    }
+    try {
+      const raw = JSON.parse(text) as Job[]
+      if (!Array.isArray(raw)) throw new Error('not a list of jobs')
       for (const job of raw) {
         // Anything that was mid-flight when the process died is not coming back.
         if (job.stage !== 'done' && job.stage !== 'failed' && !WAITING.includes(job.stage)) {
@@ -94,8 +101,12 @@ export class JobStore {
         }
         this.jobs.set(job.id, job)
       }
-    } catch {
-      /* first run */
+    } catch (err) {
+      // The next save would overwrite every summary in it; keep a copy first.
+      const backup = `${this.opts.file}.corrupt-${Date.now()}`
+      console.error(`[jobs] could not read ${this.opts.file} (${(err as Error).message}); saved a copy to ${backup}`)
+      this.jobs.clear()
+      await copyFile(this.opts.file, backup).catch(() => undefined)
     }
   }
 
@@ -139,6 +150,8 @@ export class JobStore {
   }
 
   private update(job: Job, patch: Partial<Job>) {
+    // Repeated progress lines (a transcription poll, say) change nothing; skip the save.
+    if (Object.entries(patch).every(([k, v]) => job[k as keyof Job] === v)) return
     Object.assign(job, patch, { updatedAt: new Date().toISOString() })
     void this.persist()
   }
@@ -183,6 +196,8 @@ export class JobStore {
     if (!job) return undefined
     if (job.stage === 'done') throw new Error('This job already has a summary.')
     if (job.stage === 'summarizing') throw new Error('This job is already being summarized.')
+    // A second run alongside one still in flight would race it to the finish.
+    if (!WAITING.includes(job.stage) && job.stage !== 'failed') throw new Error('This job is still working; wait for it to finish or fail.')
     const segments = parseTranscriptFile(text, format)
     if (wordCount(segments) < 50) throw new Error('That transcript is too short to be the episode.')
     this.update(job, { stage: 'summarizing', message: 'Got the transcript…', error: undefined })
