@@ -23,6 +23,8 @@ export type BagMode = 'field' | 'battle' | 'sell'
  * picture and description. Returns the item picked, or null.
  */
 export class BagScene extends Modal<ItemId | null> {
+  /** The pocket the bag last showed, so it reopens there. */
+  private static lastPocket = 0
   readonly opaque = true
   private pocket = 0
   private index = [0, 0, 0]
@@ -33,10 +35,22 @@ export class BagScene extends Modal<ItemId | null> {
     private readonly game: Game,
     private readonly save: SaveData,
     private readonly mode: BagMode,
-    startPocket = 0,
+    startPocket = BagScene.lastPocket,
   ) {
     super()
     this.pocket = startPocket
+    // Never open on an empty pocket when another has something to use.
+    if (this.items().length === 0) {
+      const full = POCKETS.findIndex((_, i) => this.items(i).length > 0)
+      if (full >= 0) this.pocket = full
+    }
+    BagScene.lastPocket = this.pocket
+  }
+
+  private turn(by: number): void {
+    this.pocket = (this.pocket + POCKETS.length + by) % POCKETS.length
+    BagScene.lastPocket = this.pocket
+    this.game.audio.sfx('cursor')
   }
 
   private items(p = this.pocket): ItemId[] {
@@ -54,13 +68,9 @@ export class BagScene extends Modal<ItemId | null> {
     const list = this.items()
     const count = list.length + 1
     const p = this.pocket
-    if (pad.pressed('left')) {
-      this.pocket = (p + POCKETS.length - 1) % POCKETS.length
-      audio.sfx('cursor')
-    } else if (pad.pressed('right')) {
-      this.pocket = (p + 1) % POCKETS.length
-      audio.sfx('cursor')
-    } else if (pad.repeat('up')) {
+    if (pad.pressed('left')) this.turn(-1)
+    else if (pad.pressed('right')) this.turn(1)
+    else if (pad.repeat('up')) {
       this.index[p] = (this.index[p] + count - 1) % count
       audio.sfx('cursor')
     } else if (pad.repeat('down')) {
@@ -100,8 +110,7 @@ export class BagScene extends Modal<ItemId | null> {
     if (this.done) return true
     const audio = this.game.audio
     if (x < 96 && y < 24) {
-      this.pocket = (this.pocket + (x < 48 ? POCKETS.length - 1 : 1)) % POCKETS.length
-      audio.sfx('cursor')
+      this.turn(x < 48 ? -1 : 1)
       this.settle()
       return true
     }
