@@ -1,0 +1,9 @@
+{
+  "name": "vox-watch",
+  "private": true,
+  "type": "module",
+  "description": "Daily check of available units at Vox Apartments, Capitol Hill, Seattle",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}
