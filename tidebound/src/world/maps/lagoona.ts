@@ -137,7 +137,7 @@ export const LAGOONA_MAPS: MapDef[] = [
     },
   },
   haven('lagoona_haven', 'LAGOONA', { map: 'lagoona', x: 5, y: 23 }),
-  market('lagoona_market', 'LAGOONA', { map: 'lagoona', x: 15, y: 23 }, ['orb', 'superOrb', 'hyperOrb', 'tideOrb', 'duskOrb', 'superSalve', 'hyperSalve', 'fullSalve', 'remedy', 'revivalSeed', 'ppDrop', 'muskSpray']),
+  market('lagoona_market', 'LAGOONA', { map: 'lagoona', x: 15, y: 23 }, ['orb', 'superOrb', 'hyperOrb', 'tideOrb', 'duskOrb', 'superSalve', 'hyperSalve', 'fullSalve', 'remedy', 'mintBerry', 'sunBerry', 'revivalSeed', 'ppDrop', 'muskSpray']),
   house(
     'lagoona_hut1',
     'LAGOONA',

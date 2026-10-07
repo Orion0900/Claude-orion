@@ -11,15 +11,17 @@ import { menuBackdrop, scrollTop } from '../ui/widgets'
 const POCKETS: { id: Pocket; label: string }[] = [
   { id: 'items', label: 'ITEMS' },
   { id: 'orbs', label: 'ORBS' },
+  { id: 'berries', label: 'BERRIES' },
   { id: 'key', label: 'KEY ITEMS' },
 ]
 
 const ROWS = 6
 
-export type BagMode = 'field' | 'battle' | 'sell'
+/** 'give' lists only what a beast can hold. */
+export type BagMode = 'field' | 'battle' | 'sell' | 'give'
 
 /**
- * The bag: three pockets, a scrolling list with counts, and the item's
+ * The bag: four pockets, a scrolling list with counts, and the item's
  * picture and description. Returns the item picked, or null.
  */
 export class BagScene extends Modal<ItemId | null> {
@@ -27,8 +29,8 @@ export class BagScene extends Modal<ItemId | null> {
   private static lastPocket = 0
   readonly opaque = true
   private pocket = 0
-  private index = [0, 0, 0]
-  private top = [0, 0, 0]
+  private index = POCKETS.map(() => 0)
+  private top = POCKETS.map(() => 0)
   private t = 0
 
   constructor(
@@ -58,6 +60,7 @@ export class BagScene extends Modal<ItemId | null> {
     return ALL_ITEMS.filter((i) => i.pocket === pocket && (this.save.bag[i.id] ?? 0) > 0)
       .filter((i) => this.mode !== 'battle' || i.battle)
       .filter((i) => this.mode !== 'sell' || i.price > 0)
+      .filter((i) => this.mode !== 'give' || !!i.hold)
       .map((i) => i.id)
   }
 
@@ -136,7 +139,7 @@ export class BagScene extends Modal<ItemId | null> {
     g.window(0, 0, 96, 24)
     const label = POCKETS[this.pocket].label
     g.text(`< ${label} >`, 6, 7)
-    POCKETS.forEach((_, i) => g.rect(70 + i * 7, 18, 5, 2, i === this.pocket ? '#e04040' : '#a0a0a0'))
+    POCKETS.forEach((_, i) => g.rect(64 + i * 7, 18, 5, 2, i === this.pocket ? '#e04040' : '#a0a0a0'))
     // The satchel picture area.
     g.window(0, 26, 96, 70)
     const list = this.items()

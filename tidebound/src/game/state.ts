@@ -1,4 +1,5 @@
 import type { Facing } from '../art/look'
+import { normalizeCreature } from '../battle/creature'
 import type { Creature } from '../battle/types'
 import type { SpeciesId } from '../data/dex'
 import { ITEM_IDS, type ItemId } from '../data/items'
@@ -151,9 +152,14 @@ export function loadGame(store: Pick<Storage, 'getItem'> | undefined = storage()
       const n = data.bag?.[id]
       if (typeof n === 'number' && n > 0) bag[id] = Math.floor(n)
     }
+    // Older saves predate effort points and held items.
+    const party = (data.party ?? []).map(normalizeCreature)
+    const box = (data.box ?? []).map(normalizeCreature)
     return {
       ...fresh,
       ...data,
+      party,
+      box,
       bag,
       options: { ...DEFAULT_OPTIONS, ...(data.options ?? {}) },
       flags: { ...(data.flags ?? {}) },

@@ -26,7 +26,7 @@ import { CreditsScene } from '../scenes/CreditsScene'
 import type { Overworld } from '../world/Overworld'
 import type { ScriptCtx, WildOptions } from '../world/script'
 import type { Game } from './Game'
-import { BOX_CAPACITY, healthyCount, markCaught, markSeen, MAX_PARTY, nextSeed, removeItem, writeGame, type SaveData } from './state'
+import { addItem, BOX_CAPACITY, healthyCount, markCaught, markSeen, MAX_PARTY, nextSeed, removeItem, writeGame, type SaveData } from './state'
 
 type EndPrompt = Extract<Prompt, { kind: 'end' }>
 
@@ -318,6 +318,8 @@ async function trainerBattle(game: Game, s: ScriptCtx, ow: Overworld, t: Trainer
   const rng = new Rng(nextSeed(save))
   const strong = t.ai === 'smart'
   const foes = t.party.map((p) => createCreature(p.species, p.level, rng, { ot: t.name, shiny: false, ivs: fixedIvs(strong ? 22 : 12) }))
+  // Wardens and the Champion give their ace a SUN BERRY.
+  if (t.className === 'WARDEN' || t.className === 'CHAMPION') foes[foes.length - 1].item = 'sunBerry'
   const warden = t.className === 'WARDEN' || t.className === 'CHAMPION'
   const end = await runBattle(game, save, {
     setup: {
@@ -345,6 +347,10 @@ async function wildBattle(game: Game, s: ScriptCtx, ow: Overworld, species: Spec
   if (healthyCount(save) === 0) return 'fled'
   const rng = new Rng(nextSeed(save))
   const foe = createCreature(species, level, rng, { metPlace: ow.map.def.name, shiny: o.shiny })
+  // Now and then a wild beast is carrying a berry, which comes along if it's caught.
+  const r = rng.next()
+  if (r < 0.01) foe.item = 'sunBerry'
+  else if (r < 0.06) foe.item = 'reefBerry'
   markSeen(save, species)
   const end = await runBattle(game, save, {
     setup: { kind: 'wild', foes: [foe], dark: !!ow.map.def.dark, noRun: o.noRun },
@@ -395,14 +401,54 @@ async function startMenu(game: Game, s: ScriptCtx): Promise<void> {
 
 async function partyMenu(game: Game, save: SaveData): Promise<void> {
   const scene = new PartyScene(game, save.party, 'field', undefined, async (i) => {
-    const pick = await game.choose(['SUMMARY', 'SWITCH', 'CANCEL'], { y: 128 - 60 })
+    const pick = await game.choose(['SUMMARY', 'SWITCH', 'ITEM', 'CANCEL'], { y: 128 - 76 })
     if (pick === 0) {
       await game.run(new SummaryScene(game, save.party, i, undefined, { name: save.name, id: save.trainerId }))
+      return null
+    }
+    if (pick === 2) {
+      const what = await game.choose(['GIVE', 'TAKE', 'CANCEL'], { y: 128 - 60 })
+      if (what === 0) {
+        const id = await game.run(new BagScene(game, save, 'give'))
+        if (id) await giveItem(game, save, i, id)
+      } else if (what === 1) await takeItem(game, save, i)
       return null
     }
     return pick === 1 ? 'switch' : null
   })
   await game.run(scene)
+}
+
+/** Hands a beast an item from the bag, swapping back whatever it held. */
+async function giveItem(game: Game, save: SaveData, i: number, id: ItemId): Promise<void> {
+  const c = save.party[i]
+  const data = item(id)
+  if (!data.hold) {
+    await game.say(`The ${data.name} can't be held.`)
+    return
+  }
+  if (c.item) {
+    const old = item(c.item)
+    if (!(await game.ask(`${displayName(c)} is already holding a ${old.name}. Swap it for the ${data.name}?`))) return
+    addItem(save, c.item)
+  }
+  removeItem(save, id)
+  c.item = id
+  game.audio.sfx('select')
+  await game.say(`${displayName(c)} is now holding the ${data.name}.`)
+}
+
+/** Puts a beast's held item back in the bag. */
+async function takeItem(game: Game, save: SaveData, i: number): Promise<void> {
+  const c = save.party[i]
+  if (!c.item) {
+    await game.say(`${displayName(c)} isn't holding anything.`)
+    return
+  }
+  const name = item(c.item).name
+  addItem(save, c.item)
+  c.item = null
+  await game.say(`Took the ${name} from ${displayName(c)}.`)
 }
 
 /** Returns true when an item use should close the START menu (surfing, fishing, escaping). */
@@ -413,9 +459,15 @@ async function bagMenu(game: Game, s: ScriptCtx): Promise<boolean> {
     const id = await game.run(new BagScene(game, save, 'field'))
     if (!id) return false
     const data = item(id)
-    const options = data.pocket === 'key' ? ['USE', 'CANCEL'] : ['USE', 'TOSS', 'CANCEL']
+    const usable = data.use.kind !== 'held'
+    const options = data.pocket === 'key' ? ['USE', 'CANCEL'] : [...(usable ? ['USE'] : []), ...(data.hold ? ['GIVE'] : []), 'TOSS', 'CANCEL']
     const pick = await game.choose(options, { prompt: `${data.name} is selected.` })
     if (options[pick] === 'CANCEL') continue
+    if (options[pick] === 'GIVE') {
+      const r = await game.run(new PartyScene(game, save.party, 'item'))
+      if (r) await giveItem(game, save, r.index, id)
+      continue
+    }
     if (options[pick] === 'TOSS') {
       const n = save.bag[id] ?? 0
       if (await game.ask(`Throw away all ${n} ${data.name}?`)) {

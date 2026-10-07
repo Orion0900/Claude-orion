@@ -28,7 +28,7 @@ export interface MoveSlot {
 /**
  * A beast the player owns (party or storage), or a foe's. Plain JSON, so it
  * goes straight into the save file. Max HP and the other stats are derived
- * from species, level and IVs whenever needed (see calcStats).
+ * from species, level, IVs, effort and nature whenever needed (see calcStats).
  */
 export interface Creature {
   /** Unique id, stable for the life of the beast. */
@@ -47,6 +47,10 @@ export interface Creature {
   moves: MoveSlot[]
   /** Individual values, 0–31 each. */
   ivs: Stats
+  /** Effort points earned by battling, 0–255 each and 510 in all. */
+  evs: Stats
+  /** The item it holds, if any. */
+  item: ItemId | null
   shiny: boolean
   /** Original trainer's name. */
   ot: string
@@ -105,6 +109,9 @@ export interface BattleSetup {
 
 export type Side = 'player' | 'foe'
 
+/** Weather on the field: rain powers up TIDE moves and dampens FLAME; sun does the reverse. */
+export type Weather = 'rain' | 'sun'
+
 /** What the HUD shows for one beast. */
 export interface CreatureView {
   species: SpeciesId
@@ -155,6 +162,8 @@ export type BattleEvent =
   | { t: 'item'; side: Side; item: ItemId }
   /** The foe trainer sends out their next beast soon; show the trainer's party balls. */
   | { t: 'trainerParty'; remaining: number }
+  /** The weather changed: rain or sun on the field, or clear skies (null). */
+  | { t: 'weather'; weather: Weather | null }
   | { t: 'prompt'; prompt: Prompt }
 
 export type Outcome = 'win' | 'lose' | 'fled' | 'caught'

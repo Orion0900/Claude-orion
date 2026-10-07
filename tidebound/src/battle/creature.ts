@@ -9,7 +9,8 @@ import { item as itemData, type ItemId } from '../data/items'
 import { move as moveData } from '../data/moves'
 import { species } from '../data/species'
 import type { TypeId } from '../data/types'
-import { hpStat, MAX_LEVEL, otherStat, xpForLevel } from './formulas'
+import { EFFORT_STAT_CAP, EFFORT_TOTAL_CAP, hpStat, MAX_LEVEL, otherStat, xpForLevel } from './formulas'
+import { natureMultiplier, natureOf } from './natures'
 import type { Creature, CreatureView, MoveId, Stats, StatusId } from './types'
 
 export interface CreateOptions {
@@ -24,9 +25,13 @@ export interface CreateOptions {
   moves?: readonly MoveId[]
   /** Fixed IVs for some or all stats, instead of rolls. */
   ivs?: Partial<Stats>
+  /** An item to hold. */
+  item?: ItemId | null
 }
 
 const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const
+
+export const NO_EFFORT: Stats = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }
 
 function hex6(rng: Rng): string {
   return rng.int(0, 0xffffff).toString(16).padStart(6, '0')
@@ -60,6 +65,8 @@ export function createCreature(id: SpeciesId, level: number, rng: Rng, opts: Cre
     sleepTurns: 0,
     moves: [],
     ivs,
+    evs: { ...NO_EFFORT },
+    item: opts.item ?? null,
     shiny: opts.shiny ?? shinyRoll,
     ot: opts.ot ?? '',
     metLevel: lv,
@@ -90,21 +97,60 @@ export function movesLearnedAt(id: SpeciesId, level: number): MoveId[] {
   return out
 }
 
-/** All six stats from species, level and IVs. */
+/** All six stats from species, level, IVs, effort and nature. */
 export function calcStats(c: Creature): Stats {
   const b = species(c.species).base
+  const e = c.evs ?? NO_EFFORT
+  const n = natureOf(c)
+  const other = (k: Exclude<keyof Stats, 'hp'>) => otherStat(b[k], c.ivs[k], c.level, e[k], natureMultiplier(n, k))
   return {
-    hp: hpStat(b.hp, c.ivs.hp, c.level),
-    atk: otherStat(b.atk, c.ivs.atk, c.level),
-    def: otherStat(b.def, c.ivs.def, c.level),
-    spa: otherStat(b.spa, c.ivs.spa, c.level),
-    spd: otherStat(b.spd, c.ivs.spd, c.level),
-    spe: otherStat(b.spe, c.ivs.spe, c.level),
+    hp: hpStat(b.hp, c.ivs.hp, c.level, e.hp),
+    atk: other('atk'),
+    def: other('def'),
+    spa: other('spa'),
+    spd: other('spd'),
+    spe: other('spe'),
   }
 }
 
 export function maxHp(c: Creature): number {
-  return hpStat(species(c.species).base.hp, c.ivs.hp, c.level)
+  return hpStat(species(c.species).base.hp, c.ivs.hp, c.level, (c.evs ?? NO_EFFORT).hp)
+}
+
+/**
+ * Adds effort points for defeating `foe`, within the caps (255 a stat, 510
+ * in all). Returns whether anything changed. Max HP may rise; current HP
+ * rises with it.
+ */
+export function gainEffort(c: Creature, foe: SpeciesId): boolean {
+  const yieldPts = species(foe).effort
+  const evs = (c.evs ??= { ...NO_EFFORT })
+  let total = STAT_KEYS.reduce((n, k) => n + evs[k], 0)
+  let changed = false
+  const hpBefore = maxHp(c)
+  for (const k of STAT_KEYS) {
+    const want = yieldPts[k] ?? 0
+    const room = Math.min(EFFORT_STAT_CAP - evs[k], EFFORT_TOTAL_CAP - total, want)
+    if (room > 0) {
+      evs[k] += room
+      total += room
+      changed = true
+    }
+  }
+  const gain = maxHp(c) - hpBefore
+  if (gain > 0 && c.hp > 0) c.hp += gain
+  return changed
+}
+
+/**
+ * Fills in anything an older save is missing (effort, held item) and keeps
+ * HP within the maximum, which natures can lower a little.
+ */
+export function normalizeCreature(c: Creature): Creature {
+  if (!c.evs) c.evs = { ...NO_EFFORT }
+  if (c.item === undefined) c.item = null
+  c.hp = Math.max(0, Math.min(maxHp(c), c.hp))
+  return c
 }
 
 /** Progress through the current level, 0–1 (0 at the level cap). */

@@ -1,7 +1,7 @@
 import type { Look } from '../../art/look'
 import type { BattleBg, OrbKind } from '../../art/world'
 import type { TrackId } from '../../audio/api'
-import type { BattleApi, BattleEvent, Choice, CreatureView, Prompt, Side, StatusId } from '../../battle/types'
+import type { BattleApi, BattleEvent, Choice, CreatureView, Prompt, Side, StatusId, Weather } from '../../battle/types'
 import { move as moveData } from '../../data/moves'
 import { item, type ItemId } from '../../data/items'
 import { TYPE_COLOR, TYPE_NAME } from '../../data/types'
@@ -90,6 +90,8 @@ export class BattleScene implements Scene {
   private backX: number | null = null
   private backFrame: 0 | 1 | 2 | 3 = 0
   private orb: { kind: OrbKind; x: number; y: number; frame: 0 | 1 | 2 | 3 | 4 } | null = null
+  /** Rain or sun over the field. */
+  private weather: Weather | null = null
   private intro = 0
   private shake = 0
   private flash = 0
@@ -407,6 +409,10 @@ export class BattleScene implements Scene {
         return
       case 'trainerParty':
         return
+      case 'weather':
+        this.weather = e.weather
+        if (!this.p.quick) await this.game.wait(24)
+        return
     }
   }
 
@@ -662,6 +668,7 @@ export class BattleScene implements Scene {
       g.image(img, this.orb.x - img.w / 2, this.orb.y - img.h / 2)
     }
     this.fx.draw(g)
+    this.drawWeather(g)
 
     if (this.intro === 0) {
       if (this.foe.shown && this.foe.view) this.drawFoeHud(g)
@@ -669,6 +676,25 @@ export class BattleScene implements Scene {
     }
     this.drawBox(g)
     if (this.levelBox) this.drawLevelBox(g)
+  }
+
+  /** Falling rain, or a warm glow and slow shafts of sunlight, over the field. */
+  private drawWeather(g: Gfx): void {
+    if (this.weather === 'rain') {
+      g.rect(0, 0, 240, BOX_Y, 'rgba(40,60,110,0.14)')
+      for (let i = 0; i < 48; i++) {
+        const x = ((i * 47 + this.t * 3) % 256) - 8
+        const y = ((i * 29 + this.t * 7) % (BOX_Y + 8)) - 8
+        g.rect(x, y, 1, 5, 'rgba(210,230,255,0.6)')
+        g.rect(x - 1, y + 5, 1, 2, 'rgba(210,230,255,0.35)')
+      }
+    } else if (this.weather === 'sun') {
+      g.rect(0, 0, 240, BOX_Y, 'rgba(255,196,90,0.14)')
+      for (let i = 0; i < 4; i++) {
+        const x = ((i * 70 + this.t / 2) % 300) - 40
+        for (let k = 0; k < 14; k++) g.rect(x + k * 2, k * 8, 6, 8, 'rgba(255,240,180,0.08)')
+      }
+    }
   }
 
   private drawBeast(g: Gfx, s: Slot, side: Side, x: number, y: number): void {

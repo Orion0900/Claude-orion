@@ -393,6 +393,124 @@ function key(): Pixels {
   return outlineLayer(l, h('#2c1c0c'))
 }
 
+/** A round berry with a stalk and a leaf; `spiky` adds a crown of points. */
+function berry(skin: string, leafColor: string, spiky = false): Pixels {
+  const l = createPixels(S, S)
+  ball(l, 12, 14, 7, 6.5, ramp(skin))
+  if (spiky)
+    for (const x of [7, 10, 13, 16]) {
+      setPx(l, x, 7, ramp(skin)[1])
+      setPx(l, x + 1, 6, ramp(skin)[0])
+    }
+  // a darker dimple where the stalk joins
+  setPx(l, 12, 8, ramp(skin)[3])
+  const leaf = ramp(leafColor)
+  line(l, 12, 8, 13, 4, h('#6a4a28'))
+  for (const [x, y, k] of [
+    [14, 4, 1],
+    [15, 4, 1],
+    [16, 3, 0],
+    [15, 3, 0],
+    [17, 3, 1],
+    [14, 5, 2],
+  ] as const)
+    setPx(l, x, y, leaf[k])
+  const out = outlineLayer(l, h('#20180c'))
+  sparkle(out, 8, 11)
+  return out
+}
+
+/** A spiral sea shell, pointed end up. */
+function spiralShell(): Pixels {
+  const l = createPixels(S, S)
+  const sh = ramp('#f0b8a0')
+  for (let y = 3; y <= 20; y++)
+    for (let x = 4; x <= 20; x++) {
+      const t = (y - 3) / 17
+      const half = 1 + 7.5 * Math.sin(Math.min(1, t * 1.15) * Math.PI * 0.55)
+      if (Math.abs(x + 0.5 - 12) > half) continue
+      const band = Math.floor((y + (x - 12) * 0.35) / 3) % 2 === 0
+      const nx = (x + 0.5 - 12) / Math.max(1, half)
+      setPx(l, x, y, nx < -0.4 ? sh[0] : band ? sh[1] : sh[2])
+    }
+  // the opening, a dark curl low on the right
+  for (let y = 14; y <= 19; y++) for (let x = 13; x <= 17; x++) if (inEllipse(x, y, 15, 16.5, 2.4, 3)) setPx(l, x, y, h('#a05a50'))
+  const out = outlineLayer(l, h('#402018'))
+  sparkle(out, 8, 8)
+  return out
+}
+
+/** A bundle of damp moss tied with a cord. */
+function moss(): Pixels {
+  const l = createPixels(S, S)
+  const g = ramp('#58a048')
+  for (let y = 5; y <= 20; y++)
+    for (let x = 3; x <= 20; x++) {
+      if (!inEllipse(x, y, 12, 13, 8.5, 7.5)) continue
+      const bump = ((x * 7 + y * 13) % 5) / 5
+      const nx = (x + 0.5 - 12) / 8.5
+      const ny = (y + 0.5 - 13) / 7.5
+      const lit = -(nx * 0.6 + ny * 0.8) + bump * 0.3
+      setPx(l, x, y, lit > 0.45 ? g[0] : lit > -0.1 ? g[1] : lit > -0.55 ? g[2] : g[3])
+    }
+  for (let x = 4; x <= 19; x++) setPx(l, x, 12 + (x % 2), h('#c8a060'))
+  for (const [x, y] of [
+    [6, 7],
+    [15, 9],
+    [10, 17],
+  ] as const)
+    setPx(l, x, y, h('#a8e0f0'))
+  return outlineLayer(l, h('#14280c'))
+}
+
+/** A dark stone with glowing cracks. */
+function cinder(): Pixels {
+  const l = createPixels(S, S)
+  ball(l, 12, 13, 8, 7, ramp('#5a4a48'))
+  const glow = [h('#fff0a0'), h('#f8a030'), h('#e05820')]
+  for (const [x0, y0, x1, y1, k] of [
+    [7, 10, 11, 13, 1],
+    [11, 13, 10, 17, 2],
+    [11, 13, 16, 12, 1],
+    [16, 12, 17, 9, 2],
+    [13, 15, 15, 18, 2],
+  ] as const)
+    line(l, x0, y0, x1, y1, glow[k])
+  setPx(l, 11, 13, glow[0])
+  return outlineLayer(l, h('#201010'))
+}
+
+/** A round pearl with a soft sheen. */
+function pearl(): Pixels {
+  const l = createPixels(S, S)
+  ball(l, 12, 12, 7.5, 7.5, ramp('#a8d8f0'))
+  for (let y = 8; y <= 16; y++) for (let x = 8; x <= 16; x++) if (inEllipse(x, y, 10, 10, 2.6, 2)) setPx(l, x, y, h('#f8fcff'))
+  const out = outlineLayer(l, h('#18304c'))
+  sparkle(out, 17, 7)
+  return out
+}
+
+/** An open green pod showing its seeds. */
+function pod(): Pixels {
+  const l = createPixels(S, S)
+  const g = ramp('#70b848')
+  for (let y = 4; y <= 20; y++)
+    for (let x = 4; x <= 20; x++) {
+      // a curved bean shape leaning right
+      const cx = 12 + (y - 12) * 0.25
+      if (!inEllipse(x, y, cx, 12, 5, 8.5)) continue
+      const nx = (x + 0.5 - cx) / 5
+      setPx(l, x, y, nx < -0.35 ? g[0] : nx < 0.4 ? g[1] : g[2])
+    }
+  for (const y of [8, 11, 14, 17]) {
+    const cx = Math.round(12 + (y - 12) * 0.25)
+    setPx(l, cx, y, h('#f0d890'))
+    setPx(l, cx + 1, y, h('#c8a050'))
+  }
+  line(l, 10, 4, 9, 2, h('#4a7a30'))
+  return outlineLayer(l, h('#1c300c'))
+}
+
 function orbIcon(kind: OrbKind): Pixels {
   const p = createPixels(S, S)
   paintOrb(p, kind, 12, 12.5, 9)
@@ -439,6 +557,33 @@ export function icon(id: ItemId): Pixels {
       case 'tideOrb':
       case 'duskOrb':
         p = orbIcon(id)
+        break
+      case 'reefBerry':
+        p = berry('#4890d8', '#48a848')
+        break
+      case 'sunBerry':
+        p = berry('#f8b030', '#48a848')
+        break
+      case 'mintBerry':
+        p = berry('#88e0c0', '#2e8a58')
+        break
+      case 'zestBerry':
+        p = berry('#e85030', '#58a838', true)
+        break
+      case 'shareShell':
+        p = spiralShell()
+        break
+      case 'mossWrap':
+        p = moss()
+        break
+      case 'cinderstone':
+        p = cinder()
+        break
+      case 'tidePearl':
+        p = pearl()
+        break
+      case 'seedPod':
+        p = pod()
         break
       case 'sprintShoes':
         p = shoe()

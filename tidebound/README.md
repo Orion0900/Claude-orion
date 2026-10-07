@@ -56,6 +56,11 @@ from Safari's.
   stat stages, burn/poison/paralysis/sleep/freeze, accuracy, priority,
   multi-hit, recoil and drain, switching, experience and levelling, learning
   moves, evolving, catching with shaking orbs, and running away.
+- **The deeper systems of that era**, all with the game's own names: 25
+  natures that nudge two stats, effort points earned by battling, an
+  ability for every species (20 in all), held items and berries that work
+  mid-battle, a SHARE SHELL that trains a beast from the bench, and rain
+  and sun that change the battle.
 - **103 moves** with original names, each with its own animation style.
 - **A whole island chain:** three towns and a city, four routes, a glowing
   cave, a shipwreck, a lagoon village on stilts and Beacon Isle, joined
@@ -64,7 +69,8 @@ from Safari's.
   three Wardens, the ATOLL legend, the Champion and the credits — then a
   legendary waiting in the shrine.
 - **Everything around it:** the START menu, BEASTIARY, party and summary
-  screens, a bag with pockets, Markets, Havens that heal, PC storage,
+  screens (with nature, ability and held item), a bag with four pockets,
+  giving and taking held items, Markets, Havens that heal, PC storage,
   surfing, fishing, ledges, trainers who spot you, a trainer card, saving,
   and options for text speed, battle animations, volume and window frames.
 - **Chip-style music:** 28 original tracks and 9 jingles, plus sound
