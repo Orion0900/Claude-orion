@@ -33,8 +33,20 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
+      - name: Install Firefox for Playwright
+        run: npx playwright install --with-deps firefox
+
       - name: Explore the Vox pages
-        run: node explore.mjs out
+        continue-on-error: true
+        run: xvfb-run -a node explore.mjs out
+
+      - name: Building footprint and streets from OpenStreetMap
+        continue-on-error: true
+        run: node geo.mjs out
+
+      - name: Archived copies of the pages
+        continue-on-error: true
+        run: node wayback.mjs out
 
       - name: Publish what was captured
         if: always()
