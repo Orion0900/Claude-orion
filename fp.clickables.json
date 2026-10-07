@@ -1,0 +1,668 @@
+[
+  {
+    "tag": "BUTTON",
+    "text": "Use Website In a Screen-Reader Mode",
+    "href": null,
+    "cls": "screen-reader-button "
+  },
+  {
+    "tag": "A",
+    "text": "Accessibility Screen-Reader Guide, Feedback, and Issue Reporting | New window",
+    "href": "https://accessibe.com/blog/knowledgebase/screen-reader-guide",
+    "cls": "acsb-sr-only"
+  },
+  {
+    "tag": "A",
+    "text": "Skip to Content ↵ ENTER",
+    "href": "#acsbContent",
+    "cls": "skip-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Open accessiBe: accessibility options, statement and help",
+    "href": null,
+    "cls": "trigger-button trigger-button--visible    size-small position-x-left position-y-bottom  "
+  },
+  {
+    "tag": "A",
+    "text": "skip to main content",
+    "href": "#content",
+    "cls": "skiptocontent"
+  },
+  {
+    "tag": "A",
+    "text": "Home",
+    "href": "/",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Resident Sign In",
+    "href": "https://essexrentcafe.securecafenet.com/residentservices/apartmentsforrent/userlogin",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Vox",
+    "href": "/apartments/seattle/vox",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__logo-link"
+  },
+  {
+    "tag": "A",
+    "text": "Search apartments",
+    "href": "/apartments",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__search-icon"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Toggle navigation",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__mobile-toggle"
+  },
+  {
+    "tag": "A",
+    "text": "Floor Plans & Pricing",
+    "href": "/apartments/seattle/vox/floor-plans-and-pricing",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link NavigationHeader-module-scss-module__xuakXq__na"
+  },
+  {
+    "tag": "A",
+    "text": "Features & Amenities",
+    "href": "/apartments/seattle/vox/amenities",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Virtual Tours",
+    "href": "/apartments/seattle/vox/virtual-tours",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Gallery",
+    "href": "/apartments/seattle/vox/gallery",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Neighborhood",
+    "href": "/apartments/seattle/vox/neighborhood",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Leasing Info",
+    "href": "/apartments/seattle/vox/leasing-info",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Resident Sign In",
+    "href": "https://essexrentcafe.securecafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "(206) 324-7000",
+    "href": "tel:+12063247000",
+    "cls": "button-tertiary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Schedule a Tour",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-book-tour"
+  },
+  {
+    "tag": "A",
+    "text": "Apply Now",
+    "href": "/apartments/seattle/vox/floor-plans-and-pricing",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-apply-now"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Contact",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-contact-mobile"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Save Up to $3,000 Off Rent!*",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__E2mswW__property-offer-cta__headline"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "all",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button Filters-module-scss-module__XzV3_a__active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "studio",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "2",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Pricing information",
+    "href": null,
+    "cls": "more-info__icon popper-target"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Minimum price",
+    "href": null,
+    "cls": "PriceRangeSlider-module-scss-module__S_W_Lq__price-range-slider__handle "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Maximum price",
+    "href": null,
+    "cls": "PriceRangeSlider-module-scss-module__S_W_Lq__price-range-slider__handle "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View on Map",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__view-map-button"
+  },
+  {
+    "tag": "A",
+    "text": "Leasing Info",
+    "href": "leasing-info",
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Step 1: Choose a Floor Plan",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__property-floor__tab PropertyFloor-module-scss-module__9ZWfCa__active "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Step 2: Select an Apartment",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__property-floor__tab  "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Step 3: See Pricing",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__property-floor__tab  "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Step 4: Apply",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__property-floor__tab  "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View on Map",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-view-on-map-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan SA floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Availability",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__button-primary PropertyFloor-module-scss-module__9ZWfCa__floorplan-available-b"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View on Map",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-view-on-map-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1A floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Availability",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__button-primary PropertyFloor-module-scss-module__9ZWfCa__floorplan-available-b"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View on Map",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-view-on-map-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 2A floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Availability",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__button-primary PropertyFloor-module-scss-module__9ZWfCa__floorplan-available-b"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan SB floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1B floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1D + Den floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1C floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1E floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 1F floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Virtual Tour",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floorplan-virtual-tour-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Plan 2B floor plan image",
+    "href": null,
+    "cls": "PropertyFloor-module-scss-module__9ZWfCa__floor-plan-card__image PropertyFloor-module-scss-module__9ZWfCa__floor-plan-ca"
+  },
+  {
+    "tag": "A",
+    "text": "City of Seattle Renter's Handbook (PDF)",
+    "href": "https://www.seattle.gov/Documents/Departments/RentingInSeattle/languages/English/RentersHandbook_English.pdf",
+    "cls": "text-amber"
+  },
+  {
+    "tag": "A",
+    "text": "",
+    "href": "/",
+    "cls": "DefaultFooter-module-scss-module__yTCYpa__default-footer__logo"
+  },
+  {
+    "tag": "A",
+    "text": "Apartments",
+    "href": "/apartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "FAQs",
+    "href": "/frequently-asked-questions",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Penthouse Apartments",
+    "href": "/apartments/penthouse-apartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "About Us",
+    "href": "/about-us",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Affordable Housing",
+    "href": "/affordable-housing-programs",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Sustainability",
+    "href": "/apartments/sustainability",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Careers",
+    "href": "/careers",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Blog",
+    "href": "/blog",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Contact Essex",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Retail",
+    "href": "/retail",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Investors",
+    "href": "https://investors.essexapartmenthomes.com/overview/default.aspx",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Facebook (opens in new window)",
+    "href": "https://www.facebook.com/EssexApartmentHomes",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Instagram (opens in new window)",
+    "href": "https://www.instagram.com/essexapartmenthomes/",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "X Twitter (opens in new window)",
+    "href": "https://x.com/EssexApartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "LinkedIn (opens in new window)",
+    "href": "https://www.linkedin.com/company/essex-property-trust",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Terms & Conditions",
+    "href": "/terms-and-conditions",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Privacy Policy",
+    "href": "/privacy-policy",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "California Privacy Notice",
+    "href": "/california-privacy-notice",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Your Privacy Rights",
+    "href": "#",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Washington Consumer Health Notice",
+    "href": "/washington-consumer-health-notice",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Essex’s Terms & Conditions",
+    "href": "/terms-and-conditions",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "A",
+    "text": "Essex’s Text Program Terms & Conditions",
+    "href": "/text-program-terms-and-conditions",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "A",
+    "text": "Essex's Privacy Policy",
+    "href": "/privacy-policy",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "TOUR",
+    "href": null,
+    "cls": "CommunityPageMobileFooter-module-scss-module___o44Rq__navigation__button CommunityPageMobileFooter-module-scss-module___"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "CONTACT",
+    "href": null,
+    "cls": "CommunityPageMobileFooter-module-scss-module___o44Rq__navigation__button CommunityPageMobileFooter-module-scss-module___"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Chat with us",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Email an agent",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Call or text us",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Minimize EliseAI widget",
+    "href": null,
+    "cls": "minimize-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Do Not Sell My Personal Information",
+    "href": null,
+    "cls": "cookie-setting-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Accept Cookies",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Close",
+    "href": null,
+    "cls": "onetrust-close-btn-handler onetrust-close-btn-ui banner-close-button ot-close-icon"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Close preference center",
+    "href": null,
+    "cls": "ot-close-icon"
+  },
+  {
+    "tag": "A",
+    "text": "Go To Opt Out Form",
+    "href": "https://privacyportal.onetrust.com/webform/364bb38c-5043-4573-86f4-ce6b725b3586/175d6f72-7b69-44f0-9f65-183171214bd2",
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "Opt Out of Sale/Sharing Cookies",
+    "href": null,
+    "cls": "ot-switch"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Back Button",
+    "href": null,
+    "cls": "ot-link-btn back-btn-handler"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Filter Icon",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Clear",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Apply",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Cancel",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Confirm My Choices",
+    "href": null,
+    "cls": "save-preference-btn-handler onetrust-close-btn-handler"
+  },
+  {
+    "tag": "A",
+    "text": "Powered by OneTrust Opens in a new Tab",
+    "href": "https://www.onetrust.com/solutions/consent-and-preferences/?utm_source=cmp&utm_medium=cmpbanner",
+    "cls": ""
+  }
+]

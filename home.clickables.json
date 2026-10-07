@@ -1,0 +1,1454 @@
+[
+  {
+    "tag": "BUTTON",
+    "text": "Use Website In a Screen-Reader Mode",
+    "href": null,
+    "cls": "screen-reader-button "
+  },
+  {
+    "tag": "A",
+    "text": "Accessibility Screen-Reader Guide, Feedback, and Issue Reporting | New window",
+    "href": "https://accessibe.com/blog/knowledgebase/screen-reader-guide",
+    "cls": "acsb-sr-only"
+  },
+  {
+    "tag": "A",
+    "text": "Skip to Content ↵ ENTER",
+    "href": "#acsbContent",
+    "cls": "skip-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Open accessiBe: accessibility options, statement and help",
+    "href": null,
+    "cls": "trigger-button trigger-button--visible    size-small position-x-left position-y-bottom  "
+  },
+  {
+    "tag": "A",
+    "text": "skip to main content",
+    "href": "#content",
+    "cls": "skiptocontent"
+  },
+  {
+    "tag": "A",
+    "text": "Home",
+    "href": "/",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Resident Sign In",
+    "href": "https://essexrentcafe.securecafenet.com/residentservices/apartmentsforrent/userlogin",
+    "cls": "UtilityNavigation-module-scss-module__GU4J5a__utility-navigation__link"
+  },
+  {
+    "tag": "A",
+    "text": "Vox",
+    "href": "/apartments/seattle/vox",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__logo-link"
+  },
+  {
+    "tag": "A",
+    "text": "Search apartments",
+    "href": "/apartments",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__search-icon"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Toggle navigation",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__mobile-toggle"
+  },
+  {
+    "tag": "A",
+    "text": "Floor Plans & Pricing",
+    "href": "/apartments/seattle/vox/floor-plans-and-pricing",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Features & Amenities",
+    "href": "/apartments/seattle/vox/amenities",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Virtual Tours",
+    "href": "/apartments/seattle/vox/virtual-tours",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Gallery",
+    "href": "/apartments/seattle/vox/gallery",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Neighborhood",
+    "href": "/apartments/seattle/vox/neighborhood",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Leasing Info",
+    "href": "/apartments/seattle/vox/leasing-info",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "Resident Sign In",
+    "href": "https://essexrentcafe.securecafe.com/residentservices/apartmentsforrent/userlogin.aspx",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__nav-link"
+  },
+  {
+    "tag": "A",
+    "text": "(206) 324-7000",
+    "href": "tel:+12063247000",
+    "cls": "button-tertiary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Schedule a Tour",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-book-tour"
+  },
+  {
+    "tag": "A",
+    "text": "Apply Now",
+    "href": "/apartments/seattle/vox/floor-plans-and-pricing",
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-apply-now"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Contact",
+    "href": null,
+    "cls": "NavigationHeader-module-scss-module__xuakXq__navigation-header__cta-contact-mobile"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Save Up to $3,000 Off Rent!*",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__E2mswW__property-offer-cta__headline"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Schedule a Tour",
+    "href": null,
+    "cls": "CommunityHero-module-scss-module__2WjyNa__community-hero__schedule-tour"
+  },
+  {
+    "tag": "A",
+    "text": "Apply Now",
+    "href": "/apartments/seattle/vox/floor-plans-and-pricing",
+    "cls": "CommunityHero-module-scss-module__2WjyNa__community-hero__cta-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Pricing information",
+    "href": null,
+    "cls": "more-info__icon popper-target"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Add to favorites",
+    "href": null,
+    "cls": "CommunityRefreshDetailsHeader-module-scss-module__PaYREG__favorite-btn"
+  },
+  {
+    "tag": "A",
+    "text": "Email",
+    "href": "#",
+    "cls": "CommunityRefreshDetailsHeader-module-scss-module__PaYREG__contact-link"
+  },
+  {
+    "tag": "A",
+    "text": "(206) 207-7010",
+    "href": "tel:+12062077010",
+    "cls": "CommunityRefreshDetailsHeader-module-scss-module__PaYREG__contact-link"
+  },
+  {
+    "tag": "A",
+    "text": "Share by Email",
+    "href": "mailto:?subject=Check out this property&body=https%3A%2F%2Fwww.essexapartmenthomes.com%2Fapartments%2Fseattle%2Fvox",
+    "cls": "CommunityRefreshDetailsHeader-module-scss-module__PaYREG__share-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Copy link to clipboard",
+    "href": null,
+    "cls": "CommunityRefreshDetailsHeader-module-scss-module__PaYREG__share-link"
+  },
+  {
+    "tag": "A",
+    "text": "Washington",
+    "href": "/apartments/search-results?query=Washington&type=states",
+    "cls": "CommunityBreadcrumb-module-scss-module__sxQb_q__community-breadcrumb__link"
+  },
+  {
+    "tag": "A",
+    "text": "Seattle",
+    "href": "/apartments/seattle",
+    "cls": "CommunityBreadcrumb-module-scss-module__sxQb_q__community-breadcrumb__link"
+  },
+  {
+    "tag": "A",
+    "text": "Seattle, WA",
+    "href": "https://www.essexapartmenthomes.com/apartments/seattle",
+    "cls": "text-amber"
+  },
+  {
+    "tag": "A",
+    "text": "City of Seattle Renter's Handbook (PDF)",
+    "href": "https://www.seattle.gov/Documents/Departments/RentingInSeattle/languages/English/RentersHandbook_English.pdf",
+    "cls": "text-amber"
+  },
+  {
+    "tag": "A",
+    "text": "Leasing Info",
+    "href": "https://www.essexapartmenthomes.com/apartments/seattle/vox/leasing-info",
+    "cls": "text-amber"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Read more",
+    "href": null,
+    "cls": "button-tertiary CommunityRefreshApartmentFeaturesCallout-module-scss-module__x59FvW__show-more "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Schedule a Tour",
+    "href": null,
+    "cls": "undefined CommunityRefreshApartmentFeaturesCallout-module-scss-module__x59FvW__button-secondary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 1",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 2",
+    "href": null,
+    "cls": "embla__dot embla__dot--active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 3",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 4",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 5",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous Slide",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next Slide",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow-"
+  },
+  {
+    "tag": "A",
+    "text": "View Virtual Tours",
+    "href": "/apartments/seattle/vox/virtual-tours",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "A",
+    "text": "View Photo Gallery",
+    "href": "/apartments/seattle/vox/gallery",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "all",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button Filters-module-scss-module__XzV3_a__active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "studio",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "2",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__filter-button "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Pricing information",
+    "href": null,
+    "cls": "more-info__icon popper-target"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Minimum price",
+    "href": null,
+    "cls": "PriceRangeSlider-module-scss-module__S_W_Lq__price-range-slider__handle "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Maximum price",
+    "href": null,
+    "cls": "PriceRangeSlider-module-scss-module__S_W_Lq__price-range-slider__handle "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View on Map",
+    "href": null,
+    "cls": "Filters-module-scss-module__XzV3_a__view-map-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous floor plan",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__floorplans-carousel-nav__btn"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1 Available Unit",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__view-availability-btn"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1 Available Unit",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__view-availability-btn"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "2 Available Units",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__view-availability-btn"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next floor plan",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__floorplans-carousel-nav__btn"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "View Availability",
+    "href": null,
+    "cls": "PropertyFloorTeaser-module-scss-module__RRZgmq__view-availability-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 1",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 2",
+    "href": null,
+    "cls": "embla__dot embla__dot--active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 3",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 4",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 5",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous Slide",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next Slide",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow CommunityRefresh-module-scss-module__HtxCqa__carousel-arrow-"
+  },
+  {
+    "tag": "A",
+    "text": "View Features",
+    "href": "/apartments/seattle/vox/amenities",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "DIV",
+    "text": "Vox - Amenities Explore 3D Space",
+    "href": null,
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__spotlight-cta__virtual-tour"
+  },
+  {
+    "tag": "A",
+    "text": "View Amenities",
+    "href": "/apartments/seattle/vox/amenities#community-amenities",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "A",
+    "text": "Explore Neighborhood",
+    "href": "/apartments/seattle/vox/neighborhood",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 1",
+    "href": null,
+    "cls": "embla__dot embla__dot--active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 2",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 3",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 4",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 5",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Favorite this community",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__favorite"
+  },
+  {
+    "tag": "A",
+    "text": "Contact",
+    "href": "#",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__contact"
+  },
+  {
+    "tag": "A",
+    "text": "See Details",
+    "href": "/apartments/seattle/patent-523",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__details"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 1",
+    "href": null,
+    "cls": "embla__dot embla__dot--active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 2",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 3",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 4",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 5",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Favorite this community",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__favorite"
+  },
+  {
+    "tag": "A",
+    "text": "Contact",
+    "href": "#",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__contact"
+  },
+  {
+    "tag": "A",
+    "text": "See Details",
+    "href": "/apartments/seattle/the-cairns",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__details"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 1",
+    "href": null,
+    "cls": "embla__dot embla__dot--active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 2",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 3",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Go to slide 4",
+    "href": null,
+    "cls": "embla__dot "
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Previous image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Next image",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__image-nav CommunityCard-module-scss-module__vCxswG__community-"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Favorite this community",
+    "href": null,
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__favorite"
+  },
+  {
+    "tag": "A",
+    "text": "Contact",
+    "href": "#",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__contact"
+  },
+  {
+    "tag": "A",
+    "text": "See Details",
+    "href": "/apartments/seattle/annaliese",
+    "cls": "CommunityCard-module-scss-module__vCxswG__community-card__details"
+  },
+  {
+    "tag": "A",
+    "text": "View",
+    "href": "/blog",
+    "cls": "CommunityRefresh-module-scss-module__HtxCqa__button-secondary"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Keyboard shortcuts",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Vox",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Aviara Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Taylor 28 Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Belcarra Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Trails of Redmond Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Audrey at Belltown Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Pinnacle on Lake Washington Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Pinnacle Sonata Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "BellCentre Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Park Highland Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Bothell Ridge Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Shadowbrook Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Parkwood at Mill Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Ellington at Bellevue Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Redmond Hill Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Vesta Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Slater 116 Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Ascent Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Cairns Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Fairwood Pond Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Elliot at Mukilteo Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Patent 523 Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Wharfside Pointe Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Wandering Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Woodland Commons Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Palisades Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Laurels at Mill Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Stonehedge Village Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Sammamish View Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Salmon Run at Perry Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Montebello Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Bernard Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Park Hill at Issaquah Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Inglenook Court Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Forestview Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Fountain Court Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Foothill Commons Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Emerald Ridge Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Evergreen Heights Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Piedmont Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Canyon Pointe Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Castle Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Bridle Trails Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Brighton Ridge Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Elevation Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "The Highlands at Wynhaven Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Courtyard off Main Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Corbella at Juanita Bay Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Cedar Terrace Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Domaine Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Annaliese Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Expo Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Velo and Ray Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Pure Redmond Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Martha Lake Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Monterra In Mill Creek Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Canvas Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "GMP-ADVANCED-MARKER",
+    "text": "Beaumont Apartments",
+    "href": null,
+    "cls": "yNHHyP-marker-view"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Map",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "Terrain",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Satellite",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "Labels",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Toggle fullscreen view",
+    "href": null,
+    "cls": "gm-control-active gm-fullscreen-control"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Drag Pegman onto the map to open Street View",
+    "href": null,
+    "cls": "gm-svpc"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Map camera controls",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Move up",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Move left",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Move right",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Move down",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Zoom in",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Zoom out",
+    "href": null,
+    "cls": "gm-control-active"
+  },
+  {
+    "tag": "A",
+    "text": "Open this area in Google Maps (opens a new window)",
+    "href": "https://maps.google.com/maps?ll=47.61508,-122.313104&z=13&t=m&hl=en-US&gl=US&mapclient=apiv3",
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Keyboard shortcuts",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Map Data",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "1 km Click to toggle between metric and imperial units",
+    "href": null,
+    "cls": "gm-style-cc"
+  },
+  {
+    "tag": "A",
+    "text": "Terms",
+    "href": "https://www.google.com/intl/en-US_US/help/terms_maps.html",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Report a map error",
+    "href": "https://www.google.com/maps/@47.61508,-122.313104,13z/data=!10m1!1e1!12b1?source=apiv3&rapsrc=apiv3",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Annaliese",
+    "href": "/apartments/seattle/annaliese",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Canvas",
+    "href": "/apartments/seattle/canvas",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Domaine",
+    "href": "/apartments/seattle/domaine",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Expo",
+    "href": "/apartments/seattle/expo",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Fountain Court",
+    "href": "/apartments/seattle/fountain-court",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Patent 523",
+    "href": "/apartments/seattle/patent-523",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Taylor 28",
+    "href": "/apartments/seattle/taylor-28",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "The Audrey at Belltown",
+    "href": "/apartments/seattle/the-audrey-at-belltown",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "The Bernard",
+    "href": "/apartments/seattle/the-bernard",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "The Cairns",
+    "href": "/apartments/seattle/the-cairns",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Velo and Ray",
+    "href": "/apartments/seattle/velo-and-ray",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Wharfside Pointe",
+    "href": "/apartments/seattle/wharfside-pointe",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "",
+    "href": "/",
+    "cls": "DefaultFooter-module-scss-module__yTCYpa__default-footer__logo"
+  },
+  {
+    "tag": "A",
+    "text": "Apartments",
+    "href": "/apartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "FAQs",
+    "href": "/frequently-asked-questions",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Penthouse Apartments",
+    "href": "/apartments/penthouse-apartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "About Us",
+    "href": "/about-us",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Affordable Housing",
+    "href": "/affordable-housing-programs",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Sustainability",
+    "href": "/apartments/sustainability",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Careers",
+    "href": "/careers",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Blog",
+    "href": "/blog",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Current Resident",
+    "href": "/current-resident",
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Contact Essex",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Retail",
+    "href": "/retail",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Investors",
+    "href": "https://investors.essexapartmenthomes.com/overview/default.aspx",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Facebook (opens in new window)",
+    "href": "https://www.facebook.com/EssexApartmentHomes",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Instagram (opens in new window)",
+    "href": "https://www.instagram.com/essexapartmenthomes/",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "X Twitter (opens in new window)",
+    "href": "https://x.com/EssexApartments",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "LinkedIn (opens in new window)",
+    "href": "https://www.linkedin.com/company/essex-property-trust",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Terms & Conditions",
+    "href": "/terms-and-conditions",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Privacy Policy",
+    "href": "/privacy-policy",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "California Privacy Notice",
+    "href": "/california-privacy-notice",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Your Privacy Rights",
+    "href": "#",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Washington Consumer Health Notice",
+    "href": "/washington-consumer-health-notice",
+    "cls": ""
+  },
+  {
+    "tag": "A",
+    "text": "Essex’s Terms & Conditions",
+    "href": "/terms-and-conditions",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "A",
+    "text": "Essex’s Text Program Terms & Conditions",
+    "href": "/text-program-terms-and-conditions",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "A",
+    "text": "Essex's Privacy Policy",
+    "href": "/privacy-policy",
+    "cls": "disclaimer-internal-link"
+  },
+  {
+    "tag": "SPAN",
+    "text": "×",
+    "href": null,
+    "cls": "ModalBrowserCheck-module-scss-module__89Je5q__browsercheck-close"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "TOUR",
+    "href": null,
+    "cls": "CommunityPageMobileFooter-module-scss-module___o44Rq__navigation__button CommunityPageMobileFooter-module-scss-module___"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "CONTACT",
+    "href": null,
+    "cls": "CommunityPageMobileFooter-module-scss-module___o44Rq__navigation__button CommunityPageMobileFooter-module-scss-module___"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Chat with us",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Email an agent",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Call or text us",
+    "href": null,
+    "cls": "inner-pill-wrapper"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Minimize EliseAI widget",
+    "href": null,
+    "cls": "minimize-button"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Do Not Sell My Personal Information",
+    "href": null,
+    "cls": "cookie-setting-link"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Accept Cookies",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Close",
+    "href": null,
+    "cls": "onetrust-close-btn-handler onetrust-close-btn-ui banner-close-button ot-close-icon"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Close preference center",
+    "href": null,
+    "cls": "ot-close-icon"
+  },
+  {
+    "tag": "A",
+    "text": "Go To Opt Out Form",
+    "href": "https://privacyportal.onetrust.com/webform/364bb38c-5043-4573-86f4-ce6b725b3586/175d6f72-7b69-44f0-9f65-183171214bd2",
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "Opt Out of Sale/Sharing Cookies",
+    "href": null,
+    "cls": "ot-switch"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Back Button",
+    "href": null,
+    "cls": "ot-link-btn back-btn-handler"
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Filter Icon",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Clear",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Apply",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Cancel",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "LABEL",
+    "text": "checkbox label",
+    "href": null,
+    "cls": ""
+  },
+  {
+    "tag": "BUTTON",
+    "text": "Confirm My Choices",
+    "href": null,
+    "cls": "save-preference-btn-handler onetrust-close-btn-handler"
+  },
+  {
+    "tag": "A",
+    "text": "Powered by OneTrust Opens in a new Tab",
+    "href": "https://www.onetrust.com/solutions/consent-and-preferences/?utm_source=cmp&utm_medium=cmpbanner",
+    "cls": ""
+  }
+]

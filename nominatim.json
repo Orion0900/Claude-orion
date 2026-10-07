@@ -1,0 +1,35 @@
+[
+  {
+    "place_id": 326082535,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "node",
+    "osm_id": 3006168238,
+    "lat": "47.6150608",
+    "lon": "-122.3129678",
+    "category": "place",
+    "type": "house",
+    "place_rank": 30,
+    "importance": 0.0000772983901731444,
+    "addresstype": "place",
+    "name": "",
+    "display_name": "1527, 15th Avenue, Madison Valley, Capitol Hill, Seattle, King County, Washington, 98122, United States",
+    "address": {
+      "house_number": "1527",
+      "road": "15th Avenue",
+      "suburb": "Madison Valley",
+      "city": "Seattle",
+      "county": "King County",
+      "state": "Washington",
+      "ISO3166-2-lvl4": "US-WA",
+      "postcode": "98122",
+      "country": "United States",
+      "country_code": "us"
+    },
+    "boundingbox": [
+      "47.6150108",
+      "47.6151108",
+      "-122.3130178",
+      "-122.3129178"
+    ]
+  }
+]

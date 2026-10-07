@@ -1,0 +1,419 @@
+{
+  "cookies": [
+    {
+      "name": "__cf_ob",
+      "value": "%7B%22cb%22%3A%7B%22cC%22%3A0%2C%22xC%22%3A0%2C%22pC%22%3A0%2C%22sC%22%3A0%2C%22cL%22%3A%5B%5D%7D%2C%22f%22%3A%7B%22t%22%3A%5B%5D%7D%2C%22k%22%3A%7B%22t%22%3A%5B%5D%7D%2C%22n%22%3A%7B%22t%22%3A%5B%7B%22p%22%3A%22%2Fvideo%2F1036523432%22%2C%22t%22%3A%22cf311595b682706e8bf558e6ca4c65bb%22%2C%22nT%22%3A%22navigate%22%2C%22r%22%3A%22https%3A%2F%2Fwww.essexapartmenthomes.com%2F%22%2C%22ts%22%3A180410.90000000002%2C%22dw%22%3A789.0999999999767%7D%5D%7D%2C%22ptr%22%3A%7B%22pt%22%3A0%2C%22l%22%3A%5B%5D%2C%22tr%22%3Afalse%7D%2C%22v%22%3A%7B%22vH%22%3A0%2C%22vV%22%3A180845.69999999995%2C%22vC%22%3A0%2C%22fO%22%3A0%2C%22fI%22%3A0%7D%2C%22_to%22%3A1791417033222.6%2C%22_ti%22%3A%226cda928a-5fd6-4e02-b001-3c98df926ddd%22%2C%22_tsrc%22%3A%22new%22%7D",
+      "domain": "player.vimeo.com",
+      "path": "/cdn-cgi/challenge-platform",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://essexapartmenthomes.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "_vcrcs",
+      "value": "1.1791416678.3600.MmJhOTMzM2U5OTJiNmY1ZmI5NzNkMWMyZjhkMTZlMzM=.56e058c718dda01d1f162380b133521e",
+      "domain": "www.essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1791420278.441418,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "sc_site",
+      "value": "essex-apartment-homes",
+      "domain": "www.essexapartmenthomes.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_gcl_au",
+      "value": "1.1.1751279763.1791416679",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1799192679,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "d28T6rpDNEFC6tGK0xg.6.eR83q.55uNizmdrVMU0Jg-1791416679.502642-1.0.1.1-4Mp9tfsIhPMcZi3XnF2CXR6cKi.9EAMLLv7KvceS9bsZZy7nHayVSyEhvBLz7HNBnWvy1jkU6P4GOurfL_ZuvdipV3NlHSwY.JsKKiE1xWc34U4NWXNLb5to.ybISv3n",
+      "domain": ".bzrcdn.openai.com",
+      "path": "/",
+      "expires": 1791418479.51708,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_cfuvid",
+      "value": "HtSe7UXkK5WJqRQ7r7f3OkY1rnmlIKa.ScaDWvgAdM0-1791416679.502642-1.0.1.1-I9zPO7zJ8I.5ikTGE6nBI9lH4PwB4D9ypHSJ71PuZfk",
+      "domain": ".bzrcdn.openai.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "JfneiOWqcWJ_TWzhvXaBIMuE9bRdmhvkQa21GswvJKo-1791416679.5178065-1.0.1.1-TfOwX9_xfgP_yrFR8KIHkyWM6J7muyyZwXMznjsjC_ZY2e2.uFmD4wr6JLSv4lvUVUTHnC5ARxp29Mkbj34n1OgYGfxQyycC.i7sUfY7NiIxunLAItarC1Wem3zURDVh",
+      "domain": ".hs-scripts.com",
+      "path": "/",
+      "expires": 1791418479.533439,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__obref",
+      "value": "d5722b11-c7e5-4e65-9ade-240f43500439",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1822952679.616565,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "vwaUispG4Vw6LWATvYfCZnQ3POIuk1XAzyy.y8U5jgQ-1791416679.642478-1.0.1.1-tHKTNWAhJsWJyzsd_f2DGYUolZUmbrH4WefDDWpcHHHzvWpu6HacWwYzpnmWg5d1.I3UFQVsl8EDLDJl_PwlG.NB9CeipJEe41aNm2nGWABsmTKChFesPLvwiVNICyTe",
+      "domain": ".hs-analytics.net",
+      "path": "/",
+      "expires": 1791418479.655031,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "tNtvBK2djni2imEEMgxg5bQbt_We6Yg7J5_mfRDICsY-1791416679.6486855-1.0.1.1-eH7vddVjqXfGi4Qlgbrwtw68ullxYzNDkvsZFzkiLhN1y2Sr2U5Hkjlp9kCXE3mB5A6Qct_OXIG93E6xh25mRppq9ksTknVs30dBfC8v8KCNd9dHjcrDTFH1SFMh_IQy",
+      "domain": ".hs-banner.com",
+      "path": "/",
+      "expires": 1791418479.666848,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "IDE",
+      "value": "AHWqTUmFS-arX9zNBvIEwdOyjAyVV4-7hpSjxWFj7z3rWEHPqxHFah71DTe9wHcD",
+      "domain": ".doubleclick.net",
+      "path": "/",
+      "expires": 1825976679.727017,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_ga",
+      "value": "GA1.1.660994067.1791416680",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825977032.67604,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_ttp",
+      "value": "3KO7IKIFnxh831eztgQbU8ZC6A0.1791416679937",
+      "domain": ".tiktok.com",
+      "path": "/",
+      "expires": 1825113033.004542,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cebs",
+      "value": "1",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "sc_13sy7JFUvBcl6Kj9eF2Zeu",
+      "value": "aa7a6ffc-ac0f-4faa-a9d9-23e43ca69d98",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825976680.532146,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_ce.clock_data",
+      "value": "108%2C20.171.36.128%2C1%2Ca75818b9881da70587eb0a9cfcb7e1d6%2CChrome%2CUS%2CDirect%20Traffic%2C",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1791503080,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "_tt_enable_cookie",
+      "value": "1",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825113033,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ttp",
+      "value": "01M4CC2G8RG0T1111AP8Y926N0_.tt.1.1791416680728",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825113033,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "At4e1e.2bIrobTi0dLZt4JFFkm5JoNdROV3cK5ZaJ_k-1791416681.0599444-1.0.1.1-b2OFlT76Hlsc2.WwP7ni3CzyR7_ved06rh.mYWH8zjDpC6gq0uynLxaQRv6MTxTKIDRwCM39PRfpPykSChXJs_zcbbb62I5Wr1Q7EexDT0J2fvA9zkw4EVm.Lvo9Mnmx",
+      "domain": ".bzr.openai.com",
+      "path": "/",
+      "expires": 1791418481.092104,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_cfuvid",
+      "value": "U8N3Vom6wfIbws3FYWeVmScxAQeb0l4Mjw_1OEbZ.PA-1791416681.0599444-1.0.1.1-m.33GAxX2cVwuhB8Tr_1wbF3F2wSKKK3Mvb3dNDLdOk",
+      "domain": ".bzr.openai.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "aU3Gn7jwl3aiMoNT4ga84gxPw8oGJPTG1_94lobbobU-1791416681.1197066-1.0.1.1-lI40aUh6NlLqMuMs5NOSBen9ARmuT2suqzlA5ui2SmZ.12Q4cYDqWjdgz4pgNzPue6uvjF6FWWacfeIYdtL688Y41Gv2bLA0jOcvytz50_ya9Q28xA6j0ainLnC.GeGX",
+      "domain": ".media.essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1791418481.208336,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__hstc",
+      "value": "177538298.712349c25ab6d8e99dc64e2ad6df65fa.1791416681408.1791416681408.1791416681408.1",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1806969034,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "hubspotutk",
+      "value": "712349c25ab6d8e99dc64e2ad6df65fa",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1806969034,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__hssrc",
+      "value": "1",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "CuDfQ.0jBKVkrJb_x7IDU1P.wqYdDun5uyL.JO_p1as-1791416681.6129954-1.0.1.1-SXs.YbrgN._iAZIPL5I4Gi0E37Yf3SpYYQPLLSbE16h3o6JyuN84xkCBnwhcdx3EQ8YCBZ1tQHFg8IH_WOjjAWI3AG92.R4K3wmQyinhW4qLhqjMU3YWPNVPSOIKS5yg",
+      "domain": ".hubspot.com",
+      "path": "/",
+      "expires": 1791418481.700344,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cebsp_",
+      "value": "2",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "ttcsid_D7C2C13C77UDSGCDVQF0",
+      "value": "1791416680732::yd_izo_gxf7peB9DYZm9.1.1791417033281.1",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825113033,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ga_6WGL6JZ4YN",
+      "value": "GS2.1.s1791416679$o1$g1$t1791417033$j59$l0$h0",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825977033.431585,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__hssc",
+      "value": "177538298.2.1791416681408",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1791418834,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OptanonConsent",
+      "value": "isGpcEnabled=0&datestamp=Wed+Oct+07+2026+16%3A50%3A34+GMT-0700+(Pacific+Daylight+Time)&version=202605.1.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=3ac8a440-cce1-4745-b71c-45a6f1af1551&interactionCount=1&isAnonUser=1&prevHadToken=0&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CBG50%3A1%2CC0004%3A1&AwaitingReconsent=false",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1822953034,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "vuid",
+      "value": "pl204484749.1046269911",
+      "domain": ".vimeo.com",
+      "path": "/",
+      "expires": 1825977034.465107,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cf_clearance",
+      "value": "XNLHvveLAC8ToBgSa_SfFen9oekDJ3MXM5wOMhGTwWc-1791417213-1.2.1.1-t6dRP423w4.obCS9emCnZOdFCZuXm8s7NvDLUAI918_i5k8ltG9pYIsdrbe1aStonohfcJnbuXeo0NEDKxFsi1cya5C7FbRH.nCd3sJe0u23N.7XGT1JGmXpx0WF0OkY2w3n5F0ipz8SPGrklvMIvrkMU2izY7RxCx9Xgx.0T84NGExuaWyUUmIM2SkKws6_8HJvLii19bB5NZRJ0RPTqdTN0sJB2Hn_kOMYJil3giktkmrxtfVaEz7T3xF5HnKq3TWhDFtLdApkqa3KeewKsVPy1uGxWhzRCgNyBnJTdzDQwXQceSCkSIAF2yJyj7WRRA6hKuQeY0DCqdHV3f8uQYtw.jmmQAHD0Lvhlf9UyFb9IEoqnPP8Lj7r6Hn9eZqI9yIAonFc0Pii.oY1l4mIoBD8.83U4yC5yJZuB7dboK5oPrg69WGCdHcqsMpiwvsZmKItir7MNog_AoavAzMA9sZRP.0PuKpU0sVbeKJBlqoPNkIj9t0oflHww2P28iteW_cpyLZmLtMF7pHG0d3msIhw6O7NUR5oJJSHAasmkog_EQoWPk18vf2f4Rat.Mqg",
+      "domain": ".vimeo.com",
+      "path": "/",
+      "expires": 1822953213.6322,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://essexapartmenthomes.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "__cf_bm",
+      "value": "QLIPNw6e0ol54hHFhLzorPsw4CQe_cSnSTJJC.4OLiI-1791417213.6166358-1.0.1.1-r8yeLgLvq7EYfvqSOFOXEokMxdUQiun0iA6DIbvif2LrSn2iso6xd3jRrUqX5x1aHeHlZQsKw7e3Zfm9BZmApvVwHnRtTOyo0xNXUVP3K_HrOPOuQzK0o7TyFaZ7RK4d",
+      "domain": ".vimeo.com",
+      "path": "/",
+      "expires": 1791419013.632293,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ttcsid",
+      "value": "1791416680733::gXF7DWmqRfD-eb0GBFvf.1.1791417033281.0::1.351491.352299::170721.1.1195.460::533706.41.7613",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1825113214,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ce.s",
+      "value": "v~c0bb22866b9c92bbbb125dc994b44be07c1d7294~vir~new~lva~1791416680292~vpv~0~v11.cs~179176~v11.s~10754b20-c2a9-11f1-9581-9df519bc5bb0~v11.vs~c0bb22866b9c92bbbb125dc994b44be07c1d7294~v11.sla~1791416680659~v11.wss~1791416680660~v11.ss~1791416680666~v11ls~10754b20-c2a9-11f1-9581-9df519bc5bb0~gtrk.la~muyrk18t~lcw~1791417214541",
+      "domain": ".essexapartmenthomes.com",
+      "path": "/",
+      "expires": 1822953214,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://www.essexapartmenthomes.com",
+      "localStorage": [
+        {
+          "name": "ce_csp_transport_check",
+          "value": "1791503080655|worker"
+        },
+        {
+          "name": "v11.fsvd",
+          "value": "{\"notModifiedUrl\":\"https://www.essexapartmenthomes.com/apartments/seattle/vox/floor-plans-and-pricing\",\"url\":\"essexapartmenthomes.com/apartments/seattle/vox/floor-plans-and-pricing\",\"ref\":\"\",\"utm\":[]}"
+        },
+        {
+          "name": "ce_bot_detector",
+          "value": "{\"visits\":0,\"clicks\":1,\"firstVisitTime\":1791416851448,\"detected\":false}"
+        },
+        {
+          "name": "ce_fvd",
+          "value": "{\"landingUrl\":\"https://www.essexapartmenthomes.com/apartments/seattle/vox/floor-plans-and-pricing\",\"referrer\":\"\",\"time\":1791416680292,\"utm\":[],\"dailyVisitTime\":1791416680293,\"userData\":[]}"
+        },
+        {
+          "name": "com.elise.webchat.slug=1906c0ae-35cc-11f0-9f48-eb3251d76baf",
+          "value": "{\"buildingSlug\":\"1906c0ae-35cc-11f0-9f48-eb3251d76baf\",\"leadId\":\"lead_e5cc65ba-3c6c-4dab-b9ca-841db72fa58a\",\"timestamp\":\"2026-10-07T16:50:33-07:00\",\"initiatedChat\":false}"
+        },
+        {
+          "name": "_gcl_ls",
+          "value": "{\"schema\":\"gcl\",\"version\":1,\"gcl_ctr\":{\"value\":{\"value\":0,\"timeouts\":0,\"errors\":0,\"eopCount\":0,\"creationTimeMs\":1791416679284},\"expires\":1799192679284},\"gsid_dc\":{\"value\":{\"joinId\":\"kMmPJnTZafiq94BCe6nRKIoymThDKDPtyA\",\"lastJoinedTimeMs\":1791417032629},\"expires\":1791417332629}}"
+        },
+        {
+          "name": "ce_segment_visit_history",
+          "value": "{\"version\":3,\"pages\":[]}"
+        }
+      ]
+    },
+    {
+      "origin": "https://sightmap.com",
+      "localStorage": [
+        {
+          "name": "ph_phc_txXbAXCfeLGPUo4EsRwBY8rCuBh1MZDOuGreOKU18uX_posthog",
+          "value": "{\"$initialization_time\":\"2026-10-07T23:47:32.561Z\",\"$configured_session_timeout_ms\":1800000,\"$sesid\":[1791416852562,\"01a118c3-e052-77ef-826c-0de6adb887ca\",1791416852562],\"$client_session_props\":{\"sessionId\":\"01a118c3-e052-77ef-826c-0de6adb887ca\",\"props\":{\"r\":\"https://www.essexapartmenthomes.com/\",\"u\":\"https://sightmap.com/embed/zdqw9zl5po9?enable_api=1&origin=https://www.essexapartmenthomes.com&move_in_date=2026-10-07\"}},\"distinct_id\":\"01a118c3-e055-7335-b331-51f1a14e75e6\",\"$device_id\":\"01a118c3-e055-7335-b331-51f1a14e75e6\",\"$user_state\":\"anonymous\",\"$session_recording_enabled_server_side\":false,\"$session_recording_network_payload_capture\":{\"capturePerformance\":{\"network_timing\":true,\"web_vitals\":false,\"web_vitals_allowed_metrics\":null}},\"$session_recording_canvas_recording\":{},\"$replay_sample_rate\":null,\"$replay_minimum_duration\":null,\"$autocapture_disabled_server_side\":false,\"$heatmaps_enabled_server_side\":false,\"$web_vitals_enabled_server_side\":false,\"$web_vitals_allowed_metrics\":null,\"$exception_capture_enabled_server_side\":true,\"$error_tracking_suppression_rules\":[],\"$dead_clicks_enabled_server_side\":false,\"$active_feature_flags\":[],\"$enabled_feature_flags\":{},\"$feature_flag_payloads\":{},\"$feature_flag_details\":{},\"$feature_flag_request_id\":\"e86aec9a-8c55-47b9-8d59-a687fea38d3c\"}"
+        }
+      ]
+    },
+    {
+      "origin": "https://player.vimeo.com",
+      "localStorage": [
+        {
+          "name": "PLAYER_PICOX_SAMPLING_SEED",
+          "value": "0.2620895713388377"
+        },
+        {
+          "name": "LOCAL_STORAGE_ID_VIMEO_PLAYER",
+          "value": "d5ca45f0-dcef-4d49-83df-d7da1af003c7"
+        },
+        {
+          "name": "LOCAL_STORAGE_ID_PICOX_ID",
+          "value": "cc330dbf-4b5d-4331-837f-e831cefd3a68"
+        }
+      ]
+    }
+  ]
+}
