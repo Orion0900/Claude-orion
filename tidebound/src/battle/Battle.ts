@@ -9,11 +9,11 @@
  * turn's aftermath and carry on afterwards exactly where it left off.
  */
 import { Rng } from '../core/rng'
-import { ALL_ITEMS, item as itemData, type ItemData, type ItemId } from '../data/items'
+import { ALL_ITEMS, item as itemData, type HoldEffect, type ItemData, type ItemId } from '../data/items'
 import { move as moveData, STRUGGLE, type MoveData, type MoveEffect } from '../data/moves'
 import { species } from '../data/species'
 import type { TypeId } from '../data/types'
-import { applyItem, calcStats, creatureView, displayName, itemWouldWork, levelUp, maxHp, typesOf, xpFraction } from './creature'
+import { applyItem, calcStats, creatureView, cureText, displayName, gainEffort, itemWouldWork, levelUp, maxHp, typesOf, xpFraction } from './creature'
 import {
   catchValue,
   clampStage,
@@ -30,6 +30,7 @@ import {
   xpShare,
   xpYield,
 } from './formulas'
+import { ability, abilityOf, type AbilityId } from './abilities'
 import { effectiveness } from './typechart'
 import type {
   BattleApi,
@@ -45,6 +46,7 @@ import type {
   Side,
   StageKey,
   StatusId,
+  Weather,
 } from './types'
 
 type Step = () => void
@@ -177,6 +179,8 @@ export class Battle implements BattleApi {
   private participants = new Set<number>()
   private readonly leveled = new Set<number>()
   private runAttempts = 0
+  /** Rain or sun, and turns left (Infinity when an ability brought it). */
+  private weather: { kind: Weather; turns: number } | null = null
   private readonly trainerItems: ItemId[]
   private caught: Creature | undefined
 
@@ -324,7 +328,8 @@ export class Battle implements BattleApi {
   private speedOf(side: Side): number {
     const c = this.active(side)
     const par = c.status === 'par' ? 0.25 : 1
-    return Math.floor(calcStats(c).spe * stageMultiplier(this.vol[side].stages.spe) * par)
+    const swift = this.weather?.kind === 'rain' && this.has(side, 'tiderider') ? 2 : 1
+    return Math.floor(calcStats(c).spe * stageMultiplier(this.vol[side].stages.spe) * par * swift)
   }
 
   private roll(chance: number): boolean {
@@ -354,6 +359,110 @@ export class Battle implements BattleApi {
     this.emit({ t: 'status', side, status })
   }
 
+  // ------------------------------------------------------- abilities
+
+  /** Whether the active beast on `side` has this ability (and is standing). */
+  private has(side: Side, id: AbilityId): boolean {
+    const c = this.active(side)
+    return c.hp > 0 && abilityOf(c) === id
+  }
+
+  private abilityName(side: Side): string {
+    return ability(abilityOf(this.active(side))).name
+  }
+
+  /** What happens as a beast comes out: MENACE cows the foe, STORMCALLER brings rain. */
+  private enter(side: Side): void {
+    const foe = other(side)
+    if (this.has(side, 'menace') && this.active(foe).hp > 0) {
+      this.msg(`${this.label(side)}'s ${this.abilityName(side)} cows ${this.label(foe)}!`)
+      this.changeStages(foe, { atk: -1 }, true, true)
+    }
+    if (this.has(side, 'stormcaller') && this.weather?.kind !== 'rain') {
+      this.setWeather('rain', Infinity, `${this.label(side)}'s ${this.abilityName(side)} brought rain!`)
+    }
+  }
+
+  private setWeather(kind: Weather, turns: number, text: string): void {
+    this.weather = { kind, turns }
+    this.emit({ t: 'weather', weather: kind })
+    this.msg(text)
+  }
+
+  /** Rain and sun power up or dampen TIDE and FLAME moves. */
+  private weatherMultiplier(type: TypeId): number {
+    const w = this.weather?.kind
+    if (!w) return 1
+    if (type === 'tide') return w === 'rain' ? 1.5 : 0.5
+    if (type === 'flame') return w === 'sun' ? 1.5 : 0.5
+    return 1
+  }
+
+  /** An ability that makes `m` useless against `side`: HOVER against EARTH, SOAKUP against TIDE. */
+  private abilityImmune(side: Side, m: MoveData): 'hover' | 'soakup' | null {
+    if (m.typeless) return null
+    if (m.type === 'earth' && this.has(side, 'hover')) return 'hover'
+    if (m.type === 'tide' && this.has(side, 'soakup')) return 'soakup'
+    return null
+  }
+
+  /** Says why the move failed against an ability, healing SOAKUP. */
+  private absorb(side: Side, kind: 'hover' | 'soakup'): void {
+    const name = this.label(side)
+    const ab = this.abilityName(side)
+    if (kind === 'hover') return this.msg(`${name} floats clear with ${ab}!`)
+    const c = this.active(side)
+    if (c.hp < maxHp(c)) {
+      this.heal(side, Math.max(1, Math.floor(maxHp(c) / 4)))
+      this.msg(`${name}'s ${ab} soaked it up and restored HP!`)
+    } else this.msg(`${name}'s ${ab} soaked it up!`)
+  }
+
+  // ------------------------------------------------------- held items
+
+  /** The held effect of the active beast on `side`, when it is standing. */
+  private holding(side: Side): HoldEffect | null {
+    const c = this.active(side)
+    return c.hp > 0 && c.item ? (itemData(c.item).hold ?? null) : null
+  }
+
+  /** Eats a held berry: it is used up. Returns its name. */
+  private eat(side: Side): string {
+    const c = this.active(side)
+    const id = c.item
+    if (!id) return 'BERRY'
+    c.item = null
+    this.emit({ t: 'item', side, item: id })
+    return itemData(id).name
+  }
+
+  /** After taking damage: a healing berry at half HP, an ATTACK berry at a quarter. */
+  private afterHurt(side: Side): void {
+    const c = this.active(side)
+    const hold = this.holding(side)
+    if (!hold || c.hp <= 0) return
+    const max = maxHp(c)
+    if (hold.kind === 'berryHeal' && c.hp <= max / 2) {
+      const berry = this.eat(side)
+      this.heal(side, hold.hp)
+      this.msg(`${this.label(side)} ate its ${berry} and regained HP!`)
+    } else if (hold.kind === 'berryAttack' && c.hp <= max / 4 && this.vol[side].stages.atk < 6) {
+      const berry = this.eat(side)
+      this.msg(`${this.label(side)} ate its ${berry}!`)
+      this.changeStages(side, { atk: 1 }, false)
+    }
+  }
+
+  /** As soon as a status problem strikes, a curing berry is eaten. */
+  private afterStatus(side: Side): void {
+    const c = this.active(side)
+    if (!c.status || this.holding(side)?.kind !== 'berryCure') return
+    const berry = this.eat(side)
+    const text = cureText(this.label(side), c.status)
+    this.setStatus(side, null)
+    this.msg(`${this.label(side)} ate its ${berry}! ${text}`)
+  }
+
   // ------------------------------------------------------------ opening
 
   private opening(): void {
@@ -378,6 +487,9 @@ export class Battle implements BattleApi {
     const me = this.party[pi]
     this.msg(`Go for it, ${displayName(me)}!`)
     this.emit({ t: 'send', side: 'player', partyIndex: pi, view: creatureView(me) })
+    const first: Side = this.speedOf('player') >= this.speedOf('foe') ? 'player' : 'foe'
+    this.enter(first)
+    this.enter(other(first))
   }
 
   // ------------------------------------------------------------ choices
@@ -509,11 +621,38 @@ export class Battle implements BattleApi {
 
   private endOfTurn(): void {
     if (this.turnOver || this.ended) return
+    if (this.weather) {
+      if (--this.weather.turns <= 0) {
+        this.msg(this.weather.kind === 'rain' ? 'The rain stopped.' : 'The sunlight faded.')
+        this.weather = null
+        this.emit({ t: 'weather', weather: null })
+      } else this.msg(this.weather.kind === 'rain' ? 'Rain continues to fall.' : 'The sunlight is strong.')
+    }
     for (const side of ['player', 'foe'] as const) {
       if (this.turnOver) return
       if (this.active(side).hp <= 0) continue
       this.residual(side)
+      this.afterHurt(side)
       this.checkFaint(side)
+      if (this.active(side).hp > 0) this.turnAbility(side)
+      if (this.holding(side)?.kind === 'regen' && this.active(side).hp < maxHp(this.active(side))) {
+        const c = this.active(side)
+        this.heal(side, Math.max(1, Math.floor(maxHp(c) / 16)))
+        this.msg(`${this.label(side)} restored a little HP with its ${itemData(c.item!).name}!`)
+      }
+    }
+  }
+
+  /** DEWDRINKER drinks the rain; QUICKENING speeds up. */
+  private turnAbility(side: Side): void {
+    const c = this.active(side)
+    if (this.weather?.kind === 'rain' && this.has(side, 'dewdrinker') && c.hp < maxHp(c)) {
+      this.heal(side, Math.max(1, Math.floor(maxHp(c) / 16)))
+      this.msg(`${this.label(side)}'s ${this.abilityName(side)} restored a little HP!`)
+    }
+    if (this.has(side, 'quickening') && this.vol[side].stages.spe < 6) {
+      this.msg(`${this.label(side)}'s ${this.abilityName(side)} kicks in!`)
+      this.changeStages(side, { spe: 1 }, false)
     }
   }
 
@@ -557,6 +696,7 @@ export class Battle implements BattleApi {
     if (c.hp > 0) this.participants.add(i)
     this.msg(`Go for it, ${displayName(c)}!`)
     this.emit({ t: 'send', side: 'player', partyIndex: i, view: creatureView(c) })
+    this.enter('player')
   }
 
   // --------------------------------------------------------------- items
@@ -678,7 +818,8 @@ export class Battle implements BattleApi {
 
   private rollHit(side: Side, m: MoveData): boolean {
     if (m.accuracy <= 0 || m.target === 'self') return true
-    const p = hitChance(m.accuracy, this.vol[side].stages.acc, this.vol[other(side)].stages.eva)
+    const keen = this.has(side, 'sharpsight') ? 1.3 : 1
+    const p = hitChance(m.accuracy, this.vol[side].stages.acc, this.vol[other(side)].stages.eva) * keen
     return p >= 1 || this.rng.next() < p
   }
 
@@ -693,10 +834,18 @@ export class Battle implements BattleApi {
     let as = this.vol[side].stages[ak]
     let ds = this.vol[tSide].stages[dk]
     if (crit) [as, ds] = critStages(as, ds)
-    const atk = Math.max(1, Math.floor(calcStats(user)[ak] * stageMultiplier(as)))
+    const gritty = physical && !!user.status && this.has(side, 'grit')
+    let atkMult = gritty ? 1.5 : 1
+    const pinch = ability(abilityOf(user)).pinch
+    if (pinch && !m.typeless && m.type === pinch && user.hp <= maxHp(user) / 3) atkMult *= 1.5
+    if (!m.typeless && (m.type === 'flame' || m.type === 'frost') && this.has(tSide, 'blubber')) atkMult *= 0.5
+    const held = this.holding(side)
+    if (held?.kind === 'boost' && !m.typeless && m.type === held.type) atkMult *= 1.1
+    const atk = Math.max(1, Math.floor(calcStats(user)[ak] * stageMultiplier(as) * atkMult))
     const def = Math.max(1, Math.floor(calcStats(target)[dk] * stageMultiplier(ds)))
     const stab = !m.typeless && typesOf(user).includes(m.type)
-    return damage({ level: user.level, power: m.power, atk, def, stab, eff, crit, burned: physical && user.status === 'brn', roll })
+    const power = m.typeless ? m.power : Math.max(1, Math.floor(m.power * this.weatherMultiplier(m.type)))
+    return damage({ level: user.level, power, atk, def, stab, eff, crit, burned: physical && user.status === 'brn' && !gritty, roll })
   }
 
   private attack(side: Side, m: MoveData): void {
@@ -709,6 +858,11 @@ export class Battle implements BattleApi {
     if (eff === 0) {
       this.emit({ t: 'miss', side })
       return this.msg(`It has no effect on ${tName}...`)
+    }
+    const immune = this.abilityImmune(tSide, m)
+    if (immune) {
+      this.emit({ t: 'miss', side })
+      return this.absorb(tSide, immune)
     }
     if (!this.rollHit(side, m)) {
       this.emit({ t: 'miss', side })
@@ -727,15 +881,20 @@ export class Battle implements BattleApi {
       if (fixed) {
         dmg = fixed.damage === 'level' ? user.level : fixed.damage
       } else {
-        crit = this.rng.chance(critChance(highCrit))
+        crit = this.rng.chance(critChance(highCrit)) && !this.has(tSide, 'hardshell')
         dmg = this.damageFor(side, m, eff, crit, this.rng.int(85, 100))
       }
       const from = target.hp
+      // STEADFAST: a hit taken at full HP leaves it standing with 1 HP.
+      const steady = from >= maxHp(target) && dmg >= from && this.has(tSide, 'steadfast')
+      if (steady) dmg = from - 1
       target.hp = Math.max(0, from - dmg)
       dealt += from - target.hp
       landed++
       this.emit({ t: 'hp', side: tSide, from, to: target.hp, maxHp: maxHp(target), eff: fixed ? 1 : eff, crit })
       if (crit) this.msg('A lucky strike!')
+      if (steady) this.msg(`${tName} held on with ${this.abilityName(tSide)}!`)
+      this.afterHurt(tSide)
     }
     if (!fixed) {
       if (eff > 1) this.msg('It hit a weak spot!')
@@ -755,7 +914,7 @@ export class Battle implements BattleApi {
     for (const e of m.effects) {
       if (target.hp <= 0) break
       if (e.kind === 'status' && this.roll(e.chance)) this.inflict(tSide, e.status, false)
-      else if (e.kind === 'stages' && e.who === 'foe' && this.roll(e.chance)) this.changeStages(tSide, e.stages, false)
+      else if (e.kind === 'stages' && e.who === 'foe' && this.roll(e.chance)) this.changeStages(tSide, e.stages, false, true)
       else if (e.kind === 'flinch' && this.roll(e.chance)) this.vol[tSide].flinch = true
     }
     for (const e of m.effects) {
@@ -765,6 +924,16 @@ export class Battle implements BattleApi {
     if (recoil && dealt > 0 && user.hp > 0) {
       this.hurt(side, Math.max(1, Math.floor(dealt * recoil.fraction)))
       this.msg(`${uName} is jarred by the recoil!`)
+      this.afterHurt(side)
+    }
+    // Touching a SPARKSKIN or VENOMSPINES beast can leave the attacker paralysed or poisoned.
+    if (m.contact && dealt > 0 && user.hp > 0 && !user.status) {
+      const touch = abilityOf(target)
+      const status: StatusId | null = touch === 'sparkskin' ? 'par' : touch === 'venomspines' ? 'psn' : null
+      if (status && !statusImmune(typesOf(user), status) && this.rng.chance(0.3)) {
+        this.msg(`${tName}'s ${ability(touch).name} struck back!`)
+        this.inflict(side, status, false)
+      }
     }
   }
 
@@ -798,15 +967,23 @@ export class Battle implements BattleApi {
         this.emit({ t: 'miss', side })
         return this.changeStages(side, stages.stages, true)
       }
+      const weatherMove = findEffect(m, 'weather')
+      if (weatherMove && this.weather?.kind === weatherMove.weather) return fail('But it failed!')
+      if (rest && this.has(side, 'wakeful')) return fail(`${uName}'s ${this.abilityName(side)} keeps it awake!`)
       this.emit({ t: 'move', side, move: m.id })
       for (const e of m.effects) {
         if (e.kind === 'heal') {
-          this.heal(side, Math.max(1, Math.floor(max * e.fraction)))
+          const w = this.weather?.kind
+          const fraction = e.sunny && w ? (w === 'sun' ? 2 / 3 : 1 / 4) : e.fraction
+          this.heal(side, Math.max(1, Math.floor(max * fraction)))
           this.msg(`${uName} feels much better!`)
+        } else if (e.kind === 'weather') {
+          this.setWeather(e.weather, 5, e.weather === 'rain' ? 'It started to rain!' : 'The sunlight turned harsh!')
         } else if (e.kind === 'rest') {
           this.setStatus(side, 'slp', e.turns)
           this.heal(side, max)
           this.msg(`${uName} took a nap and became healthy!`)
+          this.afterStatus(side)
         } else if (e.kind === 'stages') {
           this.changeStages(side, e.stages, true)
         }
@@ -814,23 +991,29 @@ export class Battle implements BattleApi {
       return
     }
 
+    const immune = this.abilityImmune(tSide, m)
+    if (immune) {
+      this.emit({ t: 'miss', side })
+      return this.absorb(tSide, immune)
+    }
     const inflict = findEffect(m, 'status')
     if (inflict) {
       const types = typesOf(target)
       if (effectiveness(m.type, types) === 0 || statusImmune(types, inflict.status)) return fail(`It has no effect on ${tName}...`)
+      if (inflict.status === 'slp' && this.has(tSide, 'wakeful')) return fail(`${tName}'s ${this.abilityName(tSide)} keeps it awake!`)
       if (target.status) return fail('But it failed!')
     }
     const onlyStages = !inflict && m.effects.every((e) => e.kind === 'stages' && e.who === 'foe')
     if (onlyStages && m.effects.every((e) => e.kind === 'stages' && this.stagesBlocked(tSide, e.stages))) {
       this.emit({ t: 'miss', side })
-      for (const e of m.effects) if (e.kind === 'stages') this.changeStages(tSide, e.stages, true)
+      for (const e of m.effects) if (e.kind === 'stages') this.changeStages(tSide, e.stages, true, true)
       return
     }
     if (!this.rollHit(side, m)) return fail(`${uName}'s attack missed!`)
     this.emit({ t: 'move', side, move: m.id })
     for (const e of m.effects) {
       if (e.kind === 'status') this.inflict(tSide, e.status, true)
-      else if (e.kind === 'stages') this.changeStages(e.who === 'self' ? side : tSide, e.stages, true)
+      else if (e.kind === 'stages') this.changeStages(e.who === 'self' ? side : tSide, e.stages, true, e.who !== 'self')
     }
   }
 
@@ -847,15 +1030,27 @@ export class Battle implements BattleApi {
       if (loud) this.msg(`It has no effect on ${name}...`)
       return false
     }
+    if (status === 'slp' && this.has(side, 'wakeful')) {
+      if (loud) this.msg(`${name}'s ${this.abilityName(side)} keeps it awake!`)
+      return false
+    }
     this.setStatus(side, status)
     this.msg(`${name} ${INFLICT_TEXT[status]}`)
+    this.afterStatus(side)
     return true
   }
 
-  /** Applies stage changes; `loud` also says when a stat can't go further. */
-  private changeStages(side: Side, stages: Partial<Record<StageKey, number>>, loud: boolean): void {
+  /**
+   * Applies stage changes; `loud` also says when a stat can't go further.
+   * `byFoe` marks drops the other side caused, which STEELNERVE shrugs off.
+   */
+  private changeStages(side: Side, stages: Partial<Record<StageKey, number>>, loud: boolean, byFoe = false): void {
     const v = this.vol[side]
     const name = this.label(side)
+    if (byFoe && this.has(side, 'steelnerve') && Object.values(stages).some((d) => (d ?? 0) < 0)) {
+      if (loud) this.msg(`${name}'s ${this.abilityName(side)} prevents stat loss!`)
+      stages = Object.fromEntries(Object.entries(stages).filter(([, d]) => (d ?? 0) > 0))
+    }
     for (const k of Object.keys(stages) as StageKey[]) {
       const d = stages[k] ?? 0
       if (!d) continue
@@ -904,6 +1099,7 @@ export class Battle implements BattleApi {
       this.msg(`A wild ${displayName(c)} leapt out!`)
     }
     this.participants = new Set(this.party[this.pIdx].hp > 0 ? [this.pIdx] : [])
+    this.enter('foe')
   }
 
   // ------------------------------------------------------------ experience
@@ -911,9 +1107,17 @@ export class Battle implements BattleApi {
   private awardXp(foe: Creature): void {
     const standing = [...this.participants].filter((i) => this.party[i]?.hp > 0).sort((a, b) => a - b)
     if (!standing.length) return
+    const holders = this.party.map((c, i) => (c.hp > 0 && c.item && itemData(c.item).hold?.kind === 'share' ? i : -1)).filter((i) => i >= 0)
+    // Effort is quiet: every beast that fought, and every SHARE SHELL holder, gets the foe's full yield.
+    for (const i of new Set([...standing, ...holders])) gainEffort(this.party[i], foe.species)
     const total = xpYield(species(foe.species).xpYield, foe.level, this.setup.kind === 'trainer')
-    const share = xpShare(total, standing.length)
-    this.enqueue(...standing.map((i) => () => this.gainXp(i, share)))
+    // With a SHARE SHELL out, half goes to those who fought and half to the holders.
+    const gains = new Map<number, number>()
+    const fought = holders.length ? Math.floor(total / 2) : total
+    for (const i of standing) gains.set(i, xpShare(fought, standing.length))
+    if (holders.length) for (const i of holders) gains.set(i, (gains.get(i) ?? 0) + xpShare(total - fought, holders.length))
+    const order = [...gains.keys()].sort((a, b) => a - b)
+    this.enqueue(...order.map((i) => () => this.gainXp(i, gains.get(i)!)))
   }
 
   private gainXp(i: number, amount: number): void {

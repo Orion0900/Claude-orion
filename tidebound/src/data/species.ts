@@ -32,6 +32,8 @@ export interface SpeciesData {
   xpYield: number
   /** Level-up moves in level order. Level 1 entries are known from the start. */
   learnset: readonly LearnsetEntry[]
+  /** Effort points it gives each beast that helps defeat it. */
+  effort: Partial<Stats>
 }
 
 type Row = {
@@ -50,35 +52,35 @@ const DATA: Record<SpeciesId, Row> = {
   },
   frondolin: {
     base: [68, 70, 80, 58, 72, 62], growth: 'medium', catchRate: 45, xpYield: 142,
-    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'seedFlick'], [9, 'sapSip'], [13, 'dozeDust'], [16, 'frondSlash'], [20, 'dirtRake'], [24, 'sunbathe'], [28, 'deepRoots'], [33, 'digIn'], [38, 'thornStorm'], [44, 'timberDrop'], [50, 'fullTilt']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'seedFlick'], [9, 'sapSip'], [13, 'dozeDust'], [16, 'frondSlash'], [20, 'dirtRake'], [24, 'sunbathe'], [28, 'deepRoots'], [30, 'dryspell'], [33, 'digIn'], [38, 'thornStorm'], [44, 'timberDrop'], [50, 'fullTilt']],
   },
   canopangol: {
     base: [95, 100, 115, 70, 95, 55], growth: 'medium', catchRate: 45, xpYield: 236,
-    moves: [[1, 'bump'], [1, 'chirrup'], [1, 'seedFlick'], [1, 'sapSip'], [13, 'dozeDust'], [16, 'frondSlash'], [20, 'dirtRake'], [24, 'sunbathe'], [28, 'deepRoots'], [32, 'tremor'], [36, 'digIn'], [41, 'thornStorm'], [46, 'upheaval'], [52, 'timberDrop'], [58, 'cragCrush']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [1, 'seedFlick'], [1, 'sapSip'], [13, 'dozeDust'], [16, 'frondSlash'], [20, 'dirtRake'], [24, 'sunbathe'], [28, 'deepRoots'], [30, 'dryspell'], [32, 'tremor'], [36, 'digIn'], [41, 'thornStorm'], [46, 'upheaval'], [52, 'timberDrop'], [58, 'cragCrush']],
   },
   kindlet: {
     base: [44, 62, 45, 55, 43, 61], growth: 'medium', catchRate: 45, xpYield: 64,
-    moves: [[1, 'bump'], [1, 'scowl'], [5, 'cinderSpit'], [9, 'quickNip'], [13, 'smoulder'], [17, 'hotCharge'], [21, 'warmUp'], [26, 'kilnBlast'], [31, 'rockfall'], [36, 'moltenRam'], [42, 'magmaSurge']],
+    moves: [[1, 'bump'], [1, 'scowl'], [5, 'cinderSpit'], [9, 'quickNip'], [13, 'smoulder'], [17, 'hotCharge'], [21, 'warmUp'], [21, 'dryspell'], [26, 'kilnBlast'], [31, 'rockfall'], [36, 'moltenRam'], [42, 'magmaSurge']],
   },
   cinderam: {
     base: [60, 85, 60, 70, 58, 80], growth: 'medium', catchRate: 45, xpYield: 142,
-    moves: [[1, 'bump'], [1, 'scowl'], [5, 'cinderSpit'], [9, 'quickNip'], [13, 'smoulder'], [16, 'hotCharge'], [20, 'warmUp'], [25, 'rockfall'], [29, 'kilnBlast'], [34, 'moltenRam'], [40, 'magmaSurge'], [46, 'fullTilt']],
+    moves: [[1, 'bump'], [1, 'scowl'], [5, 'cinderSpit'], [9, 'quickNip'], [13, 'smoulder'], [16, 'hotCharge'], [20, 'warmUp'], [22, 'dryspell'], [25, 'rockfall'], [29, 'kilnBlast'], [34, 'moltenRam'], [40, 'magmaSurge'], [46, 'fullTilt']],
   },
   volcaram: {
     base: [80, 118, 90, 85, 72, 85], growth: 'medium', catchRate: 45, xpYield: 240,
-    moves: [[1, 'bump'], [1, 'scowl'], [1, 'cinderSpit'], [1, 'quickNip'], [13, 'smoulder'], [16, 'hotCharge'], [20, 'warmUp'], [25, 'rockfall'], [29, 'kilnBlast'], [32, 'bellyFlop'], [36, 'moltenRam'], [41, 'bedrock'], [45, 'magmaSurge'], [50, 'cragCrush'], [56, 'upheaval']],
+    moves: [[1, 'bump'], [1, 'scowl'], [1, 'cinderSpit'], [1, 'quickNip'], [13, 'smoulder'], [16, 'hotCharge'], [20, 'warmUp'], [22, 'dryspell'], [25, 'rockfall'], [29, 'kilnBlast'], [32, 'bellyFlop'], [36, 'moltenRam'], [41, 'bedrock'], [45, 'magmaSurge'], [50, 'cragCrush'], [56, 'upheaval']],
   },
   narlet: {
     base: [55, 45, 55, 58, 55, 42], growth: 'medium', catchRate: 45, xpYield: 64,
-    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'slipstream'], [13, 'sleetSpray'], [17, 'riptide'], [21, 'tidepool'], [26, 'breaker'], [31, 'coldSnap'], [36, 'stillness'], [42, 'maelstrom']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'slipstream'], [13, 'sleetSpray'], [17, 'riptide'], [21, 'tidepool'], [21, 'downpour'], [26, 'breaker'], [31, 'coldSnap'], [36, 'stillness'], [42, 'maelstrom']],
   },
   narwhelm: {
     base: [72, 60, 70, 80, 75, 58], growth: 'medium', catchRate: 45, xpYield: 142,
-    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'slipstream'], [13, 'sleetSpray'], [16, 'riptide'], [20, 'tidepool'], [25, 'breaker'], [30, 'coldSnap'], [35, 'stillness'], [41, 'maelstrom'], [47, 'bigBellow']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'slipstream'], [13, 'sleetSpray'], [16, 'riptide'], [20, 'tidepool'], [22, 'downpour'], [25, 'breaker'], [30, 'coldSnap'], [35, 'stillness'], [41, 'maelstrom'], [47, 'bigBellow']],
   },
   tidelance: {
     base: [92, 80, 88, 110, 95, 65], growth: 'medium', catchRate: 45, xpYield: 239,
-    moves: [[1, 'bump'], [1, 'chirrup'], [1, 'spritz'], [1, 'slipstream'], [13, 'sleetSpray'], [16, 'riptide'], [20, 'tidepool'], [25, 'breaker'], [30, 'coldSnap'], [32, 'rimeLance'], [36, 'stillness'], [39, 'brainwave'], [42, 'maelstrom'], [48, 'whiteout'], [54, 'shiver']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [1, 'spritz'], [1, 'slipstream'], [13, 'sleetSpray'], [16, 'riptide'], [20, 'tidepool'], [22, 'downpour'], [25, 'breaker'], [30, 'coldSnap'], [32, 'rimeLance'], [36, 'stillness'], [39, 'brainwave'], [42, 'maelstrom'], [48, 'whiteout'], [54, 'shiver']],
   },
 
   // Routes 1–2 and the cave.
@@ -88,7 +90,7 @@ const DATA: Record<SpeciesId, Row> = {
   },
   capybaron: {
     base: [110, 70, 80, 60, 90, 40], growth: 'medium', catchRate: 90, xpYield: 165,
-    moves: [[1, 'bump'], [4, 'chirrup'], [8, 'spritz'], [12, 'siesta'], [16, 'bellyFlop'], [18, 'riptide'], [23, 'lickWounds'], [28, 'bigBellow'], [34, 'breaker'], [37, 'deepRoots'], [40, 'digIn'], [46, 'fullTilt'], [52, 'maelstrom']],
+    moves: [[1, 'bump'], [4, 'chirrup'], [8, 'spritz'], [12, 'siesta'], [16, 'bellyFlop'], [18, 'riptide'], [23, 'lickWounds'], [25, 'downpour'], [28, 'bigBellow'], [34, 'breaker'], [37, 'deepRoots'], [40, 'digIn'], [46, 'fullTilt'], [52, 'maelstrom']],
   },
   pufflet: {
     base: [42, 50, 40, 38, 40, 85], growth: 'medium', catchRate: 255, xpYield: 52,
@@ -186,7 +188,7 @@ const DATA: Record<SpeciesId, Row> = {
   },
   manatide: {
     base: [130, 70, 90, 80, 95, 30], growth: 'medium', catchRate: 60, xpYield: 175,
-    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'puppyEyes'], [13, 'riptide'], [16, 'seedFlick'], [18, 'tidepool'], [23, 'bellyFlop'], [29, 'breaker'], [30, 'sunbathe'], [35, 'bigBellow'], [38, 'deepRoots'], [41, 'maelstrom'], [47, 'fullTilt']],
+    moves: [[1, 'bump'], [1, 'chirrup'], [5, 'spritz'], [9, 'puppyEyes'], [13, 'riptide'], [16, 'seedFlick'], [18, 'tidepool'], [23, 'bellyFlop'], [26, 'downpour'], [29, 'breaker'], [30, 'sunbathe'], [35, 'bigBellow'], [38, 'deepRoots'], [41, 'maelstrom'], [47, 'fullTilt']],
   },
   cocrab: {
     base: [45, 70, 80, 30, 40, 40], growth: 'medium', catchRate: 190, xpYield: 60,
@@ -198,7 +200,7 @@ const DATA: Record<SpeciesId, Row> = {
   },
   brandger: {
     base: [70, 105, 60, 70, 60, 90], growth: 'slow', catchRate: 75, xpYield: 165,
-    moves: [[1, 'cinderSpit'], [1, 'scowl'], [5, 'quickJab'], [9, 'gnash'], [13, 'hotCharge'], [17, 'warmUp'], [21, 'knuckleBash'], [26, 'smoulder'], [31, 'moltenRam'], [37, 'haymaker'], [43, 'magmaSurge'], [50, 'fullTilt']],
+    moves: [[1, 'cinderSpit'], [1, 'scowl'], [5, 'quickJab'], [9, 'gnash'], [13, 'hotCharge'], [17, 'warmUp'], [21, 'knuckleBash'], [26, 'smoulder'], [28, 'dryspell'], [31, 'moltenRam'], [37, 'haymaker'], [43, 'magmaSurge'], [50, 'fullTilt']],
   },
   sawfry: {
     base: [45, 70, 65, 35, 40, 55], growth: 'slow', catchRate: 190, xpYield: 62,
@@ -214,7 +216,7 @@ const DATA: Record<SpeciesId, Row> = {
   },
   tempestwyrm: {
     base: [90, 115, 80, 115, 80, 80], growth: 'slow', catchRate: 45, xpYield: 270,
-    moves: [[1, 'scaleFlick'], [1, 'scowl'], [5, 'slipstream'], [10, 'staticPop'], [15, 'riptide'], [20, 'coilCrush'], [25, 'ascend'], [30, 'wyrmWrath'], [35, 'howlingGale'], [40, 'arcFlash'], [45, 'skyPlunge'], [50, 'skybolt'], [56, 'maelstrom']],
+    moves: [[1, 'scaleFlick'], [1, 'scowl'], [5, 'slipstream'], [10, 'staticPop'], [15, 'riptide'], [20, 'coilCrush'], [25, 'ascend'], [30, 'wyrmWrath'], [35, 'howlingGale'], [38, 'downpour'], [40, 'arcFlash'], [45, 'skyPlunge'], [50, 'skybolt'], [56, 'maelstrom']],
   },
   atollus: {
     base: [120, 100, 130, 100, 100, 50], growth: 'slow', catchRate: 3, xpYield: 300,
@@ -222,19 +224,42 @@ const DATA: Record<SpeciesId, Row> = {
   },
 }
 
+/** How far along its line a species is: 1 unevolved, 2 once evolved, 3 twice. */
+function stageOf(id: SpeciesId): number {
+  const from = SPECIES_IDS.find((s) => dex(s).evolves?.into === id)
+  return from ? stageOf(from) + 1 : 1
+}
+
+/**
+ * Effort points given when defeated: in the species' best stat, 1 for an
+ * unevolved beast, 2 once evolved, 3 for a final form of three. Beasts that
+ * never evolve give by strength: 3 from a base total of 500, 2 from 400.
+ */
+function effortYield(id: SpeciesId, base: Stats): Partial<Stats> {
+  const keys = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const
+  const best = keys.reduce((a, b) => (base[b] > base[a] ? b : a))
+  const stage = stageOf(id)
+  const alone = stage === 1 && !dex(id).evolves
+  const total = keys.reduce((n, k) => n + base[k], 0)
+  const points = alone ? (total >= 500 ? 3 : total >= 400 ? 2 : 1) : stage
+  return { [best]: points }
+}
+
 function build(id: SpeciesId): SpeciesData {
   const r = DATA[id]
   const [hp, atk, def, spa, spd, spe] = r.base
+  const base = { hp, atk, def, spa, spd, spe }
   return {
     id,
     types: dex(id).types,
-    base: { hp, atk, def, spa, spd, spe },
+    base,
     growth: r.growth,
     catchRate: r.catchRate,
     xpYield: r.xpYield,
     learnset: r.moves
       .map(([level, move]) => ({ level, move }))
       .sort((a, b) => a.level - b.level),
+    effort: effortYield(id, base),
   }
 }
 

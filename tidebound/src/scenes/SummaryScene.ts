@@ -1,4 +1,7 @@
+import { ability, abilityOf } from '../battle/abilities'
 import { calcStats, displayName, maxHp, typesOf, xpToNextLevel } from '../battle/creature'
+import { natureOf } from '../battle/natures'
+import { item as itemData } from '../data/items'
 import type { Creature, MoveId } from '../battle/types'
 import { dex } from '../data/dex'
 import { move as moveData } from '../data/moves'
@@ -11,6 +14,9 @@ import { wrap } from '../ui/font'
 import { hpBar, statusBadge, typeBadge } from '../ui/widgets'
 
 const PAGES = ['INFO', 'SKILLS', 'MOVES'] as const
+
+/** How wide an ability description may run in the summary box. */
+export const ABILITY_TEXT_W = 128
 
 /**
  * Where move row `i` of `rows` sits on the MOVES page. Five rows (choosing a
@@ -167,37 +173,46 @@ export class SummaryScene extends Modal<number | null> {
         ['KIND', `${d.kind}`],
         ['OT', this.ot?.name ?? c.ot],
         ['ID No.', String(this.ot?.id ?? '-----')],
+        ['ITEM', c.item ? itemData(c.item).name : 'NONE'],
       ]
       rows.forEach(([k, v], i) => {
-        g.text(k, x, 26 + i * 16, { color: '#788088' })
-        g.text(v, x + 44, 26 + i * 16)
+        g.text(k, x, 24 + i * 13, { color: '#788088' })
+        g.text(v, x + 44, 24 + i * 13)
       })
       g.window(x - 4, 92, 140, 66)
+      const nature = `${natureOf(c).name} nature.`
       const memo = c.ot === (this.ot?.name ?? c.ot) ? `Met at ${c.metPlace} at Lv. ${c.metLevel}.` : `Traded. Met at ${c.metPlace}.`
-      wrap(`${memo} ${c.shiny ? 'It sparkles strangely.' : 'A trusty partner.'}`, 124)
+      wrap(`${nature} ${memo} ${c.shiny ? 'It sparkles strangely.' : 'A trusty partner.'}`, 124)
         .slice(0, 4)
         .forEach((l, i) => g.text(l, x + 4, 99 + i * 13))
     } else if (this.page === 1) {
       const s = calcStats(c)
       const mhp = maxHp(c)
-      g.text('HP', x, 26)
-      g.textRight(`${c.hp}/${mhp}`, 232, 26)
-      hpBar(g, x + 40, 40, c.hp, mhp, 88)
-      const rows: [string, number][] = [
-        ['ATTACK', s.atk],
-        ['DEFENSE', s.def],
-        ['SP. ATK', s.spa],
-        ['SP. DEF', s.spd],
-        ['SPEED', s.spe],
+      g.text('HP', x, 22)
+      g.textRight(`${c.hp}/${mhp}`, 232, 22)
+      hpBar(g, x + 40, 34, c.hp, mhp, 88)
+      // The stat its nature raises is red, the one it lowers blue.
+      const n = natureOf(c)
+      const rows: [string, number, keyof typeof s][] = [
+        ['ATTACK', s.atk, 'atk'],
+        ['DEFENSE', s.def, 'def'],
+        ['SP. ATK', s.spa, 'spa'],
+        ['SP. DEF', s.spd, 'spd'],
+        ['SPEED', s.spe, 'spe'],
       ]
-      rows.forEach(([k, v], i) => {
-        g.text(k, x, 50 + i * 14)
-        g.textRight(String(v), 232, 50 + i * 14)
+      rows.forEach(([k, v, key], i) => {
+        const color = key === n.up ? '#d04040' : key === n.down ? '#3868c8' : undefined
+        g.text(k, x, 42 + i * 12, { color })
+        g.textRight(String(v), 232, 42 + i * 12)
       })
-      g.text('EXP. POINTS', x, 124, { color: '#788088' })
-      g.textRight(String(c.xp), 232, 124)
-      g.text('NEXT LV.', x, 140, { color: '#788088' })
-      g.textRight(String(xpToNextLevel(c)), 232, 140)
+      g.text('NEXT LV.', x, 103, { color: '#788088' })
+      g.textRight(String(xpToNextLevel(c)), 232, 103)
+      const a = ability(abilityOf(c))
+      g.window(x - 4, 116, 140, 42)
+      g.text(a.name, x + 4, 121, { color: '#c04040' })
+      wrap(a.desc, ABILITY_TEXT_W)
+        .slice(0, 2)
+        .forEach((l, i) => g.text(l, x + 4, 132 + i * 12))
     } else {
       const ids: MoveId[] = c.moves.map((m) => m.id)
       if (this.forget) ids.push(this.forget.move)

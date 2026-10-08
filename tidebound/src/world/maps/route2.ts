@@ -145,8 +145,8 @@ export const ROUTE2_MAPS: MapDef[] = [
     ],
     items: [
       { id: 'r2orbs', x: 9, y: 2, item: 'orb', qty: 3 },
-      { id: 'r2remedy', x: 36, y: 17, item: 'remedy' },
-      { id: 'r2salve', x: 23, y: 18, item: 'salve', qty: 2 },
+      { id: 'r2remedy', x: 36, y: 17, item: 'mintBerry', qty: 2 },
+      { id: 'r2salve', x: 23, y: 18, item: 'seedPod' },
     ],
     npcs: [
       { id: 'toby', x: 10, y: 5, face: 'down', look: PEOPLE.youngster, trainer: TOBY, sight: 3 },
@@ -208,8 +208,8 @@ export const ROUTE2_MAPS: MapDef[] = [
       { x: 28, y: 3, to: 'basalt', tx: 3, ty: 6, face: 'down' },
     ],
     items: [
-      { id: 'gcremedy', x: 3, y: 4, item: 'remedy' },
-      { id: 'gcsuper', x: 21, y: 16, item: 'superSalve' },
+      { id: 'gcremedy', x: 3, y: 4, item: 'mossWrap' },
+      { id: 'gcsuper', x: 21, y: 16, item: 'cinderstone' },
       { id: 'gcdusk', x: 11, y: 7, item: 'duskOrb' },
       { id: 'gcwing', x: 27, y: 9, item: 'returnWing' },
     ],
@@ -342,7 +342,7 @@ export const ROUTE2_MAPS: MapDef[] = [
     ],
   },
   haven('basalt_haven', 'BASALT TOWN', { map: 'basalt', x: 5, y: 13 }),
-  market('basalt_market', 'BASALT TOWN', { map: 'basalt', x: 24, y: 11 }, ['orb', 'superOrb', 'salve', 'superSalve', 'remedy', 'muskSpray', 'returnWing']),
+  market('basalt_market', 'BASALT TOWN', { map: 'basalt', x: 24, y: 11 }, ['orb', 'superOrb', 'salve', 'superSalve', 'remedy', 'reefBerry', 'mintBerry', 'muskSpray', 'returnWing']),
   house('basalt_house', 'BASALT TOWN', { map: 'basalt', x: 23, y: 18 }, [
     {
       id: 'mum',

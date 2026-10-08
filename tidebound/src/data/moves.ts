@@ -1,4 +1,4 @@
-import type { MoveId, StageKey, StatusId } from '../battle/types'
+import type { MoveId, StageKey, StatusId, Weather } from '../battle/types'
 import type { TypeId } from './types'
 
 /**
@@ -63,8 +63,10 @@ export type MoveEffect =
   | { kind: 'drain'; fraction: number }
   /** Hits `min`–`max` times; 2–5 uses the 3:3:1:1 spread, equal numbers hit exactly that often. */
   | { kind: 'multiHit'; min: number; max: number }
-  /** The user restores this fraction of its max HP. */
-  | { kind: 'heal'; fraction: number }
+  /** The user restores this fraction of its max HP; `sunny` heals 2/3 in sun and 1/4 in rain. */
+  | { kind: 'heal'; fraction: number; sunny?: boolean }
+  /** Changes the weather for five turns. */
+  | { kind: 'weather'; weather: Weather }
   /** Critical hits land 1 time in 8 instead of 1 in 16. */
   | { kind: 'highCrit' }
   /** Deals exactly this much damage, or the user's level; ignores stats and effectiveness but not immunity. */
@@ -154,7 +156,9 @@ const LIST: readonly MoveData[] = [
   def({ id: 'thornStorm', name: 'THORN STORM', type: 'leaf', category: 'special', power: 110, accuracy: 85, pp: 5, fx: 'rain', desc: 'Rains a storm of sharp thorns on the foe.' }),
   def({ id: 'timberDrop', name: 'TIMBER DROP', type: 'leaf', category: 'physical', power: 120, accuracy: 100, pp: 15, contact: true, effects: [recoil(1 / 3)], fx: 'shake', desc: 'Topples like a tree. The user takes recoil.' }),
   def({ id: 'dozeDust', name: 'DOZE DUST', type: 'leaf', category: 'status', power: 0, accuracy: 75, pp: 15, effects: [inflict('slp')], fx: 'aura', desc: 'Scatters sleepy dust that puts the foe to sleep.' }),
-  def({ id: 'sunbathe', name: 'SUNBATHE', type: 'leaf', category: 'status', power: 0, accuracy: 0, pp: 10, target: 'self', effects: [heal(1 / 2)], fx: 'aura', desc: 'Basks in the sun to restore half its max HP.' }),
+  def({ id: 'sunbathe', name: 'SUNBATHE', type: 'leaf', category: 'status', power: 0, accuracy: 0, pp: 10, target: 'self', effects: [{ kind: 'heal', fraction: 1 / 2, sunny: true }], fx: 'aura', desc: 'Basks to restore half its max HP; more in sun, less in rain.' }),
+  def({ id: 'downpour', name: 'DOWNPOUR', type: 'tide', category: 'status', power: 0, accuracy: 0, pp: 5, target: 'self', effects: [{ kind: 'weather', weather: 'rain' }], fx: 'rain', desc: 'Calls rain for five turns, powering up TIDE moves.' }),
+  def({ id: 'dryspell', name: 'DRY SPELL', type: 'flame', category: 'status', power: 0, accuracy: 0, pp: 5, target: 'self', effects: [{ kind: 'weather', weather: 'sun' }], fx: 'aura', desc: 'Calls harsh sun for five turns, powering up FLAME moves.' }),
 
   // VOLT
   def({ id: 'staticPop', name: 'STATIC POP', type: 'volt', category: 'special', power: 40, accuracy: 100, pp: 30, effects: [inflict('par', 10)], fx: 'burst', desc: 'A crackling pop of static. May paralyse.' }),

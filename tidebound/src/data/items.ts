@@ -20,6 +20,15 @@ export const ITEM_IDS = [
   'hyperOrb',
   'tideOrb',
   'duskOrb',
+  'reefBerry',
+  'sunBerry',
+  'mintBerry',
+  'zestBerry',
+  'shareShell',
+  'mossWrap',
+  'cinderstone',
+  'tidePearl',
+  'seedPod',
   'sprintShoes',
   'driftRod',
   'tideCharm',
@@ -29,7 +38,7 @@ export const ITEM_IDS = [
 
 export type ItemId = (typeof ITEM_IDS)[number]
 
-export type Pocket = 'items' | 'orbs' | 'key'
+export type Pocket = 'items' | 'orbs' | 'berries' | 'key'
 
 export type ItemUse =
   /** Restores `hp` HP, or all of it when `hp` is 0. `cure` also clears status. */
@@ -51,6 +60,23 @@ export type ItemUse =
   | { kind: 'escape' }
   /** A key item; the field decides what it does. */
   | { kind: 'key' }
+  /** Does nothing from the bag; it only works held. */
+  | { kind: 'held' }
+
+/** What an item does while a beast holds it (berries are eaten once). */
+export type HoldEffect =
+  /** Eaten at half HP or less: restores `hp` HP. */
+  | { kind: 'berryHeal'; hp: number }
+  /** Eaten as soon as a status problem strikes: cures it. */
+  | { kind: 'berryCure' }
+  /** Eaten at a quarter HP or less: raises ATTACK one stage. */
+  | { kind: 'berryAttack' }
+  /** The holder gets a share of the experience from every battle, even sitting out. */
+  | { kind: 'share' }
+  /** Restores 1/16 of max HP at the end of every turn. */
+  | { kind: 'regen' }
+  /** Moves of `type` hit 10% harder. */
+  | { kind: 'boost'; type: TypeId }
 
 export interface ItemData {
   id: ItemId
@@ -64,6 +90,8 @@ export interface ItemData {
   use: ItemUse
   /** Usable from the bag in battle. */
   battle: boolean
+  /** What it does when held; items without this can't be held. */
+  hold?: HoldEffect
 }
 
 const ITEMS: readonly ItemData[] = [
@@ -81,6 +109,15 @@ const ITEMS: readonly ItemData[] = [
   { id: 'hyperOrb', name: 'HYPER ORB', pocket: 'orbs', price: 1200, battle: true, desc: 'A high-grade orb. Very likely to catch a beast.', use: { kind: 'orb', rate: 2 } },
   { id: 'tideOrb', name: 'TIDE ORB', pocket: 'orbs', price: 1000, battle: true, desc: 'Works well on TIDE and BUG beasts.', use: { kind: 'orb', rate: 1, bonus: { types: ['tide', 'bug'], mult: 3 } } },
   { id: 'duskOrb', name: 'DUSK ORB', pocket: 'orbs', price: 1000, battle: true, desc: 'Works well in caves and other dark places.', use: { kind: 'orb', rate: 1, bonus: { dark: true, mult: 3.5 } } },
+  { id: 'reefBerry', name: 'REEF BERRY', pocket: 'berries', price: 120, battle: true, hold: { kind: 'berryHeal', hp: 10 }, desc: 'A salty berry. Restores 10 HP; held, eaten at half HP.', use: { kind: 'heal', hp: 10 } },
+  { id: 'sunBerry', name: 'SUN BERRY', pocket: 'berries', price: 450, battle: true, hold: { kind: 'berryHeal', hp: 30 }, desc: 'A sweet berry. Restores 30 HP; held, eaten at half HP.', use: { kind: 'heal', hp: 30 } },
+  { id: 'mintBerry', name: 'MINT BERRY', pocket: 'berries', price: 300, battle: true, hold: { kind: 'berryCure' }, desc: 'A cool berry. Cures any status; held, eaten at once.', use: { kind: 'cure' } },
+  { id: 'zestBerry', name: 'ZEST BERRY', pocket: 'berries', price: 0, battle: false, hold: { kind: 'berryAttack' }, desc: 'A sharp berry. Held, eaten at low HP to raise ATTACK.', use: { kind: 'held' } },
+  { id: 'shareShell', name: 'SHARE SHELL', pocket: 'items', price: 0, battle: false, hold: { kind: 'share' }, desc: 'Held, its beast shares the experience from every battle.', use: { kind: 'held' } },
+  { id: 'mossWrap', name: 'MOSS WRAP', pocket: 'items', price: 0, battle: false, hold: { kind: 'regen' }, desc: 'Damp moss. Held, it restores a little HP every turn.', use: { kind: 'held' } },
+  { id: 'cinderstone', name: 'CINDERSTONE', pocket: 'items', price: 0, battle: false, hold: { kind: 'boost', type: 'flame' }, desc: 'Still warm. Held, it powers up FLAME moves.', use: { kind: 'held' } },
+  { id: 'tidePearl', name: 'TIDE PEARL', pocket: 'items', price: 0, battle: false, hold: { kind: 'boost', type: 'tide' }, desc: 'A sea-blue pearl. Held, it powers up TIDE moves.', use: { kind: 'held' } },
+  { id: 'seedPod', name: 'SEED POD', pocket: 'items', price: 0, battle: false, hold: { kind: 'boost', type: 'leaf' }, desc: 'A lively pod. Held, it powers up LEAF moves.', use: { kind: 'held' } },
   { id: 'sprintShoes', name: 'SPRINT SHOES', pocket: 'key', price: 0, battle: false, desc: 'Hold B while walking to run.', use: { kind: 'key' } },
   { id: 'driftRod', name: 'DRIFT ROD', pocket: 'key', price: 0, battle: false, desc: 'A fishing rod. Use it facing water to fish for beasts.', use: { kind: 'key' } },
   { id: 'tideCharm', name: 'TIDE CHARM', pocket: 'key', price: 0, battle: false, desc: 'Lets a TIDE beast carry you across water. Face the water and press A.', use: { kind: 'key' } },

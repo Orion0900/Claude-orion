@@ -9,14 +9,19 @@ import type { StatusId } from './types'
 export const MAX_LEVEL = 100
 export const STAGE_LIMIT = 6
 
-/** HP = ⌊(2·base + IV)·L/100⌋ + L + 10. */
-export function hpStat(base: number, iv: number, level: number): number {
-  return Math.floor(((2 * base + iv) * level) / 100) + level + 10
+/** Effort points: at most 255 in one stat and 510 in all. Every 4 points add 1 to a level-100 stat. */
+export const EFFORT_STAT_CAP = 255
+export const EFFORT_TOTAL_CAP = 510
+
+/** HP = ⌊(2·base + IV + ⌊effort/4⌋)·L/100⌋ + L + 10. */
+export function hpStat(base: number, iv: number, level: number, effort = 0): number {
+  return Math.floor(((2 * base + iv + Math.floor(effort / 4)) * level) / 100) + level + 10
 }
 
-/** Other stats = ⌊(2·base + IV)·L/100⌋ + 5. */
-export function otherStat(base: number, iv: number, level: number): number {
-  return Math.floor(((2 * base + iv) * level) / 100) + 5
+/** Other stats = ⌊(⌊(2·base + IV + ⌊effort/4⌋)·L/100⌋ + 5) × nature⌋, nature being 0.9, 1 or 1.1. */
+export function otherStat(base: number, iv: number, level: number, effort = 0, nature = 1): number {
+  const raw = Math.floor(((2 * base + iv + Math.floor(effort / 4)) * level) / 100) + 5
+  return Math.floor(raw * nature)
 }
 
 /** Battle stat stages, −6…+6: (2+s)/2 raised, 2/(2−s) lowered. */

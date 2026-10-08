@@ -45,7 +45,7 @@ export const ROUTE1_MAPS: MapDef[] = [
     signs: [{ x: 3, y: 25, text: 'ROUTE 1\n↑ MOSSGROVE   ↓ DRIFTWOOD' }],
     items: [
       { id: 'r1orb', x: 20, y: 21, item: 'orb', qty: 2 },
-      { id: 'r1salve', x: 2, y: 10, item: 'salve' },
+      { id: 'r1salve', x: 2, y: 10, item: 'reefBerry', qty: 2 },
       { id: 'r1spray', x: 19, y: 2, item: 'muskSpray' },
     ],
     npcs: [
@@ -187,7 +187,7 @@ export const ROUTE1_MAPS: MapDef[] = [
       text: 'That PC in the corner stores beasts. You can only carry six at once, so the rest wait in there.',
     },
   ]),
-  market('mossgrove_market', 'MOSSGROVE', { map: 'mossgrove', x: 17, y: 6 }, ['orb', 'salve', 'remedy', 'muskSpray'], [
+  market('mossgrove_market', 'MOSSGROVE', { map: 'mossgrove', x: 17, y: 6 }, ['orb', 'salve', 'remedy', 'reefBerry', 'muskSpray'], [
     {
       id: 'shopper',
       x: 6,

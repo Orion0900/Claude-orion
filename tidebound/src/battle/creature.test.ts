@@ -21,8 +21,11 @@ import {
   useItemInField,
   xpFraction,
   xpToNextLevel,
+  gainEffort,
+  normalizeCreature,
 } from './creature'
 import { hpStat, otherStat, xpForLevel } from './formulas'
+import { NATURES, natureMultiplier, natureOf } from './natures'
 import { ALL_31, beast } from './testkit'
 
 describe('createCreature', () => {
@@ -87,18 +90,64 @@ describe('createCreature', () => {
 })
 
 describe('stats and experience', () => {
-  it('computes stats from base, IVs and level', () => {
+  it('computes stats from base, IVs, level and nature', () => {
     const c = createCreature('kindlet', 50, new Rng(1), { ivs: ALL_31 })
     const b = species('kindlet').base
+    const n = natureOf(c)
+    const m = (k: 'atk' | 'def' | 'spa' | 'spd' | 'spe') => natureMultiplier(n, k)
     expect(calcStats(c)).toEqual({
       hp: hpStat(b.hp, 31, 50),
-      atk: otherStat(b.atk, 31, 50),
-      def: otherStat(b.def, 31, 50),
-      spa: otherStat(b.spa, 31, 50),
-      spd: otherStat(b.spd, 31, 50),
-      spe: otherStat(b.spe, 31, 50),
+      atk: otherStat(b.atk, 31, 50, 0, m('atk')),
+      def: otherStat(b.def, 31, 50, 0, m('def')),
+      spa: otherStat(b.spa, 31, 50, 0, m('spa')),
+      spd: otherStat(b.spd, 31, 50, 0, m('spd')),
+      spe: otherStat(b.spe, 31, 50, 0, m('spe')),
     })
     expect(maxHp(c)).toBe(calcStats(c).hp)
+  })
+
+  it('gives every beast a fixed nature that nudges two stats', () => {
+    const c = createCreature('kindlet', 50, new Rng(7), { ivs: ALL_31 })
+    expect(natureOf(c)).toBe(natureOf({ uid: c.uid }))
+    const names = new Set(NATURES.map((x) => x.name))
+    expect(names.size).toBe(25)
+    expect(NATURES.filter((x) => !x.up && !x.down)).toHaveLength(5)
+    for (const x of NATURES) expect(!!x.up).toBe(!!x.down)
+    // Over many beasts every nature turns up.
+    const seen = new Set<string>()
+    for (let s = 0; s < 2000; s++) seen.add(natureOf(createCreature('pufflet', 5, new Rng(s))).name)
+    expect(seen.size).toBe(25)
+  })
+
+  it('earns effort by defeating beasts, within the caps', () => {
+    const c = createCreature('kindlet', 30, new Rng(3), { ivs: ALL_31 })
+    const atkBefore = calcStats(c).atk
+    // CINDERAM, a middle stage, gives 2 points in its best stat.
+    const y = species('cinderam').effort
+    expect(Object.values(y).reduce((a, b) => a + (b ?? 0), 0)).toBe(2)
+    for (let i = 0; i < 400; i++) gainEffort(c, 'cinderam')
+    const total = Object.values(c.evs).reduce((a, b) => a + b, 0)
+    expect(total).toBeLessThanOrEqual(510)
+    for (const v of Object.values(c.evs)) expect(v).toBeLessThanOrEqual(255)
+    const k = Object.keys(y)[0] as keyof typeof c.evs
+    expect(c.evs[k]).toBe(255)
+    if (k === 'atk') expect(calcStats(c).atk).toBeGreaterThan(atkBefore)
+  })
+
+  it('effort yields grow with evolution', () => {
+    const sum = (id: Parameters<typeof species>[0]) => Object.values(species(id).effort).reduce((a, b) => a + (b ?? 0), 0)
+    expect([sum('leafolin'), sum('frondolin'), sum('canopangol')]).toEqual([1, 2, 3])
+    expect(sum('atollus')).toBe(3)
+  })
+
+  it('repairs beasts from older saves', () => {
+    const c = createCreature('narlet', 12, new Rng(5)) as Partial<ReturnType<typeof createCreature>>
+    delete c.evs
+    delete c.item
+    const fixed = normalizeCreature(c as ReturnType<typeof createCreature>)
+    expect(fixed.evs).toEqual({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 })
+    expect(fixed.item).toBeNull()
+    expect(fixed.hp).toBeLessThanOrEqual(maxHp(fixed))
   })
 
   it('tracks progress through a level', () => {

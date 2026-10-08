@@ -59,7 +59,7 @@ export const ROUTE3_MAPS: MapDef[] = [
     items: [
       { id: 'r3super', x: 3, y: 3, item: 'superOrb', qty: 2 },
       { id: 'r3tide', x: 50, y: 10, item: 'tideOrb', qty: 2 },
-      { id: 'r3pp', x: 34, y: 2, item: 'ppDrop' },
+      { id: 'r3pp', x: 34, y: 2, item: 'tidePearl' },
       { id: 'r3seed', x: 8, y: 10, item: 'revivalSeed' },
     ],
     npcs: [
@@ -345,7 +345,7 @@ export const ROUTE3_MAPS: MapDef[] = [
     ],
   },
   haven('spark_haven', 'SPARKWHARF', { map: 'sparkwharf', x: 5, y: 5 }),
-  market('spark_market', 'SPARKWHARF', { map: 'sparkwharf', x: 13, y: 5 }, ['orb', 'superOrb', 'tideOrb', 'superSalve', 'hyperSalve', 'remedy', 'revivalSeed', 'muskSpray', 'returnWing']),
+  market('spark_market', 'SPARKWHARF', { map: 'sparkwharf', x: 13, y: 5 }, ['orb', 'superOrb', 'tideOrb', 'superSalve', 'hyperSalve', 'remedy', 'mintBerry', 'sunBerry', 'revivalSeed', 'muskSpray', 'returnWing']),
   house('spark_house', 'SPARKWHARF', { map: 'sparkwharf', x: 15, y: 14 }, [
     {
       id: 'sailorwife',

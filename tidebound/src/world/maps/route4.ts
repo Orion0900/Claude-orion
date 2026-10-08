@@ -228,7 +228,7 @@ export const ROUTE4_MAPS: MapDef[] = [
     ],
     items: [
       { id: 'wkhyper', x: 1, y: 3, item: 'hyperSalve' },
-      { id: 'wkpp', x: 14, y: 6, item: 'ppDrop' },
+      { id: 'wkpp', x: 14, y: 6, item: 'zestBerry', qty: 2 },
     ],
     npcs: [
       {

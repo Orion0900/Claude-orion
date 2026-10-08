@@ -56,6 +56,8 @@ async function chooseStarter(s: ScriptCtx, index: number): Promise<void> {
   void s.game.audio.playJingle('keyItemGet')
   await s.say('{PLAYER} received the BEASTIARY!')
   await s.give('orb', 5)
+  await s.say("PROF. MARIS: And this SHARE SHELL. A beast holding it learns from every battle, even watching from your party.\fGive it to one from the BEASTS menu, under ITEM.")
+  await s.give('shareShell')
   await s.say("PROF. MARIS: Throw an ORB at a tired wild beast to catch it.\fThe WARDENS of the isles test every young trainer. Beat them, and you'll earn their CRESTS.\fThe first WARDEN, BRECK, lives in BASALT TOWN, past GLIMMER CAVE. Start by heading north to MOSSGROVE.")
   await s.say("{RIVAL}: I'm going to fill the whole BEASTIARY before you! See you, {PLAYER}!")
   await s.walk(rival, 'd4', true)
