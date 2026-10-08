@@ -1,0 +1,57 @@
+name: Vox watch
+
+# Checks which apartments are available at Vox (Capitol Hill, Seattle) and
+# publishes the list to the vox-watch-data branch, where a daily Claude
+# routine picks it up and sends it as a notification.
+
+on:
+  schedule:
+    # 10:17 and 11:17 Pacific in summer (9:17 and 10:17 in winter): both land
+    # before the 11:51 notification, and the second covers a late or failed first.
+    - cron: '17 17 * * *'
+    - cron: '17 18 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['vox-watch/**', '.github/workflows/vox-watch.yml']
+
+# Pushing the result to the data branch is the only write.
+permissions:
+  contents: write
+
+concurrency:
+  group: vox-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: vox-watch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test
+
+      - name: Previous result, for marking new units
+        run: git fetch -q --depth=1 origin vox-watch-data && git show FETCH_HEAD:latest.json > previous.json || echo 'No previous result yet'
+
+      - name: Check Vox availability
+        run: node check.mjs out previous.json
+
+      - name: Publish to the vox-watch-data branch
+        if: always() && hashFiles('vox-watch/out/latest.md') != ''
+        run: |
+          cd out
+          git init -q -b vox-watch-data
+          git add latest.json latest.md
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -qm "Vox availability $(jq -r .date latest.json)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" vox-watch-data

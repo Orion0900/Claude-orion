@@ -1,0 +1,10 @@
+{
+  "name": "vox-watch",
+  "private": true,
+  "type": "module",
+  "description": "Daily check of available units at Vox Apartments, Capitol Hill, Seattle",
+  "scripts": {
+    "check": "node check.mjs out",
+    "test": "node --test"
+  }
+}
