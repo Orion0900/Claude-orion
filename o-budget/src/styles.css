@@ -251,6 +251,10 @@ h3 {
   order: 4;
 }
 
+.layout .projection {
+  order: 5;
+}
+
 @media (min-width: 900px) {
   .top,
   .layout {
@@ -1438,6 +1442,151 @@ output.hero-money {
 
 .sheet-row .push {
   margin-left: auto;
+}
+
+/* -------------------------------------------------------- projection */
+
+.proj-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+
+.pct-well {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+}
+
+.pct-well .pct input {
+  font-size: 18px;
+  font-weight: 750;
+  border-bottom: 0;
+}
+
+.years {
+  width: 100%;
+  height: 46px;
+  margin: 0;
+  accent-color: var(--invest);
+}
+
+.link-btn {
+  margin-top: 10px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--invest);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.proj-facts {
+  margin: 16px 0 6px;
+}
+
+.chart {
+  position: relative;
+  min-width: 0;
+  touch-action: pan-y;
+}
+
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin: 6px 0 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--invest);
+}
+
+.key.put-in {
+  border-top: 2px dashed var(--ink-3);
+}
+
+.chart .grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart .tick {
+  fill: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .area {
+  fill: var(--invest);
+  opacity: 0.14;
+}
+
+.chart .value {
+  fill: none;
+  stroke: var(--invest);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.chart .put-in {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.chart .end,
+.chart .value-dot {
+  fill: var(--invest);
+  stroke: var(--card);
+  stroke-width: 2;
+}
+
+.chart .put-in-dot {
+  fill: var(--ink-3);
+  stroke: var(--card);
+  stroke-width: 2;
+}
+
+.chart .cross {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+
+.tip {
+  position: absolute;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tip .muted {
+  opacity: 0.7;
 }
 
 /* ------------------------------------------------------------- toast */
