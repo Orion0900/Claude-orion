@@ -53,6 +53,11 @@ end at your door.
 > one tap, punch-in zooms, hooks, a teleprompter, and optional Claude tools for
 > hooks, best clips and translation. Ships at `/cutline/`. See
 > [cutline/README.md](cutline/README.md).
+> [O-Budget](o-budget/) — Orion's budget as an app: income split between
+> Investing and Living by amount or percent, the steps to run each paycheck in
+> order with what's left after each, and every living expense with a popout
+> for the details, like each subscription. Ships at `/o-budget/`. See
+> [o-budget/README.md](o-budget/README.md).
 
 ## What it does
 

@@ -1,0 +1,41 @@
+// Screenshots for a look at the layout: phone dark and light, the subscriptions popout, and a wide screen.
+// Run after `npm run build`: node tests/look.mjs <dir>
+import { IPHONE, launch, serve, watchErrors } from './harness.mjs'
+
+const dir = process.argv[2] ?? '.'
+const server = await serve(4194)
+const browser = await launch()
+const phone = await browser.newContext(IPHONE)
+const page = await phone.newPage()
+const errors = watchErrors(page)
+await page.goto(server.url)
+await page.waitForSelector('.hero-money')
+await page.evaluate(() => document.fonts.ready)
+await page.screenshot({ path: `${dir}/phone-dark.png`, fullPage: true })
+await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+await page.waitForTimeout(400)
+await page.screenshot({ path: `${dir}/phone-light.png`, fullPage: true })
+await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+await page.waitForTimeout(400)
+await page.tap('.cat >> text="Subscriptions"')
+await page.waitForSelector('.sheet')
+await page.waitForTimeout(400)
+await page.screenshot({ path: `${dir}/phone-sheet.png` })
+await page.keyboard.press('Escape')
+const wide = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+const desk = await wide.newPage()
+errors.push(...watchErrors(desk))
+await desk.goto(server.url)
+await desk.waitForSelector('.hero-money')
+await desk.evaluate(() => document.fonts.ready)
+await desk.screenshot({ path: `${dir}/desktop-dark.png`, fullPage: true })
+await desk.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+await desk.waitForTimeout(400)
+await desk.screenshot({ path: `${dir}/desktop-light.png`, fullPage: true })
+await browser.close()
+server.close()
+if (errors.length) {
+  console.error(errors.join('\n'))
+  process.exit(1)
+}
+console.log('screenshots in', dir)
