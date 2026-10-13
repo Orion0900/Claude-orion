@@ -6,6 +6,7 @@
  * tests share one set of sums.
  */
 import { roundCents } from './money'
+import { normalizeProjection, type Projection } from './projection'
 
 export interface Item {
   id: string
@@ -59,6 +60,8 @@ export interface Budget {
   investing: number
   steps: Step[]
   categories: Category[]
+  /** The investing projection's inputs. */
+  projection: Projection
 }
 
 export function newId(): string {
@@ -104,11 +107,21 @@ export function orionBudget(): Budget {
       category('Haircut', 100),
       category('Medical', 100),
     ],
+    projection: { start: 0, monthly: 4000, rate: 0.07, years: 30 },
   }
 }
 
 export function emptyBudget(): Budget {
-  return { gross: 0, bonus: 0, paycheck: 0, cadence: 'semimonthly', investing: 0, steps: [], categories: [] }
+  return {
+    gross: 0,
+    bonus: 0,
+    paycheck: 0,
+    cadence: 'semimonthly',
+    investing: 0,
+    steps: [],
+    categories: [],
+    projection: { start: 0, monthly: 0, rate: 0.07, years: 30 },
+  }
 }
 
 // ---------------------------------------------------------------- the sums
@@ -371,8 +384,15 @@ export function normalizeBudget(raw: unknown): Budget | null {
     investing: amountOf(raw.investing),
     steps,
     categories,
+    // Saves from before the projection start it off contributing the Investing amount.
+    projection: normalizeProjection(raw.projection, amountOf(raw.investing)),
   }
 }
+
+export const setProjection = (b: Budget, patch: Partial<Projection>): Budget => ({
+  ...b,
+  projection: normalizeProjection({ ...b.projection, ...patch }, b.projection.monthly),
+})
 
 /** Same numbers, names and order: a copy that changes nothing on screen. */
 export function sameBudget(a: Budget | null, b: Budget | null): boolean {

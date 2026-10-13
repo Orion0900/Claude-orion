@@ -17,6 +17,7 @@ import { GrossSection } from './components/GrossSection'
 import { IncomeSection } from './components/IncomeSection'
 import { Ring } from './components/Marks'
 import { ProcessSection, StepSheet } from './components/ProcessSection'
+import { ProjectionSection } from './components/ProjectionSection'
 import { useBudget } from './useBudget'
 
 type Open = { kind: 'step' | 'category'; id: string; fresh: boolean }
@@ -101,6 +102,7 @@ export default function App() {
             onOpen={(id) => setOpen({ kind: 'category', id, fresh: false })}
             onAdd={() => add('category')}
           />
+          <ProjectionSection budget={budget} update={update} />
         </div>
       </main>
 

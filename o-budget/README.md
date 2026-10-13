@@ -88,6 +88,13 @@ popout:
 - notes, for due dates, accounts or anything else;
 - **Delete category**.
 
+**Investment projection.** Enter an upfront amount, what goes in each
+month (it starts at the Investing amount), a yearly return and the years,
+and a line chart shows the total value year by year against what was put
+in, with the end total, the amount put in and the growth above it. Tap or
+drag across the chart for any year. It compounds monthly at a steady
+return, before taxes and inflation.
+
 Deleting a category, step or item offers **Undo** for a few seconds. A new
 step or category that's closed while still blank isn't kept.
 
