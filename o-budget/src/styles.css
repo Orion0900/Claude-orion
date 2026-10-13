@@ -759,7 +759,7 @@ output.hero-money {
   box-shadow: 0 0 0 5px var(--card);
 }
 
-.step-edge:first-child .edge-dot {
+.step-edge.lands .edge-dot {
   background: var(--ink);
 }
 
@@ -853,6 +853,82 @@ output.hero-money {
 .step.done .step-text,
 .step.done .step-amount {
   color: var(--ink-3);
+}
+
+/* Taken out before the paycheck lands: a dashed ring, off the paycheck's own line. */
+.step.before-pay:not(.done) .step-check {
+  border-style: dashed;
+}
+
+/* A switch: the checkbox itself stays in place for the keyboard and screen readers, drawn over by the track. */
+.toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 18px;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggle-track {
+  position: relative;
+  pointer-events: none;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background 0.15s;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--thumb);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s;
+}
+
+.toggle input:checked + .toggle-track {
+  background: var(--invest);
+  box-shadow: none;
+}
+
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(20px);
+}
+
+.toggle input:focus-visible + .toggle-track {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.toggle-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toggle-label {
+  font-weight: 650;
 }
 
 .step.done .step-text {

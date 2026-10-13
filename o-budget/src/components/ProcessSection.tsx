@@ -1,5 +1,5 @@
-import { useRef } from 'react'
-import { moveStep, paycheckRun, resetSteps, toggleStep, updateStep, type Budget } from '../lib/budget'
+import { Fragment, useRef } from 'react'
+import { canMoveStep, moveStep, paycheckRun, resetSteps, setStepBeforePay, toggleStep, updateStep, type Budget } from '../lib/budget'
 import { money } from '../lib/money'
 import { MoneyInput } from './Fields'
 import { CheckIcon, CloseIcon, DownIcon, PlusIcon, ResetIcon, TrashIcon, UpIcon } from './Icons'
@@ -9,8 +9,10 @@ type Update = (change: (b: Budget) => Budget) => void
 
 /**
  * The steps to run each payday, in order and numbered from 0 the way Orion
- * wrote them, with what's left of the paycheck after each one. Each step
- * ticks off; "Start next paycheck" clears the ticks.
+ * wrote them, with what's left of the paycheck after each one. Steps taken
+ * out before the paycheck, like the 401k, come before it lands and don't
+ * come out of it. Each step ticks off; "Start next paycheck" clears the
+ * ticks.
  */
 export function ProcessSection({
   budget: b,
@@ -26,6 +28,17 @@ export function ProcessSection({
   const run = paycheckRun(b)
   const done = b.steps.filter((s) => s.done).length
   const short = run.leftOver < 0
+  // Steps before the paycheck come first in the list; the paycheck lands after the last of them.
+  const landsAfter = b.steps.filter((s) => s.beforePay).length
+  const lands = (
+    <li className="step-edge lands">
+      <span className="edge-dot" aria-hidden="true" />
+      <div className="edge-row">
+        <span className="edge-text">Paycheck lands</span>
+        <span className="step-amount num">{money(run.start)}</span>
+      </div>
+    </li>
+  )
 
   return (
     <section className="section process" aria-labelledby="process-title">
@@ -41,36 +54,34 @@ export function ProcessSection({
       </div>
 
       <ol className="steps">
-        <li className="step-edge">
-          <span className="edge-dot" aria-hidden="true" />
-          <div className="edge-row">
-            <span className="edge-text">Paycheck lands</span>
-            <span className="step-amount num">{money(run.start)}</span>
-          </div>
-        </li>
+        {landsAfter === 0 && lands}
 
         {b.steps.map((s, i) => {
           const name = s.text.trim() || 'New step'
+          const after = run.after[i]
           return (
-            <li key={s.id} className={`step${s.done ? ' done' : ''}`}>
-              <button
-                type="button"
-                className="step-check"
-                role="checkbox"
-                aria-checked={s.done}
-                aria-label={`Step ${i}: ${name}`}
-                onClick={() => update((x) => toggleStep(x, s.id))}
-              >
-                {s.done ? <CheckIcon /> : <span className="num">{i}</span>}
-              </button>
-              <button type="button" className="step-main" onClick={() => onOpen(s.id)} aria-label={`Edit step ${i}: ${name}, ${money(s.amount)}`}>
-                <span className={`step-text${s.text.trim() ? '' : ' placeholder'}`}>{name}</span>
-                <span className="step-amount num">{money(s.amount)}</span>
-                <span className="step-left num">
-                  {run.after[i] < 0 ? `then ${money(-run.after[i])} short` : `then ${money(run.after[i])} left`}
-                </span>
-              </button>
-            </li>
+            <Fragment key={s.id}>
+              <li className={`step${s.done ? ' done' : ''}${s.beforePay ? ' before-pay' : ''}`}>
+                <button
+                  type="button"
+                  className="step-check"
+                  role="checkbox"
+                  aria-checked={s.done}
+                  aria-label={`Step ${i}: ${name}`}
+                  onClick={() => update((x) => toggleStep(x, s.id))}
+                >
+                  {s.done ? <CheckIcon /> : <span className="num">{i}</span>}
+                </button>
+                <button type="button" className="step-main" onClick={() => onOpen(s.id)} aria-label={`Edit step ${i}: ${name}, ${money(s.amount)}`}>
+                  <span className={`step-text${s.text.trim() ? '' : ' placeholder'}`}>{name}</span>
+                  <span className="step-amount num">{money(s.amount)}</span>
+                  <span className="step-left num">
+                    {after === null ? 'out before the paycheck lands' : after < 0 ? `then ${money(-after)} short` : `then ${money(after)} left`}
+                  </span>
+                </button>
+              </li>
+              {i === landsAfter - 1 && lands}
+            </Fragment>
           )
         })}
 
@@ -152,16 +163,34 @@ export function StepSheet({
         <span className="field-label">Amount</span>
         <MoneyInput id="step-amount" className="well-money" value={s.amount} label="Step amount" onChange={(n) => update((x) => updateStep(x, id, { amount: n }))} />
         <span className="field-hint num">
-          {after < 0 ? `That's ${money(-after)} more than the paycheck has left.` : `${money(after)} of the paycheck left after this.`}
+          {after === null
+            ? `Not taken from the ${money(b.paycheck)} paycheck.`
+            : after < 0
+              ? `That's ${money(-after)} more than the paycheck has left.`
+              : `${money(after)} of the paycheck left after this.`}
         </span>
       </div>
 
+      <label className="toggle">
+        <input
+          id="step-before-pay"
+          type="checkbox"
+          checked={s.beforePay}
+          onChange={(e) => update((x) => setStepBeforePay(x, id, e.target.checked))}
+        />
+        <span className="toggle-track" aria-hidden="true" />
+        <span className="toggle-text">
+          <span className="toggle-label">Comes out before the paycheck</span>
+          <span className="field-hint">Like a 401k: taken from gross pay, so the net paycheck doesn't pay for it.</span>
+        </span>
+      </label>
+
       <div className="sheet-row">
-        <button type="button" className="btn" disabled={index === 0} onClick={() => update((x) => moveStep(x, id, -1))}>
+        <button type="button" className="btn" disabled={!canMoveStep(b, id, -1)} onClick={() => update((x) => moveStep(x, id, -1))}>
           <UpIcon />
           Earlier
         </button>
-        <button type="button" className="btn" disabled={index === b.steps.length - 1} onClick={() => update((x) => moveStep(x, id, 1))}>
+        <button type="button" className="btn" disabled={!canMoveStep(b, id, 1)} onClick={() => update((x) => moveStep(x, id, 1))}>
           <DownIcon />
           Later
         </button>

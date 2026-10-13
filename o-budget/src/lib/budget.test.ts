@@ -3,6 +3,7 @@ import {
   addItem,
   addStep,
   CADENCES,
+  canMoveStep,
   categoryTotal,
   emptyBudget,
   expensesTotal,
@@ -31,6 +32,7 @@ import {
   setLiving,
   setLivingShare,
   setPaycheck,
+  setStepBeforePay,
   shares,
   takeHomeShare,
   takeHomeYear,
@@ -74,8 +76,16 @@ describe("Orion's budget", () => {
     expect(livingLeft(b)).toBe(-53)
   })
 
-  it('works the paycheck down step by step and leaves $95 over', () => {
-    expect(paycheckRun(b)).toEqual({ start: 3900, after: [3495, 1995, 95], leftOver: 95 })
+  it('takes the 401k out before the paycheck lands', () => {
+    expect(b.steps.map((s) => [s.text, s.beforePay])).toEqual([
+      ['Goes into 401k', true],
+      ['Invest in VTI', false],
+      ['Remains for 2 wks', false],
+    ])
+  })
+
+  it('works the paycheck down step by step and leaves $500 over', () => {
+    expect(paycheckRun(b)).toEqual({ start: 3900, after: [null, 2400, 500], leftOver: 500 })
   })
 
   it('gives every step, category and item its own id', () => {
@@ -196,14 +206,34 @@ describe('steps', () => {
 
   it('edits, reorders and removes', () => {
     let b = orionBudget()
-    const [first, second] = b.steps
-    b = updateStep(b, second.id, { amount: 1600, text: 'Invest in VTI and VXUS' })
-    expect(paycheckRun(b).leftOver).toBe(-5)
-    b = moveStep(b, second.id, -1)
-    expect(b.steps.map((s) => s.id).slice(0, 2)).toEqual([second.id, first.id])
-    expect(moveStep(b, second.id, -1)).toBe(b)
-    b = removeStep(b, first.id)
+    const [k401, vti, rest] = b.steps
+    b = updateStep(b, vti.id, { amount: 2100, text: 'Invest in VTI and VXUS' })
+    expect(paycheckRun(b).leftOver).toBe(-100)
+    b = moveStep(b, rest.id, -1)
+    expect(b.steps.map((s) => s.id)).toEqual([k401.id, rest.id, vti.id])
+    expect(paycheckRun(b).after).toEqual([null, 2000, -100])
+    b = removeStep(b, k401.id)
     expect(b.steps).toHaveLength(2)
+  })
+
+  it("keeps steps on their own side of payday when they're moved", () => {
+    const b = orionBudget()
+    const [k401, vti] = b.steps
+    expect(canMoveStep(b, vti.id, -1)).toBe(false)
+    expect(moveStep(b, vti.id, -1)).toBe(b)
+    expect(canMoveStep(b, k401.id, 1)).toBe(false)
+    expect(canMoveStep(b, vti.id, 1)).toBe(true)
+  })
+
+  it('moves a step marked before the paycheck in front of it, and back', () => {
+    let b = orionBudget()
+    const [k401, vti, rest] = b.steps
+    b = setStepBeforePay(b, rest.id, true)
+    expect(b.steps.map((s) => s.id)).toEqual([k401.id, rest.id, vti.id])
+    expect(paycheckRun(b)).toEqual({ start: 3900, after: [null, null, 2400], leftOver: 2400 })
+    b = setStepBeforePay(b, k401.id, false)
+    expect(b.steps.map((s) => s.id)).toEqual([rest.id, k401.id, vti.id])
+    expect(paycheckRun(b).leftOver).toBe(1995)
   })
 
   it('ticks steps off and clears them for the next paycheck', () => {
@@ -329,11 +359,32 @@ describe('normalizeBudget', () => {
     expect(b.paycheck).toBe(3900.12)
     expect(b.cadence).toBe('weekly')
     expect(b.investing).toBe(0)
-    expect(b.steps).toEqual([{ id: expect.any(String), text: 'Invest', amount: 1500.12, done: false }])
+    expect(b.steps).toEqual([{ id: expect.any(String), text: 'Invest', amount: 1500.12, done: false, beforePay: false }])
     expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '' })
     // A repeated id gets a fresh one, and an item list sets the amount.
     expect(b.categories[1].id).not.toBe('a')
     expect(b.categories[1].amount).toBe(25)
+  })
+
+  it('takes the 401k out before the paycheck in budgets saved before that could be marked', () => {
+    const v2 = {
+      version: 2,
+      paycheck: 3900,
+      cadence: 'semimonthly',
+      steps: [
+        { id: 'a', text: 'Invest in VTI', amount: 1500 },
+        { id: 'b', text: 'Goes into 401(k)', amount: 405 },
+      ],
+    }
+    const b = normalizeBudget(v2)!
+    expect(b.steps.map((s) => [s.id, s.beforePay])).toEqual([
+      ['b', true],
+      ['a', false],
+    ])
+    expect(paycheckRun(b).leftOver).toBe(2400)
+    // Once it can be marked, what was marked stands.
+    const v3 = normalizeBudget({ ...v2, version: 3, steps: [{ id: 'b', text: 'Goes into 401k', amount: 405, beforePay: false }] })!
+    expect(v3.steps[0].beforePay).toBe(false)
   })
 
   it('fills in an empty object as an empty budget', () => {
