@@ -1,15 +1,18 @@
 # O-Budget
 
-Orion's budget as an app. What comes in each month and how it splits between
-**Investing** and **Living**, the steps to run every payday in order, and where
-Living goes, category by category, with a popout for the details, like each
-subscription. Every number can be changed in place, and every total follows.
+Orion's budget as an app. The net paycheck and how often it comes, which make
+the month's income, and how that splits between **Investing** and **Living**;
+gross pay and bonus beside it; the steps to run every payday in order; and
+where Living goes, category by category, with a popout for the details, like
+each subscription. Every number can be changed in place, and every total
+follows.
 
 It opens on the budget as written down:
 
 | | |
 |---|---|
-| Income | $7,800 a month, in 2 paychecks of $3,900 |
+| Income | $7,800 a month: a $3,900 net paycheck, twice a month |
+| Gross pay | gross income and bonus, a year, to fill in |
 | Investing | $4,000 (51.3%) |
 | Living | $3,800 (48.7%) |
 | Paycheck process | 0 — $405 into the 401k · 1 — $1,500 into VTI · 2 — $1,900 for the next 2 weeks |
@@ -48,11 +51,18 @@ loads the budget from that database.
 
 ## What it does
 
-**Income.** The month's income, big, and the number of paychecks it comes in,
-with what each one is. One slider sets the split: cobalt for Investing, amber
-for Living. Or type either side in dollars or as a percent of income. Each
-side shows what it is per paycheck, and a line under them says how the living
-expenses compare: "$53 over" or "$47 to spare".
+**Income.** The month's income, big, made from the **net paycheck** and how
+often it's **paid**: every week, every 2 weeks, twice a month or once a month.
+Under them, the paychecks in a year and the year's take-home. One slider sets
+the split: cobalt for Investing, amber for Living. Or type either side in
+dollars or as a percent of income. Each side shows what it is per paycheck,
+and a line under them says how the living expenses compare: "$53 over" or
+"$47 to spare".
+
+**Gross pay.** Gross income and bonus, a year, before taxes. The bonus can be
+typed in dollars or as a percent of gross. Under them: the two together, gross
+income a month, and take-home as a share of gross. Neither is part of the
+monthly income, which runs on the paycheck.
 
 **Paycheck process.** The steps to run each payday, numbered from 0 the way
 the note numbers them, starting from the paycheck and ending with what's left
@@ -80,12 +90,18 @@ step or category that's closed while still blank isn't kept.
 
 ## How the numbers work
 
-- Income is per month. Paychecks are how many it arrives in (1 to 5), and
-  "each" is income divided by them.
-- Investing is kept in dollars and Living is the rest of income. A change of
-  income keeps Investing where it is and moves Living, so a raise shows up as
-  room in the living expenses. A percent typed into either side sets
+- The month's income is the net paycheck times the paychecks in a year (52,
+  26, 24 or 12), over twelve months. Every two weeks is an average: $3,900
+  makes $8,450 a month, though most months bring two paychecks ($7,800) and
+  two months bring three, and the app says so under the paycheck.
+- Per-paycheck amounts divide by the paychecks a month (26 ÷ 12 for every two
+  weeks). On the Investing and Living tiles they round to whole dollars.
+- Investing is kept in dollars and Living is the rest of income. A bigger
+  paycheck keeps Investing where it is and moves Living, so a raise shows up
+  as room in the living expenses. A percent typed into either side sets
   Investing to that share of the current income.
+- Gross income and bonus are a year and stay out of the monthly income.
+  Take-home is a year of net paychecks as a share of gross income.
 - The paycheck process starts from one paycheck and takes each step's amount
   off in order.
 - Amounts keep cents when they have them ($4.99) and round to the cent.
@@ -94,7 +110,8 @@ step or category that's closed while still blank isn't kept.
 
 In the installed app, in the phone's `localStorage` under `o-budget.state`,
 written a moment after each change and straight away when the app is put
-away. In the artifact, in the artifact's database as the document
+away. A budget saved by the first version, which kept a monthly income,
+opens unchanged: its paycheck is worked back from that income. In the artifact, in the artifact's database as the document
 `budget/main`, with a copy in the browser. Edits show at once and are written
 one at a time; a change made on another device shows up unless an edit made
 here is still on its way. The header says where the budget is saved.
@@ -112,10 +129,11 @@ npm run icons      # redraws the Home Screen icons
 
 ## Tests
 
-Unit tests (`npm test`) cover the sums (the split, per paycheck, the paycheck
-run, category totals and the expenses against Living), every edit, reading
-back saved budgets, including broken ones, and the save and sync rules with
-a stand-in database. The browser checks in [`tests/`](tests/README.md) drive
+Unit tests (`npm test`) cover the sums (income from the paycheck and its
+cadence, take-home against gross, the split, per paycheck, the paycheck run,
+category totals and the expenses against Living), every edit, reading back
+saved budgets, including broken ones and the first version's, and the save
+and sync rules with a stand-in database. The browser checks in [`tests/`](tests/README.md) drive
 the built app on an iPhone-sized screen.
 
 ## Layout
@@ -128,7 +146,7 @@ src/
   lib/sync.ts         saving, and the artifact's database
   useBudget.ts        the budget on screen and the one way to change it
   App.tsx             the three sections, the popouts and Undo
-  components/         Income, Paycheck process, Living expenses, the popout, fields
+  components/         Income, Gross pay, Paycheck process, Living expenses, the popout, fields
 scripts/
   make-icons.mjs      the Home Screen icons
   build-artifact.mjs  the single-page artifact

@@ -4,6 +4,7 @@ import {
   addStep,
   isBlankCategory,
   isBlankStep,
+  monthlyIncome,
   removeCategory,
   removeItem,
   removeStep,
@@ -12,6 +13,7 @@ import {
 } from './lib/budget'
 import type { SyncStatus } from './lib/sync'
 import { CategorySheet, ExpensesSection } from './components/ExpensesSection'
+import { GrossSection } from './components/GrossSection'
 import { IncomeSection } from './components/IncomeSection'
 import { Ring } from './components/Marks'
 import { ProcessSection, StepSheet } from './components/ProcessSection'
@@ -74,7 +76,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="top">
-        <Ring investing={budget.income > 0 ? shares(budget).investing : null} />
+        <Ring investing={monthlyIncome(budget) > 0 ? shares(budget).investing : null} />
         <h1 className="wordmark">O-Budget</h1>
         <span className="sync" data-status={status} role="status">
           <span className="sync-dot" aria-hidden="true" />
@@ -93,6 +95,7 @@ export default function App() {
           />
         </div>
         <div className="col">
+          <GrossSection budget={budget} update={update} />
           <ExpensesSection
             budget={budget}
             onOpen={(id) => setOpen({ kind: 'category', id, fresh: false })}
@@ -170,25 +173,29 @@ function Loading() {
         </span>
       </header>
       <main className="layout">
-        <div className="col">
-          {['Income', 'Paycheck process'].map((title) => (
-            <section className="section" key={title}>
-              <h2 className="eyebrow">{title}</h2>
-              <div className="skeleton big" />
-              <div className="skeleton" />
-              <div className="skeleton short" />
-            </section>
-          ))}
-        </div>
-        <div className="col">
-          <section className="section">
-            <h2 className="eyebrow">Living expenses</h2>
-            <div className="skeleton big" />
-            <div className="skeleton" />
-            <div className="skeleton" />
-            <div className="skeleton short" />
-          </section>
-        </div>
+        {[
+          [
+            ['income', 'Income', 3],
+            ['process', 'Paycheck process', 3],
+          ],
+          [
+            ['gross', 'Gross pay', 2],
+            ['expenses', 'Living expenses', 5],
+          ],
+        ].map((col, i) => (
+          <div className="col" key={i}>
+            {col.map(([kind, title, lines]) => (
+              <section className={`section ${kind}`} key={kind}>
+                <h2 className="eyebrow">{title}</h2>
+                <div className="skeleton big" />
+                {Array.from({ length: Number(lines) - 1 }, (_, j) => (
+                  <div className="skeleton" key={j} />
+                ))}
+                <div className="skeleton short" />
+              </section>
+            ))}
+          </div>
+        ))}
       </main>
     </div>
   )

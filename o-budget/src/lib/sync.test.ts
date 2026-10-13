@@ -1,4 +1,4 @@
-import { emptyBudget, orionBudget, sameBudget, setIncome, type Budget } from './budget'
+import { emptyBudget, orionBudget, sameBudget, setPaycheck, type Budget } from './budget'
 import { STORAGE_KEY, type KeyValueStore } from './storage'
 import { createSync, type CloudDoc, type DocSnapshot, type SyncStatus } from './sync'
 
@@ -79,9 +79,9 @@ describe('sync on the phone', () => {
     h.sync.start(false, b)
     expect(h.last()).toBe('device')
     expect(h.shown).toEqual([])
-    h.sync.edit(setIncome(b, 8000))
+    h.sync.edit(setPaycheck(b, 8000))
     await settle()
-    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).income).toBe(8000)
+    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).paycheck).toBe(8000)
     expect(h.last()).toBe('device')
   })
 
@@ -96,9 +96,9 @@ describe('sync on the phone', () => {
   it('writes the waiting edit at once on flush', async () => {
     const h = harness(async () => null)
     h.sync.start(false, orionBudget())
-    h.sync.edit(setIncome(orionBudget(), 9000))
+    h.sync.edit(setPaycheck(orionBudget(), 9000))
     await h.sync.flush()
-    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).income).toBe(9000)
+    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).paycheck).toBe(9000)
   })
 })
 
@@ -139,13 +139,13 @@ describe('sync in an artifact', () => {
     h.sync.start(true, null)
     await settle()
     const base = h.shown[0]
-    h.sync.edit(setIncome(base, 7900))
-    h.sync.edit(setIncome(base, 8000))
-    h.sync.edit(setIncome(base, 8100))
+    h.sync.edit(setPaycheck(base, 7900))
+    h.sync.edit(setPaycheck(base, 8000))
+    h.sync.edit(setPaycheck(base, 8100))
     await settle()
-    expect(cloud.writes.map((w) => w.income)).toEqual([8100])
+    expect(cloud.writes.map((w) => w.paycheck)).toEqual([8100])
     expect(cloud.writes[0].savedAt).toEqual(expect.any(String))
-    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).income).toBe(8100)
+    expect(JSON.parse(h.store.data.get(STORAGE_KEY)!).paycheck).toBe(8100)
     expect(h.last()).toBe('synced')
     // Its own write coming back doesn't put anything new on screen.
     expect(h.shown).toHaveLength(1)
@@ -158,15 +158,15 @@ describe('sync in an artifact', () => {
     await settle()
     const base = h.shown[0]
     cloud.holdWrites()
-    h.sync.edit(setIncome(base, 8000))
+    h.sync.edit(setPaycheck(base, 8000))
     await settle()
     expect(h.last()).toBe('saving')
-    h.sync.edit(setIncome(base, 8500))
+    h.sync.edit(setPaycheck(base, 8500))
     await settle()
     expect(cloud.writes).toHaveLength(1)
     cloud.releaseWrite()
     await settle()
-    expect(cloud.writes.map((w) => w.income)).toEqual([8000, 8500])
+    expect(cloud.writes.map((w) => w.paycheck)).toEqual([8000, 8500])
     expect(h.last()).toBe('synced')
   })
 
@@ -175,9 +175,9 @@ describe('sync in an artifact', () => {
     const h = harness(async () => cloud.doc)
     h.sync.start(true, null)
     await settle()
-    cloud.remote({ ...setIncome(h.shown[0], 9100) })
+    cloud.remote({ ...setPaycheck(h.shown[0], 9100) })
     expect(h.shown).toHaveLength(2)
-    expect(h.shown[1].income).toBe(9100)
+    expect(h.shown[1].paycheck).toBe(9100)
   })
 
   it("keeps an edit that hasn't been written over another device's change", async () => {
@@ -185,11 +185,11 @@ describe('sync in an artifact', () => {
     const h = harness(async () => cloud.doc)
     h.sync.start(true, null)
     await settle()
-    h.sync.edit(setIncome(h.shown[0], 8000))
-    cloud.remote({ ...setIncome(h.shown[0], 9100) })
+    h.sync.edit(setPaycheck(h.shown[0], 8000))
+    cloud.remote({ ...setPaycheck(h.shown[0], 9100) })
     expect(h.shown).toHaveLength(1)
     await settle()
-    expect(cloud.writes.at(-1)!.income).toBe(8000)
+    expect(cloud.writes.at(-1)!.paycheck).toBe(8000)
   })
 
   it('turns read-only when the database refuses the write', async () => {
@@ -198,11 +198,11 @@ describe('sync in an artifact', () => {
     h.sync.start(true, null)
     await settle()
     cloud.failWith('invalid_argument')
-    h.sync.edit(setIncome(h.shown[0], 8000))
+    h.sync.edit(setPaycheck(h.shown[0], 8000))
     await settle()
     expect(h.last()).toBe('readonly')
     cloud.failWith(null)
-    h.sync.edit(setIncome(h.shown[0], 8100))
+    h.sync.edit(setPaycheck(h.shown[0], 8100))
     await settle()
     expect(cloud.writes).toHaveLength(0)
     expect(h.last()).toBe('readonly')
@@ -214,12 +214,12 @@ describe('sync in an artifact', () => {
     h.sync.start(true, null)
     await settle()
     cloud.failWith('unavailable')
-    h.sync.edit(setIncome(h.shown[0], 8000))
+    h.sync.edit(setPaycheck(h.shown[0], 8000))
     await settle()
     expect(h.last()).toBe('offline')
     cloud.failWith(null)
     await settle(80)
-    expect(cloud.writes.map((w) => w.income)).toEqual([8000])
+    expect(cloud.writes.map((w) => w.paycheck)).toEqual([8000])
     expect(h.last()).toBe('synced')
   })
 
@@ -229,7 +229,7 @@ describe('sync in an artifact', () => {
     h.sync.start(true, null)
     await settle()
     h.sync.stop()
-    cloud.remote({ ...setIncome(h.shown[0], 9100) })
+    cloud.remote({ ...setPaycheck(h.shown[0], 9100) })
     expect(h.shown).toHaveLength(1)
   })
 })

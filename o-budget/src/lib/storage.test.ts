@@ -1,5 +1,5 @@
 import { orionBudget, sameBudget } from './budget'
-import { loadBudget, saveBudget, STORAGE_KEY, type KeyValueStore } from './storage'
+import { loadBudget, saveBudget, STORAGE_KEY, STORAGE_VERSION, type KeyValueStore } from './storage'
 
 const memory = (): KeyValueStore & { data: Map<string, string> } => {
   const data = new Map<string, string>()
@@ -11,7 +11,7 @@ describe('storage', () => {
     const store = memory()
     const b = orionBudget()
     expect(saveBudget(b, store)).toBe(true)
-    expect(JSON.parse(store.data.get(STORAGE_KEY)!).version).toBe(1)
+    expect(JSON.parse(store.data.get(STORAGE_KEY)!).version).toBe(STORAGE_VERSION)
     expect(sameBudget(loadBudget(store), b)).toBe(true)
   })
 

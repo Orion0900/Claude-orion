@@ -9,6 +9,8 @@ interface NumberFieldProps {
   label: string
   className?: string
   autoFocus?: boolean
+  /** Shows $0 as an empty field waiting to be filled in, for amounts not entered yet. */
+  blank?: boolean
 }
 
 /** Typing replaces the whole number, the way a calculator would. */
@@ -35,9 +37,9 @@ const widthFor = (text: string) => {
  * exactly what was typed; each readable keystroke updates the budget, and
  * leaving the field tidies it up ("7800" back to "7,800").
  */
-export function MoneyInput({ id, value, onChange, label, className = '', autoFocus }: NumberFieldProps) {
+export function MoneyInput({ id, value, onChange, label, className = '', autoFocus, blank }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null)
-  const text = draft ?? moneyField(value)
+  const text = draft ?? (blank && value === 0 ? '' : moneyField(value))
   return (
     <label className={`money ${className}`}>
       <span className="money-sign" aria-hidden="true">
@@ -52,9 +54,10 @@ export function MoneyInput({ id, value, onChange, label, className = '', autoFoc
         aria-label={label}
         autoFocus={autoFocus}
         value={text}
+        placeholder={blank ? '0' : undefined}
         style={widthFor(text)}
         onFocus={(e) => {
-          setDraft(moneyDraft(value))
+          setDraft(blank && value === 0 ? '' : moneyDraft(value))
           selectAll(e)
         }}
         onChange={(e) => {
@@ -71,8 +74,8 @@ export function MoneyInput({ id, value, onChange, label, className = '', autoFoc
   )
 }
 
-/** A share of income as a percent, edited the same way. `value` is a fraction. */
-export function PercentInput({ id, value, onChange, label, className = '' }: NumberFieldProps) {
+/** A share as a percent, edited the same way. `value` is a fraction, at most `max` (1 is 100%). */
+export function PercentInput({ id, value, onChange, label, className = '', max = 1 }: NumberFieldProps & { max?: number }) {
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? percentField(value)
   return (
@@ -94,7 +97,7 @@ export function PercentInput({ id, value, onChange, label, className = '' }: Num
           const typed = e.target.value
           setDraft(typed)
           const n = parsePercent(typed)
-          if (n !== null) onChange(Math.min(1, n))
+          if (n !== null) onChange(Math.min(max, n))
           else if (!typed.trim()) onChange(0)
         }}
         onBlur={() => setDraft(null)}
@@ -104,32 +107,5 @@ export function PercentInput({ id, value, onChange, label, className = '' }: Num
         %
       </span>
     </label>
-  )
-}
-
-/** A small whole number with − and + either side. */
-export function Stepper({
-  value,
-  min,
-  max,
-  onChange,
-  label,
-}: {
-  value: number
-  min: number
-  max: number
-  onChange: (value: number) => void
-  label: string
-}) {
-  return (
-    <div className="stepper" role="group" aria-label={label}>
-      <button type="button" aria-label="One fewer" disabled={value <= min} onClick={() => onChange(value - 1)}>
-        −
-      </button>
-      <output aria-live="polite">{value}</output>
-      <button type="button" aria-label="One more" disabled={value >= max} onClick={() => onChange(value + 1)}>
-        +
-      </button>
-    </div>
   )
 }
