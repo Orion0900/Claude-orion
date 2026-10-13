@@ -89,7 +89,8 @@ popout:
 - **Delete category**.
 
 **Investment projection.** Enter an upfront amount, what goes in each
-month (it starts at the Investing amount), a yearly return and the years,
+month (it starts at the Investing amount), the 401k each month (it starts
+at the steps taken out before the paycheck, $810), a yearly return and the years,
 and a line chart shows the total value year by year against what was put
 in, with the end total, the amount put in and the growth above it. Tap or
 drag across the chart for any year. It compounds monthly at a steady

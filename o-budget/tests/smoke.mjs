@@ -235,13 +235,14 @@ assert.equal(await text(page, '.spent-total'), '$3,919')
 // The investment projection: Investing's $4,000 a month at 7% for 30 years, then $13,780 up front and 20 years.
 await page.locator('.projection').scrollIntoViewIfNeeded()
 assert.equal(await value(page, '#proj-monthly'), '4,000')
-assert.match(await text(page, '.proj-facts'), /In 30 years\s+\$4\.\d+M\s+Put in\s+\$1\.4M/)
+assert.equal(await value(page, '#proj-401k'), '810')
+assert.match(await text(page, '.proj-facts'), /In 30 years\s+\$5\.\d+M\s+Put in\s+\$1\.7M/)
 await enter(page, '#proj-start', '13780')
 await page.locator('#proj-years').fill('20')
 assert.match(await text(page, '.proj-facts'), /In 20 years/)
 const box = await page.locator('.chart svg').boundingBox()
 await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2)
-assert.match(await text(page, '.tip'), /Year 20\s+\$[\d,]+ total\s+\$973,780 put in/)
+assert.match(await text(page, '.tip'), /Year 20\s+\$[\d,]+ total\s+\$1,168,180 put in/)
 await shot(page, '07b-projection')
 
 // Everything is still there after a reload.
