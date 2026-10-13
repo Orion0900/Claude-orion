@@ -2,6 +2,7 @@ import {
   addCategory,
   addItem,
   addStep,
+  CADENCES,
   categoryTotal,
   emptyBudget,
   expensesTotal,
@@ -9,23 +10,30 @@ import {
   isBlankStep,
   living,
   livingLeft,
+  monthlyIncome,
   moveStep,
   normalizeBudget,
   orionBudget,
   paycheckRun,
+  paychecksPerMonth,
   perPaycheck,
   removeCategory,
   removeItem,
   removeStep,
   resetSteps,
   sameBudget,
-  setIncome,
+  setBonus,
+  setBonusShare,
+  setCadence,
+  setGross,
   setInvesting,
   setInvestingShare,
   setLiving,
   setLivingShare,
-  setPaychecks,
+  setPaycheck,
   shares,
+  takeHomeShare,
+  takeHomeYear,
   toggleStep,
   updateCategory,
   updateItem,
@@ -39,15 +47,17 @@ describe("Orion's budget", () => {
   const b = orionBudget()
 
   it('splits $7,800 into $4,000 Investing and $3,800 Living', () => {
-    expect(b.income).toBe(7800)
+    expect(monthlyIncome(b)).toBe(7800)
     expect(b.investing).toBe(4000)
     expect(living(b)).toBe(3800)
     expect(shares(b).investing).toBeCloseTo(0.5128, 4)
     expect(shares(b).living).toBeCloseTo(0.4872, 4)
   })
 
-  it('comes in two paychecks of $3,900', () => {
-    expect(b.paychecks).toBe(2)
+  it('comes in two paychecks of $3,900 a month', () => {
+    expect(b.paycheck).toBe(3900)
+    expect(b.cadence).toBe('semimonthly')
+    expect(paychecksPerMonth(b)).toBe(2)
     expect(perPaycheck(b)).toBe(3900)
     expect(perPaycheck(b, living(b))).toBe(1900)
   })
@@ -77,8 +87,9 @@ describe("Orion's budget", () => {
 describe('the split', () => {
   const b = orionBudget()
 
-  it('keeps Investing in dollars when income changes, so Living takes the difference', () => {
-    const raised = setIncome(b, 8200)
+  it('keeps Investing in dollars when the paycheck changes, so Living takes the difference', () => {
+    const raised = setPaycheck(b, 4100)
+    expect(monthlyIncome(raised)).toBe(8200)
     expect(raised.investing).toBe(4000)
     expect(living(raised)).toBe(4200)
   })
@@ -97,7 +108,7 @@ describe('the split', () => {
 
   it('never goes negative or keeps fractions of a cent', () => {
     expect(setInvesting(b, -10).investing).toBe(0)
-    expect(setIncome(b, -1).income).toBe(0)
+    expect(setPaycheck(b, -1).paycheck).toBe(0)
     expect(setInvesting(b, 10.556).investing).toBe(10.56)
   })
 
@@ -109,10 +120,69 @@ describe('the split', () => {
     expect(shares(emptyBudget())).toEqual({ investing: 0, living: 0 })
   })
 
-  it('keeps paychecks between 1 and 5', () => {
-    expect(setPaychecks(b, 0).paychecks).toBe(1)
-    expect(setPaychecks(b, 9).paychecks).toBe(5)
-    expect(perPaycheck(setPaychecks(b, 3))).toBe(2600)
+})
+
+describe('the paycheck and its cadence', () => {
+  const b = orionBudget()
+
+  it('makes the month from the paychecks in a year', () => {
+    expect(CADENCES.map((c) => [c.id, c.perYear])).toEqual([
+      ['weekly', 52],
+      ['biweekly', 26],
+      ['semimonthly', 24],
+      ['monthly', 12],
+    ])
+    expect(monthlyIncome(setCadence(b, 'biweekly'))).toBe(8450)
+    expect(monthlyIncome(setCadence(b, 'weekly'))).toBe(16900)
+    expect(monthlyIncome(setCadence(b, 'monthly'))).toBe(3900)
+  })
+
+  it('counts every two weeks as 26 paychecks a year, two months with three', () => {
+    const biweekly = setCadence(b, 'biweekly')
+    expect(paychecksPerMonth(biweekly)).toBeCloseTo(2.1667, 4)
+    expect(takeHomeYear(biweekly)).toBe(101400)
+    // A paycheck is still a paycheck: the process starts from it.
+    expect(perPaycheck(biweekly)).toBe(3900)
+    expect(paycheckRun(biweekly).start).toBe(3900)
+    expect(perPaycheck(biweekly, 4000)).toBe(1846.15)
+  })
+
+  it('ignores a cadence it does not know', () => {
+    expect(setCadence(b, 'yearly' as never)).toBe(b)
+  })
+
+  it('keeps cents on a paycheck and never goes below zero', () => {
+    expect(setPaycheck(b, 3333.333).paycheck).toBe(3333.33)
+    expect(monthlyIncome(setPaycheck(b, 0))).toBe(0)
+  })
+})
+
+describe('gross pay and bonus', () => {
+  const b = orionBudget()
+
+  it('starts empty, with no take-home share until there is a gross income', () => {
+    expect(b.gross).toBe(0)
+    expect(b.bonus).toBe(0)
+    expect(takeHomeShare(b)).toBeNull()
+  })
+
+  it('works out the share of gross that comes home', () => {
+    const paid = setGross(b, 120000)
+    expect(takeHomeYear(paid)).toBe(93600)
+    expect(takeHomeShare(paid)).toBeCloseTo(0.78, 4)
+  })
+
+  it('takes the bonus in dollars or as a share of gross', () => {
+    const paid = setGross(b, 120000)
+    expect(setBonus(paid, 15000).bonus).toBe(15000)
+    expect(setBonusShare(paid, 0.125).bonus).toBe(15000)
+    expect(setBonusShare(paid, 1.5).bonus).toBe(180000)
+    expect(setBonus(paid, -3).bonus).toBe(0)
+  })
+
+  it('leaves the month alone: the income comes from the paycheck', () => {
+    const paid = setBonus(setGross(b, 120000), 15000)
+    expect(monthlyIncome(paid)).toBe(7800)
   })
 })
 
@@ -230,9 +300,22 @@ describe('normalizeBudget', () => {
     expect(normalizeBudget([1, 2])).toBeNull()
   })
 
+  it('carries a first-version budget over, keeping its monthly income', () => {
+    const v1 = { version: 1, income: 7800, paychecks: 2, investing: 4000, steps: [], categories: [] }
+    expect(normalizeBudget(v1)).toMatchObject({ paycheck: 3900, cadence: 'semimonthly', gross: 0, bonus: 0 })
+    const monthly = normalizeBudget({ ...v1, paychecks: 1 })!
+    expect(monthly).toMatchObject({ paycheck: 7800, cadence: 'monthly' })
+    const weekly = normalizeBudget({ ...v1, paychecks: 4 })!
+    expect(weekly).toMatchObject({ paycheck: 1800, cadence: 'weekly' })
+    expect(monthlyIncome(weekly)).toBe(7800)
+  })
+
   it('repairs what it can', () => {
     const b = normalizeBudget({
-      income: '7800',
+      gross: '120000',
+      bonus: -5,
+      paycheck: 3900.123,
+      cadence: 'yearly',
       paychecks: 12,
       investing: -4,
       steps: [{ text: 'Invest', amount: 1500.123, done: 'yes' }, 'junk'],
@@ -241,8 +324,10 @@ describe('normalizeBudget', () => {
         { id: 'a', name: 'Subs', amount: 1, items: [{ name: 'HBO', amount: 20 }, { name: 'Max', amount: 5 }] },
       ],
     })!
-    expect(b.income).toBe(0)
-    expect(b.paychecks).toBe(5)
+    expect(b.gross).toBe(0)
+    expect(b.bonus).toBe(0)
+    expect(b.paycheck).toBe(3900.12)
+    expect(b.cadence).toBe('weekly')
     expect(b.investing).toBe(0)
     expect(b.steps).toEqual([{ id: expect.any(String), text: 'Invest', amount: 1500.12, done: false }])
     expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '' })

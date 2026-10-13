@@ -6,7 +6,8 @@
 import { normalizeBudget, type Budget } from './budget'
 
 export const STORAGE_KEY = 'o-budget.state'
-export const STORAGE_VERSION = 1
+/** 2 keeps the paycheck and its cadence; 1 kept a monthly income. */
+export const STORAGE_VERSION = 2
 
 export interface KeyValueStore {
   getItem(key: string): string | null

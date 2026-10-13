@@ -1,8 +1,9 @@
 /**
- * The budget: what comes in a month, how it splits between Investing and
- * Living, the steps to run each payday, and where Living goes. Everything
- * here is plain data and pure functions, so the screens and the tests share
- * one set of sums.
+ * The budget: gross pay and bonus, the net paycheck and how often it comes
+ * (which make the month's income), how that income splits between
+ * Investing and Living, the steps to run each payday, and where Living goes.
+ * Everything here is plain data and pure functions, so the screens and the
+ * tests share one set of sums.
  */
 import { roundCents } from './money'
 
@@ -29,18 +30,31 @@ export interface Step {
   done: boolean
 }
 
+/** How often the paycheck comes. */
+export type Cadence = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly'
+
+export const CADENCES: { id: Cadence; label: string; perYear: number }[] = [
+  { id: 'weekly', label: 'Every week', perYear: 52 },
+  { id: 'biweekly', label: 'Every 2 weeks', perYear: 26 },
+  { id: 'semimonthly', label: 'Twice a month', perYear: 24 },
+  { id: 'monthly', label: 'Once a month', perYear: 12 },
+]
+
+const isCadence = (v: unknown): v is Cadence => CADENCES.some((c) => c.id === v)
+
 export interface Budget {
-  /** A month. */
-  income: number
-  /** How many paychecks the month's income arrives in. */
-  paychecks: number
+  /** Before taxes, a year. */
+  gross: number
+  /** A year, on top of gross income. */
+  bonus: number
+  /** Net: what lands in the account each payday. */
+  paycheck: number
+  cadence: Cadence
   /** A month. Living is whatever income is left after it. */
   investing: number
   steps: Step[]
   categories: Category[]
 }
-
-export const MAX_PAYCHECKS = 5
 
 export function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
@@ -56,11 +70,13 @@ const category = (name: string, amount: number, items: Item[] = []): Category =>
 })
 const step = (text: string, amount: number): Step => ({ id: newId(), text, amount, done: false })
 
-/** Orion's budget as written down: $7,800 a month in two paychecks. */
+/** Orion's budget as written down: $7,800 a month in two paychecks of $3,900. */
 export function orionBudget(): Budget {
   return {
-    income: 7800,
-    paychecks: 2,
+    gross: 0,
+    bonus: 0,
+    paycheck: 3900,
+    cadence: 'semimonthly',
     investing: 4000,
     steps: [step('Goes into 401k', 405), step('Invest in VTI', 1500), step('Remains for 2 wks', 1900)],
     categories: [
@@ -87,7 +103,7 @@ export function orionBudget(): Budget {
 }
 
 export function emptyBudget(): Budget {
-  return { income: 0, paychecks: 2, investing: 0, steps: [], categories: [] }
+  return { gross: 0, bonus: 0, paycheck: 0, cadence: 'semimonthly', investing: 0, steps: [], categories: [] }
 }
 
 // ---------------------------------------------------------------- the sums
@@ -100,18 +116,40 @@ export function categoryTotal(c: Category): number {
   return c.items.length ? sum(c.items.map((i) => i.amount)) : c.amount
 }
 
+export const paychecksPerYear = (b: Budget) => CADENCES.find((c) => c.id === b.cadence)?.perYear ?? 24
+
+/** 2 for twice a month; 26 ÷ 12 for every two weeks, an average across the year. */
+export const paychecksPerMonth = (b: Budget) => paychecksPerYear(b) / 12
+
+/** The month's income: the net paycheck times the paychecks in a year, spread over twelve months. */
+export function monthlyIncome(b: Budget): number {
+  return roundCents((b.paycheck * paychecksPerYear(b)) / 12)
+}
+
+/** Net pay over a year, the bonus aside. */
+export function takeHomeYear(b: Budget): number {
+  return roundCents(b.paycheck * paychecksPerYear(b))
+}
+
+/** Take-home as a fraction of gross income; null until there's a gross income. */
+export function takeHomeShare(b: Budget): number | null {
+  return b.gross > 0 ? takeHomeYear(b) / b.gross : null
+}
+
 export function living(b: Budget): number {
-  return roundCents(b.income - b.investing)
+  return roundCents(monthlyIncome(b) - b.investing)
 }
 
 /** Investing and Living as fractions of income, 0 when there's no income yet. */
 export function shares(b: Budget): { investing: number; living: number } {
-  if (b.income <= 0) return { investing: 0, living: 0 }
-  return { investing: b.investing / b.income, living: living(b) / b.income }
+  const income = monthlyIncome(b)
+  if (income <= 0) return { investing: 0, living: 0 }
+  return { investing: b.investing / income, living: living(b) / income }
 }
 
-export function perPaycheck(b: Budget, monthly = b.income): number {
-  return roundCents(monthly / Math.max(1, b.paychecks))
+/** A monthly amount per paycheck. */
+export function perPaycheck(b: Budget, monthly = monthlyIncome(b)): number {
+  return roundCents(monthly / paychecksPerMonth(b))
 }
 
 export function expensesTotal(b: Budget): number {
@@ -129,7 +167,7 @@ export function livingLeft(b: Budget): number {
  * ask for more than the paycheck).
  */
 export function paycheckRun(b: Budget): { start: number; after: number[]; leftOver: number } {
-  const start = perPaycheck(b)
+  const start = b.paycheck
   let left = start
   const after = b.steps.map((s) => (left = roundCents(left - s.amount)))
   return { start, after, leftOver: left }
@@ -137,7 +175,19 @@ export function paycheckRun(b: Budget): { start: number; after: number[]; leftOv
 
 // --------------------------------------------------------------- the edits
 
-export const setIncome = (b: Budget, income: number): Budget => ({ ...b, income: Math.max(0, roundCents(income)) })
+/** Amounts are never negative and never hold fractions of a cent. */
+const dollars = (n: number) => Math.max(0, roundCents(n))
+
+export const setGross = (b: Budget, gross: number): Budget => ({ ...b, gross: dollars(gross) })
+
+export const setBonus = (b: Budget, bonus: number): Budget => ({ ...b, bonus: dollars(bonus) })
+
+/** The bonus as a share of gross income. */
+export const setBonusShare = (b: Budget, share: number): Budget => setBonus(b, b.gross * Math.max(0, share))
+
+export const setPaycheck = (b: Budget, paycheck: number): Budget => ({ ...b, paycheck: dollars(paycheck) })
+
+export const setCadence = (b: Budget, cadence: Cadence): Budget => (isCadence(cadence) ? { ...b, cadence } : b)
 
 export const setInvesting = (b: Budget, investing: number): Budget => ({
   ...b,
@@ -145,18 +195,13 @@ export const setInvesting = (b: Budget, investing: number): Budget => ({
 })
 
 /** Living is the rest of income, so setting it moves Investing. */
-export const setLiving = (b: Budget, amount: number): Budget => setInvesting(b, b.income - Math.max(0, amount))
+export const setLiving = (b: Budget, amount: number): Budget => setInvesting(b, monthlyIncome(b) - Math.max(0, amount))
 
 export const setInvestingShare = (b: Budget, share: number): Budget =>
-  setInvesting(b, b.income * Math.min(1, Math.max(0, share)))
+  setInvesting(b, monthlyIncome(b) * Math.min(1, Math.max(0, share)))
 
 export const setLivingShare = (b: Budget, share: number): Budget =>
   setInvestingShare(b, 1 - Math.min(1, Math.max(0, share)))
-
-export const setPaychecks = (b: Budget, paychecks: number): Budget => ({
-  ...b,
-  paychecks: Math.min(MAX_PAYCHECKS, Math.max(1, Math.round(paychecks))),
-})
 
 // Steps
 
@@ -264,7 +309,12 @@ const idOf = (v: unknown, seen: Set<string>) => {
 export function normalizeBudget(raw: unknown): Budget | null {
   if (!isObject(raw)) return null
   const seen = new Set<string>()
-  const paychecks = typeof raw.paychecks === 'number' && Number.isFinite(raw.paychecks) ? raw.paychecks : 2
+  // The first version kept a monthly income and a count of paychecks a month
+  // instead of the paycheck and its cadence; the month's income carries over.
+  const perMonth = typeof raw.paychecks === 'number' && Number.isFinite(raw.paychecks) ? Math.round(raw.paychecks) : 2
+  const cadence: Cadence = isCadence(raw.cadence) ? raw.cadence : perMonth <= 1 ? 'monthly' : perMonth === 2 ? 'semimonthly' : 'weekly'
+  const perYear = CADENCES.find((c) => c.id === cadence)!.perYear
+  const paycheck = 'paycheck' in raw ? amountOf(raw.paycheck) : roundCents((amountOf(raw.income) * 12) / perYear)
 
   const steps: Step[] = (Array.isArray(raw.steps) ? raw.steps : []).filter(isObject).map((s) => ({
     id: idOf(s.id, seen),
@@ -286,8 +336,10 @@ export function normalizeBudget(raw: unknown): Budget | null {
   )
 
   return {
-    income: amountOf(raw.income),
-    paychecks: Math.min(MAX_PAYCHECKS, Math.max(1, Math.round(paychecks))),
+    gross: amountOf(raw.gross),
+    bonus: amountOf(raw.bonus),
+    paycheck,
+    cadence,
     investing: amountOf(raw.investing),
     steps,
     categories,
