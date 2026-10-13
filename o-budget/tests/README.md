@@ -10,8 +10,9 @@ node tests/smoke.mjs
 ```
 
 It opens on the budget as written down and checks every number: $3,900 twice
-a month making $7,800, the split, the expenses $53 over Living and the
-paycheck run down to $95. Then it takes a raise and puts it back, tries every
+a month making $7,800, the split, the expenses $53 over Living, the 401k
+coming out before the paycheck and the run down to $500. It switches the 401k
+to come out of the paycheck and back. Then it takes a raise and puts it back, tries every
 2 weeks and once a month, fills in gross income and a bonus by dollars and by
 percent, splits by percent, by the slider and by the Living amount, ticks off a payday
 and starts the next one, edits, moves and adds steps (and closes a blank

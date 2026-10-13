@@ -15,12 +15,13 @@ It opens on the budget as written down:
 | Gross pay | gross income and bonus, a year, to fill in |
 | Investing | $4,000 (51.3%) |
 | Living | $3,800 (48.7%) |
-| Paycheck process | 0 — $405 into the 401k · 1 — $1,500 into VTI · 2 — $1,900 for the next 2 weeks |
+| Paycheck process | 0 — $405 into the 401k, before the paycheck lands · 1 — $1,500 into VTI · 2 — $1,900 for the next 2 weeks |
 | Living expenses | Rent, utils, park $1,380 · STNDRD $1,000 · Car $250 · Subscriptions $223 (RCF, Cap Hill Fitness, Claude, HBO, Spotify, iCloud, NFL, Soundcloud, WSJ, Chase) · Food $800 · Haircut $100 · Medical $100 |
 
 Two things the app shows that the note didn't add up: the expenses come to
-**$3,853**, not $3,740, which is **$53 more than Living**; and the three steps
-use $3,805 of each $3,900 paycheck, leaving **$95** that no step accounts for.
+**$3,853**, not $3,740, which is **$53 more than Living**; and with the 401k
+taken out before the paycheck, VTI and the next two weeks use $3,400 of each
+$3,900 paycheck, leaving **$500** that no step accounts for.
 
 ## Installing it on an iPhone
 
@@ -66,7 +67,9 @@ monthly income, which runs on the paycheck.
 
 **Paycheck process.** The steps to run each payday, numbered from 0 the way
 the note numbers them, starting from the paycheck and ending with what's left
-over. Under each step is what's left of the paycheck after it. Tap a step's
+over. Under each step is what's left of the paycheck after it. A step can be
+marked as coming out before the paycheck, like the 401k: it sits above
+"Paycheck lands" with a dashed ring, and the paycheck doesn't pay for it. Tap a step's
 circle to tick it off; **Start next paycheck** clears the ticks. Tap the step
 itself to change its words and amount, move it earlier or later, or delete
 it. A step that asks for more than is left shows the paycheck as short.
@@ -103,7 +106,7 @@ step or category that's closed while still blank isn't kept.
 - Gross income and bonus are a year and stay out of the monthly income.
   Take-home is a year of net paychecks as a share of gross income.
 - The paycheck process starts from one paycheck and takes each step's amount
-  off in order.
+  off in order, except the steps that come out before the paycheck.
 - Amounts keep cents when they have them ($4.99) and round to the cent.
 
 ## Where it's saved
@@ -111,7 +114,9 @@ step or category that's closed while still blank isn't kept.
 In the installed app, in the phone's `localStorage` under `o-budget.state`,
 written a moment after each change and straight away when the app is put
 away. A budget saved by the first version, which kept a monthly income,
-opens unchanged: its paycheck is worked back from that income. In the artifact, in the artifact's database as the document
+opens unchanged: its paycheck is worked back from that income. In a budget
+saved before steps could be marked as coming out before the paycheck, a 401k
+step is moved there. In the artifact, in the artifact's database as the document
 `budget/main`, with a copy in the browser. Edits show at once and are written
 one at a time; a change made on another device shows up unless an edit made
 here is still on its way. The header says where the budget is saved.

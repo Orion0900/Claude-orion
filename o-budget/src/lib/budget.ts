@@ -28,6 +28,11 @@ export interface Step {
   amount: number
   /** Ticked off for the paycheck in hand. */
   done: boolean
+  /**
+   * Taken out before the paycheck lands, like a 401k contribution: listed
+   * first, and not taken from the net paycheck.
+   */
+  beforePay: boolean
 }
 
 /** How often the paycheck comes. */
@@ -68,7 +73,7 @@ const category = (name: string, amount: number, items: Item[] = []): Category =>
   note: '',
   items,
 })
-const step = (text: string, amount: number): Step => ({ id: newId(), text, amount, done: false })
+const step = (text: string, amount: number, beforePay = false): Step => ({ id: newId(), text, amount, done: false, beforePay })
 
 /** Orion's budget as written down: $7,800 a month in two paychecks of $3,900. */
 export function orionBudget(): Budget {
@@ -78,7 +83,7 @@ export function orionBudget(): Budget {
     paycheck: 3900,
     cadence: 'semimonthly',
     investing: 4000,
-    steps: [step('Goes into 401k', 405), step('Invest in VTI', 1500), step('Remains for 2 wks', 1900)],
+    steps: [step('Goes into 401k', 405, true), step('Invest in VTI', 1500), step('Remains for 2 wks', 1900)],
     categories: [
       category('Rent, utils, park', 1380),
       category('STNDRD', 1000),
@@ -163,13 +168,14 @@ export function livingLeft(b: Budget): number {
 
 /**
  * The paycheck as it's worked through: what it starts at, what's left after
- * each step in order, and what no step accounts for (negative when the steps
- * ask for more than the paycheck).
+ * each step in order (null for a step taken out before the paycheck, which
+ * doesn't come out of it), and what no step accounts for (negative when the
+ * steps ask for more than the paycheck).
  */
-export function paycheckRun(b: Budget): { start: number; after: number[]; leftOver: number } {
+export function paycheckRun(b: Budget): { start: number; after: (number | null)[]; leftOver: number } {
   const start = b.paycheck
   let left = start
-  const after = b.steps.map((s) => (left = roundCents(left - s.amount)))
+  const after = b.steps.map((s) => (s.beforePay ? null : (left = roundCents(left - s.amount))))
   return { start, after, leftOver: left }
 }
 
@@ -217,17 +223,33 @@ export const updateStep = (b: Budget, id: string, patch: Partial<Omit<Step, 'id'
 
 export const removeStep = (b: Budget, id: string): Budget => ({ ...b, steps: b.steps.filter((s) => s.id !== id) })
 
+/** Steps taken out before the paycheck come first, each group in its own order. */
+const grouped = (steps: Step[]): Step[] => [...steps.filter((s) => s.beforePay), ...steps.filter((s) => !s.beforePay)]
+
+/** Whether a step can move one place earlier (-1) or later (+1): only among steps on the same side of payday. */
+export function canMoveStep(b: Budget, id: string, by: -1 | 1): boolean {
+  const from = b.steps.findIndex((s) => s.id === id)
+  const neighbour = b.steps[from + by]
+  return from >= 0 && neighbour !== undefined && neighbour.beforePay === b.steps[from].beforePay
+}
+
 /** Moves a step one place earlier (-1) or later (+1) in the order. */
 export function moveStep(b: Budget, id: string, by: -1 | 1): Budget {
+  if (!canMoveStep(b, id, by)) return b
   const from = b.steps.findIndex((s) => s.id === id)
   const to = from + by
-  if (from < 0 || to < 0 || to >= b.steps.length) return b
   const steps = [...b.steps]
   ;[steps[from], steps[to]] = [steps[to], steps[from]]
   return { ...b, steps }
 }
 
 export const toggleStep = (b: Budget, id: string): Budget => updateStep(b, id, { done: !b.steps.find((s) => s.id === id)?.done })
+
+/** Marks a step as taken out before the paycheck (or not), moving it to that side of payday. */
+export const setStepBeforePay = (b: Budget, id: string, beforePay: boolean): Budget => ({
+  ...b,
+  steps: grouped(b.steps.map((s) => (s.id === id ? { ...s, beforePay } : s))),
+})
 
 /** Clears the ticks for the next paycheck. */
 export const resetSteps = (b: Budget): Budget => ({ ...b, steps: b.steps.map((s) => (s.done ? { ...s, done: false } : s)) })
@@ -316,12 +338,18 @@ export function normalizeBudget(raw: unknown): Budget | null {
   const perYear = CADENCES.find((c) => c.id === cadence)!.perYear
   const paycheck = 'paycheck' in raw ? amountOf(raw.paycheck) : roundCents((amountOf(raw.income) * 12) / perYear)
 
-  const steps: Step[] = (Array.isArray(raw.steps) ? raw.steps : []).filter(isObject).map((s) => ({
-    id: idOf(s.id, seen),
-    text: textOf(s.text),
-    amount: amountOf(s.amount),
-    done: s.done === true,
-  }))
+  // Before version 3 there was no way to mark a step as coming out before
+  // the paycheck, and the 401k was taken from it; it comes out before.
+  const version = typeof raw.version === 'number' ? raw.version : 1
+  const steps: Step[] = grouped(
+    (Array.isArray(raw.steps) ? raw.steps : []).filter(isObject).map((s) => ({
+      id: idOf(s.id, seen),
+      text: textOf(s.text),
+      amount: amountOf(s.amount),
+      done: s.done === true,
+      beforePay: version < 3 ? /\b401\s*\(?k\)?/i.test(textOf(s.text)) : s.beforePay === true,
+    })),
+  )
 
   const categories: Category[] = (Array.isArray(raw.categories) ? raw.categories : []).filter(isObject).map((c) =>
     settle({
