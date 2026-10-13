@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { setProjection, type Budget } from '../lib/budget'
+import { beforePayMonthly, setProjection, type Budget } from '../lib/budget'
 import { money } from '../lib/money'
 import { compactMoney, MAX_RATE, MAX_YEARS, niceTicks, project, type ProjectionPoint } from '../lib/projection'
 import { MoneyInput, PercentInput } from './Fields'
@@ -15,6 +15,7 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
   const points = project(p)
   const last = points[points.length - 1]
   const set = (patch: Partial<typeof p>) => update((x) => setProjection(x, patch))
+  const k401Steps = beforePayMonthly(b)
 
   return (
     <section className="section projection" aria-labelledby="projection-title">
@@ -34,12 +35,16 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
           <MoneyInput id="proj-monthly" className="well-money" value={p.monthly} label="Added each month" onChange={(n) => set({ monthly: n })} />
         </div>
         <div className="pay-field">
+          <span className="field-label">401k each month</span>
+          <MoneyInput id="proj-401k" className="well-money" value={p.k401} label="401k each month" onChange={(n) => set({ k401: n })} />
+        </div>
+        <div className="pay-field">
           <span className="field-label">Return a year</span>
           <span className="well-money pct-well">
             <PercentInput id="proj-rate" value={p.rate} max={MAX_RATE} label="Yearly return, percent" onChange={(n) => set({ rate: n })} />
           </span>
         </div>
-        <label className="pay-field">
+        <label className="pay-field years-field">
           <span className="field-label">
             Years <span className="num">{p.years}</span>
           </span>
@@ -57,6 +62,11 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
       {p.monthly !== b.investing && b.investing > 0 && (
         <button type="button" className="link-btn" onClick={() => set({ monthly: b.investing })}>
           Use the Investing amount, {money(b.investing)} a month
+        </button>
+      )}
+      {p.k401 !== k401Steps && k401Steps > 0 && (
+        <button type="button" className="link-btn" onClick={() => set({ k401: k401Steps })}>
+          Use the paycheck's 401k, {money(k401Steps)} a month
         </button>
       )}
 

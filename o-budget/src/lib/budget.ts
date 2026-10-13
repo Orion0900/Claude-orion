@@ -107,7 +107,7 @@ export function orionBudget(): Budget {
       category('Haircut', 100),
       category('Medical', 100),
     ],
-    projection: { start: 0, monthly: 4000, rate: 0.07, years: 30 },
+    projection: { start: 0, monthly: 4000, k401: 810, rate: 0.07, years: 30 },
   }
 }
 
@@ -120,7 +120,7 @@ export function emptyBudget(): Budget {
     investing: 0,
     steps: [],
     categories: [],
-    projection: { start: 0, monthly: 0, rate: 0.07, years: 30 },
+    projection: { start: 0, monthly: 0, k401: 0, rate: 0.07, years: 30 },
   }
 }
 
@@ -384,14 +384,24 @@ export function normalizeBudget(raw: unknown): Budget | null {
     investing: amountOf(raw.investing),
     steps,
     categories,
-    // Saves from before the projection start it off contributing the Investing amount.
-    projection: normalizeProjection(raw.projection, amountOf(raw.investing)),
+    // Saves from before the projection start it off contributing the Investing
+    // amount, and the steps taken out before the paycheck as the 401k.
+    projection: normalizeProjection(
+      raw.projection,
+      amountOf(raw.investing),
+      roundCents(sum(steps.filter((s) => s.beforePay).map((s) => s.amount)) * (perYear / 12)),
+    ),
   }
+}
+
+/** A month of the steps taken out before the paycheck, like the 401k. */
+export function beforePayMonthly(b: Budget): number {
+  return roundCents(sum(b.steps.filter((s) => s.beforePay).map((s) => s.amount)) * paychecksPerMonth(b))
 }
 
 export const setProjection = (b: Budget, patch: Partial<Projection>): Budget => ({
   ...b,
-  projection: normalizeProjection({ ...b.projection, ...patch }, b.projection.monthly),
+  projection: normalizeProjection({ ...b.projection, ...patch }, b.projection.monthly, b.projection.k401),
 })
 
 /** Same numbers, names and order: a copy that changes nothing on screen. */

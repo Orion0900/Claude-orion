@@ -1471,7 +1471,12 @@ output.hero-money {
   accent-color: var(--invest);
 }
 
+.years-field {
+  grid-column: 1 / -1;
+}
+
 .link-btn {
+  display: block;
   margin-top: 10px;
   padding: 6px 0;
   border: 0;
