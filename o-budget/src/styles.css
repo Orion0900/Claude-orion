@@ -239,20 +239,30 @@ h3 {
   order: 1;
 }
 
-.layout .gross {
+.layout .self-invest {
   order: 2;
 }
 
-.layout .process {
+.layout .gross {
   order: 3;
 }
 
-.layout .expenses {
+.layout .process {
   order: 4;
 }
 
-.layout .projection {
+.layout .expenses {
   order: 5;
+}
+
+.layout .projection {
+  order: 6;
+}
+
+/* Self investment is paid from Investing, so it's drawn in Investing's color. */
+.self-invest .meter-fill,
+.self-invest .bar-fill {
+  background: var(--invest);
 }
 
 @media (min-width: 900px) {

@@ -16,11 +16,11 @@ describe('project', () => {
     expect(project({ start: 10000, monthly: 0, k401: 0, rate: 0.12, years: 1 })[1].value).toBe(11268.25)
   })
 
-  it("projects Orion's $4,000 a month plus $810 into the 401k at 7% for 30 years", () => {
+  it("projects Orion's $3,000 a month plus $810 into the 401k at 7% for 30 years", () => {
     const last = project(orionBudget().projection).at(-1)!
-    expect(last.contributed).toBe(1731600)
+    expect(last.contributed).toBe(1371600)
     const without401k = project({ ...orionBudget().projection, k401: 0 }).at(-1)!
-    expect(without401k.contributed).toBe(1440000)
+    expect(without401k.contributed).toBe(1080000)
     expect(last.value).toBeGreaterThan(without401k.value)
   })
 
@@ -39,7 +39,7 @@ describe('projection settings', () => {
 
   it('keeps settings in range', () => {
     const b = setProjection(orionBudget(), { rate: 2, years: 500, start: -5 })
-    expect(b.projection).toEqual({ start: 0, monthly: 4000, k401: 810, rate: 0.3, years: 60 })
+    expect(b.projection).toEqual({ start: 0, monthly: 3000, k401: 810, rate: 0.3, years: 60 })
     expect(setProjection(b, { years: 0 }).projection.years).toBe(1)
   })
 })

@@ -2,7 +2,7 @@ import { money } from '../lib/money'
 import { AlertIcon, OkIcon } from './Icons'
 
 /** How Living compares with the expenses: over, to spare, or exactly on. Icon and words, never color alone. */
-export function StatusPill({ left }: { left: number }) {
+export function StatusPill({ left, spare = 'to spare' }: { left: number; spare?: string }) {
   if (left < 0) {
     return (
       <span className="pill over">
@@ -14,7 +14,7 @@ export function StatusPill({ left }: { left: number }) {
   return (
     <span className="pill good">
       <OkIcon />
-      <span className="num">{left === 0 ? 'Right on budget' : `${money(left)} to spare`}</span>
+      <span className="num">{left === 0 ? 'Right on budget' : `${money(left)} ${spare}`}</span>
     </span>
   )
 }

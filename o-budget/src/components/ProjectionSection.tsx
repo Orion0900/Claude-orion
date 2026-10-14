@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { beforePayMonthly, setProjection, type Budget } from '../lib/budget'
+import { beforePayMonthly, marketInvesting, setProjection, type Budget } from '../lib/budget'
 import { money } from '../lib/money'
 import { compactMoney, MAX_RATE, MAX_YEARS, niceTicks, project, type ProjectionPoint } from '../lib/projection'
 import { MoneyInput, PercentInput } from './Fields'
@@ -16,6 +16,8 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
   const last = points[points.length - 1]
   const set = (patch: Partial<typeof p>) => update((x) => setProjection(x, patch))
   const k401Steps = beforePayMonthly(b)
+  // Self investment comes out of Investing but doesn't grow with the markets.
+  const markets = marketInvesting(b)
 
   return (
     <section className="section projection" aria-labelledby="projection-title">
@@ -59,9 +61,9 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
           />
         </label>
       </div>
-      {p.monthly !== b.investing && b.investing > 0 && (
-        <button type="button" className="link-btn" onClick={() => set({ monthly: b.investing })}>
-          Use the Investing amount, {money(b.investing)} a month
+      {p.monthly !== markets && markets > 0 && (
+        <button type="button" className="link-btn" onClick={() => set({ monthly: markets })}>
+          Use Investing less self investment, {money(markets)} a month
         </button>
       )}
       {p.k401 !== k401Steps && k401Steps > 0 && (

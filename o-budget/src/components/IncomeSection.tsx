@@ -3,6 +3,8 @@ import {
   CADENCES,
   living,
   livingLeft,
+  marketInvesting,
+  selfTotal,
   monthlyIncome,
   paychecksPerYear,
   perPaycheck,
@@ -41,6 +43,7 @@ const wholeDollars = (n: number) => money(Math.round(n))
  */
 export function IncomeSection({ budget: b, update }: { budget: Budget; update: Update }) {
   const income = monthlyIncome(b)
+  const self = selfTotal(b)
   const livingAmount = living(b)
   const split = shares(b)
   const hasIncome = income > 0
@@ -120,6 +123,11 @@ export function IncomeSection({ budget: b, update }: { budget: Budget; update: U
             <span>of income</span>
           </div>
           <div className="bucket-line num">{wholeDollars(perPaycheck(b, b.investing))} a paycheck</div>
+          {self > 0 && (
+            <div className="bucket-line num">
+              {money(self)} self · {money(marketInvesting(b))} markets
+            </div>
+          )}
         </div>
 
         <div className="bucket living">

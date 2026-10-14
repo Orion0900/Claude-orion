@@ -7,10 +7,10 @@ import { normalizeBudget, type Budget } from './budget'
 
 export const STORAGE_KEY = 'o-budget.state'
 /**
- * 3 marks steps taken out before the paycheck; 2 added the paycheck and its
+ * 4 adds self investment, paid from Investing; 3 marks steps taken out before the paycheck; 2 added the paycheck and its
  * cadence; 1 kept a monthly income.
  */
-export const STORAGE_VERSION = 3
+export const STORAGE_VERSION = 4
 
 export interface KeyValueStore {
   getItem(key: string): string | null
