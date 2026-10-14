@@ -42,7 +42,7 @@ await shot(page, '01-open', true)
 assert.equal(await income(page), '7,800')
 assert.equal(await value(page, '#paycheck'), '3,900')
 assert.equal(await value(page, '#cadence'), 'semimonthly')
-assert.equal(await text(page, '.pay-note'), '24 paychecks a year · $93,600 take-home')
+assert.match(await text(page, '.pay-note'), /^24 paychecks a year · \$93,600 take-home/)
 assert.match(await text(page, '.bucket.invest'), /INVESTING\s+\$3,900\s+50% of income\s+\$2,900 markets · \$1,000 self/)
 assert.match(await text(page, '.bucket.living'), /LIVING\s+\$3,053\s+39\.1% of income\s+\$2,053 fixed · \$1,000 variable/)
 assert.match(await text(page, '.left-line'), /\$847 left over, unplanned/)
@@ -52,17 +52,14 @@ assert.equal(await text(page, '.sync'), 'Saved on this device')
 // Each paycheck: the rules, then every dollar in order.
 assert.deepEqual(await page.locator('.rules li').allInnerTexts(), [
   '$1,450 into VTI the day it lands.',
-  'Chase Sapphire for fixed bills only, $2,053 a month.',
+  'Chase Sapphire for fixed bills and STNDRD, $3,053 a month.',
   "Amazon card for everything variable (food, gas, random), $1,000 a month. It's the only one to watch.",
 ])
-assert.deepEqual(await page.locator('.step-text').allInnerTexts(), [
-  '401k',
-  'Deposit into VTI',
-  'Pay STNDRD',
-  'Set aside for Chase Sapphire',
-  'Set aside for Amazon card',
-])
-assert.deepEqual(await page.locator('.steps .step-amount').allInnerTexts(), ['$405', '$3,900', '$1,450', '$500', '$1,027', '$500', '$423'])
+// The paycheck starts the run; the 401k is out before it, noted under the paycheck.
+assert.deepEqual(await page.locator('.step-text').allInnerTexts(), ['Deposit into VTI', 'Set aside for Chase Sapphire', 'Set aside for Amazon card'])
+assert.deepEqual(await page.locator('.steps .step-amount').allInnerTexts(), ['$3,900', '$1,450', '$1,527', '$500', '$423'])
+assert.match(await text(page, '.step >> nth=1'), /plus STNDRD/)
+assert.match(await text(page, '.pay-note'), /After \$405 into the 401k, taken out before each paycheck/)
 assert.match(await text(page, '.step-edge.end'), /Left in checking\s+\$423/)
 
 // A raise lands in checking.
@@ -76,8 +73,8 @@ await enter(page, '#paycheck', '3900')
 // Every two weeks: 26 paychecks a year, averaged over the months.
 await page.selectOption('#cadence', 'biweekly')
 assert.equal(await income(page), '8,450')
-assert.equal(await text(page, '.pay-note'), '26 paychecks a year · $101,400 take-home')
-assert.match(await text(page, '.step >> nth=1'), /Deposit into VTI\s+\$1,338/)
+assert.match(await text(page, '.pay-note'), /^26 paychecks a year · \$101,400 take-home/)
+assert.match(await text(page, '.step >> nth=0'), /Deposit into VTI\s+\$1,338/)
 await page.selectOption('#cadence', 'monthly')
 assert.equal(await income(page), '3,900')
 assert.match(await text(page, '.left-line.short'), /\$3,053 more planned than comes in/)
@@ -87,8 +84,8 @@ assert.equal(await income(page), '7,800')
 // Payday: tick the rows off, then clear them for next time.
 await page.tap('.step-check >> nth=0')
 await page.tap('.step-check >> nth=1')
-assert.equal(await text(page, '.progress'), '2 of 5 done')
-for (const n of [2, 3, 4]) await page.tap(`.step-check >> nth=${n}`)
+assert.equal(await text(page, '.progress'), '2 of 3 done')
+await page.tap('.step-check >> nth=2')
 assert.equal(await text(page, '.progress'), 'All done')
 await shot(page, '02-all-done')
 await page.tap('.btn >> text=Start next paycheck')
@@ -111,7 +108,7 @@ await enter(page, '#spent', '400')
 // The cards can be renamed, and the plan follows.
 await page.locator('#card-variable').fill('Prime Visa')
 assert.match(await text(page, '#card-title'), /Prime Visa check-in/i)
-assert.match(await text(page, '.step >> nth=4'), /Set aside for Prime Visa/)
+assert.match(await text(page, '.step >> nth=2'), /Set aside for Prime Visa/)
 await page.locator('#card-variable').fill('Amazon card')
 
 // Investing and Living in detail.
@@ -153,7 +150,7 @@ await page.locator('#category-note').fill('Spotify renews on the 3rd')
 await page.keyboard.press('Escape')
 await page.waitForSelector('.sheet', { state: 'detached' })
 assert.equal(await text(page, '.part-fixed .part-total'), '$2,069')
-assert.match(await text(page, '.step >> nth=3'), /Set aside for Chase Sapphire\s+\$1,035/)
+assert.match(await text(page, '.step >> nth=1'), /Set aside for Chase Sapphire\s+\$1,535/)
 
 // Break a plain category down without its total jumping.
 await page.tap('.cat >> text="Car"')
@@ -229,7 +226,8 @@ await enter(page, '#bonus-pct', '10')
 assert.equal(await value(page, '#bonus'), '12,000')
 assert.equal(await income(page), '7,800')
 await enter(page, '#k401', '500')
-assert.match(await text(page, '.step >> nth=0'), /401k\s+\$500/)
+assert.match(await text(page, '.pay-note'), /After \$500 into the 401k/)
+assert.equal(await page.locator('.step-text').count(), 3)
 assert.match(await text(page, '.link-btn'), /Use the paycheck's 401k, \$1,000 a month/)
 await enter(page, '#k401', '405')
 assert.match(await text(page, '.step-edge.end'), /Left in checking\s+\$390/)

@@ -74,6 +74,12 @@ export function Overview({ budget: b, update }: { budget: Budget; update: Update
       </div>
       <p className="pay-note num">
         {paychecksPerYear(b)} paychecks a year · {money(takeHomeYear(b))} take-home
+        {b.k401 > 0 && (
+          <>
+            <br />
+            After {money(b.k401)} into the 401k, taken out before each paycheck
+          </>
+        )}
       </p>
 
       <div
