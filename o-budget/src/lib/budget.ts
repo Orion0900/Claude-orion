@@ -4,8 +4,8 @@
  * four places:
  *
  * - Investing, markets: like VTI, deposited each paycheck.
- * - Investing, self investment: like STNDRD, paid from Investing but not
- *   grown by the projection.
+ * - Investing, self investment: like STNDRD, counted in Investing but not
+ *   grown by the projection, and pulled from the fixed card.
  * - Living, fixed: bills that are the same each month, all on one card.
  * - Living, variable: food, gas and the rest, all on another card, checked
  *   against a monthly budget.
@@ -205,32 +205,34 @@ export interface PlanRow {
   label: string
   detail: string
   amount: number
-  bucket: Bucket | 'before'
+  bucket: Bucket
 }
 
 const names = (cs: Category[]) => cs.map((c) => c.name.trim() || 'Untitled').join(', ')
 
 /**
- * Where each paycheck goes, in order: the 401k before it lands, then each
- * investment, then what to set aside for each card's bill, and what's left.
+ * Where each paycheck goes once it lands, in order: each investment, then
+ * what to set aside for each card's bill, and what's left. Self investment
+ * like STNDRD is pulled from the fixed card, so it's set aside with the
+ * fixed bills. The 401k is out before the paycheck and isn't part of it.
  */
-export function paycheckPlan(b: Budget): { rows: PlanRow[]; start: number; after: (number | null)[]; leftOver: number } {
+export function paycheckPlan(b: Budget): { rows: PlanRow[]; start: number; after: number[]; leftOver: number } {
   // Whole dollars, so the rows and what's left add up to the paycheck exactly.
   const each = (monthly: number) => Math.round(perPaycheck(b, monthly))
   const rows: PlanRow[] = []
-  if (b.k401 > 0) rows.push({ key: 'k401', label: '401k', detail: 'Out before the paycheck lands', amount: b.k401, bucket: 'before' })
   for (const c of inBucket(b, 'invest'))
     rows.push({ key: c.id, label: `Deposit into ${c.name.trim() || 'investing'}`, detail: 'Investing', amount: each(categoryTotal(c)), bucket: 'invest' })
-  for (const c of inBucket(b, 'self'))
-    rows.push({ key: c.id, label: `Pay ${c.name.trim() || 'self investment'}`, detail: 'Self investment', amount: each(categoryTotal(c)), bucket: 'self' })
   const fixed = inBucket(b, 'fixed')
-  if (fixed.length)
-    rows.push({ key: 'fixed', label: `Set aside for ${b.cards.fixed}`, detail: `Fixed: ${names(fixed)}`, amount: each(bucketTotal(b, 'fixed')), bucket: 'fixed' })
+  const self = inBucket(b, 'self')
+  if (fixed.length || self.length) {
+    const parts = [fixed.length ? `Fixed: ${names(fixed)}` : '', self.length ? `${fixed.length ? 'plus ' : ''}${names(self)}` : ''].filter(Boolean)
+    rows.push({ key: 'fixed', label: `Set aside for ${b.cards.fixed}`, detail: parts.join(', '), amount: each(bucketTotal(b, 'fixed', 'self')), bucket: 'fixed' })
+  }
   const variable = inBucket(b, 'variable')
   if (variable.length)
     rows.push({ key: 'variable', label: `Set aside for ${b.cards.variable}`, detail: `Variable: ${names(variable)}`, amount: each(bucketTotal(b, 'variable')), bucket: 'variable' })
   let left = b.paycheck
-  const after = rows.map((r) => (r.bucket === 'before' ? null : (left = roundCents(left - r.amount))))
+  const after = rows.map((r) => (left = roundCents(left - r.amount)))
   return { rows, start: b.paycheck, after, leftOver: left }
 }
 

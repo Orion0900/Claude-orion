@@ -3,7 +3,7 @@
 Orion's budget as an app, built around a budgeting system that runs itself:
 
 1. **$1,450 straight into VTI** every paycheck.
-2. **Chase Sapphire for fixed expenses only.**
+2. **Chase Sapphire for fixed expenses**, and STNDRD is pulled from it too.
 3. **The Amazon card for everything variable** (food, gas, random), $1,000 a
    month. It's the only account to watch.
 
@@ -20,7 +20,7 @@ It opens on the budget as written down:
 | Living, fixed (Chase Sapphire) | $2,053: Rent, utils, park $1,380 · Car $250 · Subscriptions $223 (10 items) · Haircut $100 · Medical $100 |
 | Living, variable (Amazon card) | $1,000: Food $600 · Gas $150 · Random $250 |
 | Left over | $847 a month |
-| Each paycheck | 401k $405 before it lands · VTI $1,450 · STNDRD $500 · set aside $1,027 for Chase · $500 for Amazon · $423 stays in checking |
+| Each paycheck | $3,900 lands · VTI $1,450 · set aside $1,527 for Chase (fixed + STNDRD) · $500 for Amazon · $423 stays in checking |
 
 ## Installing it on an iPhone
 
@@ -57,8 +57,10 @@ hatched for what's left over. Tap the Investing or Living tile to jump to its
 detail.
 
 **Each paycheck.** The three rules of the system, then the paycheck dollar by
-dollar: the 401k before it lands, each investment, what to set aside for each
-card's bill, and what stays in checking. It's built from the categories, so
+dollar from the moment it lands: each investment, what to set aside for each
+card's bill (self investment like STNDRD is pulled from the fixed card, so
+it's set aside with the fixed bills), and what stays in checking. The 401k
+comes out before the paycheck, so it's noted under the net paycheck instead. It's built from the categories, so
 it always matches the budget. Tick rows off on payday; **Start next
 paycheck** clears them.
 

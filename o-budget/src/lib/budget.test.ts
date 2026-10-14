@@ -86,17 +86,16 @@ describe("Orion's budget", () => {
 })
 
 describe('paycheck plan', () => {
-  it('runs the 401k before the paycheck, then VTI, STNDRD and each card', () => {
+  it('starts at the paycheck: VTI, then each card, with STNDRD on the fixed card', () => {
     const plan = paycheckPlan(orionBudget())
     expect(plan.rows.map((r) => [r.label, r.amount, r.bucket])).toEqual([
-      ['401k', 405, 'before'],
       ['Deposit into VTI', 1450, 'invest'],
-      ['Pay STNDRD', 500, 'self'],
-      ['Set aside for Chase Sapphire', 1027, 'fixed'],
+      ['Set aside for Chase Sapphire', 1527, 'fixed'],
       ['Set aside for Amazon card', 500, 'variable'],
     ])
+    expect(plan.rows[1].detail).toBe('Fixed: Rent, utils, park, Car, Subscriptions, Haircut, Medical, plus STNDRD')
     expect(plan.start).toBe(3900)
-    expect(plan.after).toEqual([null, 2450, 1950, 923, 423])
+    expect(plan.after).toEqual([2450, 923, 423])
     expect(plan.leftOver).toBe(423)
   })
 
@@ -118,15 +117,15 @@ describe('paycheck plan', () => {
     expect(plan.leftOver).toBe(-477)
   })
 
-  it('leaves out the 401k when there is none', () => {
-    expect(paycheckPlan(setK401(orionBudget(), 0)).rows[0].key).not.toBe('k401')
+  it('leaves the 401k out: it comes out before the paycheck', () => {
+    expect(paycheckPlan(orionBudget()).rows.some((r) => r.label.includes('401k'))).toBe(false)
   })
 
   it('ticks rows off and clears them for the next paycheck', () => {
-    let b = togglePaid(orionBudget(), 'k401')
+    let b = togglePaid(orionBudget(), 'variable')
     b = togglePaid(b, 'fixed')
-    expect(b.paid).toEqual(['k401', 'fixed'])
-    b = togglePaid(b, 'k401')
+    expect(b.paid).toEqual(['variable', 'fixed'])
+    b = togglePaid(b, 'variable')
     expect(b.paid).toEqual(['fixed'])
     expect(resetPaid(b).paid).toEqual([])
   })
