@@ -14,6 +14,9 @@ export interface Item {
   amount: number
 }
 
+/** Where a category's money comes from: Living, or Investing as self investment. */
+export type Bucket = 'living' | 'self'
+
 export interface Category {
   id: string
   name: string
@@ -21,6 +24,11 @@ export interface Category {
   amount: number
   note: string
   items: Item[]
+  /**
+   * 'self' is self investment: paid from Investing rather than Living, and
+   * left out of what the investment projection grows.
+   */
+  bucket: Bucket
 }
 
 export interface Step {
@@ -69,12 +77,13 @@ export function newId(): string {
 }
 
 const item = (name: string, amount: number): Item => ({ id: newId(), name, amount })
-const category = (name: string, amount: number, items: Item[] = []): Category => ({
+const category = (name: string, amount: number, items: Item[] = [], bucket: Bucket = 'living'): Category => ({
   id: newId(),
   name,
   amount: items.length ? sum(items.map((i) => i.amount)) : amount,
   note: '',
   items,
+  bucket,
 })
 const step = (text: string, amount: number, beforePay = false): Step => ({ id: newId(), text, amount, done: false, beforePay })
 
@@ -89,7 +98,7 @@ export function orionBudget(): Budget {
     steps: [step('Goes into 401k', 405, true), step('Invest in VTI', 1500), step('Remains for 2 wks', 1900)],
     categories: [
       category('Rent, utils, park', 1380),
-      category('STNDRD', 1000),
+      category('STNDRD', 1000, [], 'self'),
       category('Car', 250),
       category('Subscriptions', 0, [
         item('RCF', 65),
@@ -107,7 +116,7 @@ export function orionBudget(): Budget {
       category('Haircut', 100),
       category('Medical', 100),
     ],
-    projection: { start: 0, monthly: 4000, k401: 810, rate: 0.07, years: 30 },
+    projection: { start: 0, monthly: 3000, k401: 810, rate: 0.07, years: 30 },
   }
 }
 
@@ -170,8 +179,19 @@ export function perPaycheck(b: Budget, monthly = monthlyIncome(b)): number {
   return roundCents(monthly / paychecksPerMonth(b))
 }
 
+/** Living expenses: every category paid from Living. */
 export function expensesTotal(b: Budget): number {
-  return sum(b.categories.map(categoryTotal))
+  return sum(b.categories.filter((c) => c.bucket === 'living').map(categoryTotal))
+}
+
+/** Self investment: the categories paid from Investing. */
+export function selfTotal(b: Budget): number {
+  return sum(b.categories.filter((c) => c.bucket === 'self').map(categoryTotal))
+}
+
+/** What's left of Investing for the markets once self investment is paid. */
+export function marketInvesting(b: Budget): number {
+  return roundCents(b.investing - selfTotal(b))
 }
 
 /** Living left after the expenses: negative when they come to more. */
@@ -269,8 +289,8 @@ export const resetSteps = (b: Budget): Budget => ({ ...b, steps: b.steps.map((s)
 
 // Categories and their items
 
-export function addCategory(b: Budget): [Budget, string] {
-  const c = category('', 0)
+export function addCategory(b: Budget, bucket: Bucket = 'living'): [Budget, string] {
+  const c = category('', 0, [], bucket)
   return [{ ...b, categories: [...b.categories, c] }, c.id]
 }
 
@@ -286,6 +306,10 @@ export const updateCategory = (b: Budget, id: string, patch: Partial<Pick<Catego
   withCategory(b, id, (c) =>
     settle({ ...c, ...patch, ...(patch.amount !== undefined && { amount: Math.max(0, roundCents(patch.amount)) }) }),
   )
+
+/** Moves a category between Living and self investment. */
+export const setCategoryBucket = (b: Budget, id: string, bucket: Bucket): Budget =>
+  withCategory(b, id, (c) => ({ ...c, bucket }))
 
 export const removeCategory = (b: Budget, id: string): Budget => ({
   ...b,
@@ -373,6 +397,8 @@ export function normalizeBudget(raw: unknown): Budget | null {
       items: (Array.isArray(c.items) ? c.items : [])
         .filter(isObject)
         .map((i) => ({ id: idOf(i.id, seen), name: textOf(i.name), amount: amountOf(i.amount) })),
+      // Before version 4 there was no self investment, and STNDRD was in Living; it's self investment.
+      bucket: c.bucket === 'self' || (version < 4 && /^\s*stndrd\s*$/i.test(textOf(c.name))) ? 'self' : 'living',
     }),
   )
 
@@ -386,12 +412,21 @@ export function normalizeBudget(raw: unknown): Budget | null {
     categories,
     // Saves from before the projection start it off contributing the Investing
     // amount, and the steps taken out before the paycheck as the 401k.
-    projection: normalizeProjection(
-      raw.projection,
-      amountOf(raw.investing),
-      roundCents(sum(steps.filter((s) => s.beforePay).map((s) => s.amount)) * (perYear / 12)),
-    ),
+    projection: projectionFrom(raw, version, categories, steps, perYear),
   }
+}
+
+function projectionFrom(raw: Record<string, unknown>, version: number, categories: Category[], steps: Step[], perYear: number): Projection {
+  const investing = amountOf(raw.investing)
+  const self = sum(categories.filter((c) => c.bucket === 'self').map(categoryTotal))
+  const projection = normalizeProjection(
+    raw.projection,
+    roundCents(investing - self),
+    roundCents(sum(steps.filter((s) => s.beforePay).map((s) => s.amount)) * (perYear / 12)),
+  )
+  // A projection that followed the whole Investing amount before self
+  // investment existed follows what's left for the markets.
+  return version < 4 && projection.monthly === investing ? { ...projection, monthly: Math.max(0, roundCents(investing - self)) } : projection
 }
 
 /** A month of the steps taken out before the paycheck, like the 401k. */

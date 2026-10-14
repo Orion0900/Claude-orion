@@ -88,8 +88,14 @@ popout:
 - notes, for due dates, accounts or anything else;
 - **Delete category**.
 
+**Self investment.** Categories paid from Investing instead of Living, like
+STNDRD: listed under Income against the Investing amount, with what's left
+for the markets ($3,000 of $4,000). They don't count as living expenses, and
+the projection grows only what's left for the markets. Any category's
+popout can move it between Living and Investing.
+
 **Investment projection.** Enter an upfront amount, what goes in each
-month (it starts at the Investing amount), the 401k each month (it starts
+month (it starts at Investing less self investment), the 401k each month (it starts
 at the steps taken out before the paycheck, $810), a yearly return and the years,
 and a line chart shows the total value year by year against what was put
 in, with the end total, the amount put in and the growth above it. Tap or

@@ -9,6 +9,7 @@ import {
   removeItem,
   removeStep,
   shares,
+  type Bucket,
   type Budget,
 } from './lib/budget'
 import type { SyncStatus } from './lib/sync'
@@ -52,10 +53,10 @@ export default function App() {
     update(change)
   }
 
-  const add = (kind: Open['kind']) => {
+  const add = (kind: Open['kind'], bucket: Bucket = 'living') => {
     let id = ''
     update((b) => {
-      const [next, added] = kind === 'step' ? addStep(b) : addCategory(b)
+      const [next, added] = kind === 'step' ? addStep(b) : addCategory(b, bucket)
       id = added
       return next
     })
@@ -88,6 +89,12 @@ export default function App() {
       <main className="layout">
         <div className="col">
           <IncomeSection budget={budget} update={update} />
+          <ExpensesSection
+            budget={budget}
+            bucket="self"
+            onOpen={(id) => setOpen({ kind: 'category', id, fresh: false })}
+            onAdd={() => add('category', 'self')}
+          />
           <ProcessSection
             budget={budget}
             update={update}

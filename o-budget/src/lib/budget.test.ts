@@ -11,6 +11,9 @@ import {
   isBlankStep,
   living,
   livingLeft,
+  marketInvesting,
+  selfTotal,
+  setCategoryBucket,
   monthlyIncome,
   moveStep,
   normalizeBudget,
@@ -71,9 +74,16 @@ describe("Orion's budget", () => {
     expect(subscriptions.amount).toBe(223)
   })
 
-  it('puts living expenses at $3,853, which is $53 more than Living', () => {
-    expect(expensesTotal(b)).toBe(3853)
-    expect(livingLeft(b)).toBe(-53)
+  it('puts living expenses at $2,853, leaving $947 of Living', () => {
+    expect(expensesTotal(b)).toBe(2853)
+    expect(livingLeft(b)).toBe(947)
+  })
+
+  it('pays STNDRD from Investing as self investment, leaving $3,000 for the markets', () => {
+    expect(byName(b, 'STNDRD').bucket).toBe('self')
+    expect(selfTotal(b)).toBe(1000)
+    expect(marketInvesting(b)).toBe(3000)
+    expect(b.projection.monthly).toBe(3000)
   })
 
   it('takes the 401k out before the paycheck lands', () => {
@@ -260,7 +270,7 @@ describe('categories and items', () => {
     const food = byName(b, 'Food')
     const next = updateCategory(b, food.id, { amount: 750 })
     expect(byName(next, 'Food').amount).toBe(750)
-    expect(livingLeft(next)).toBe(-3)
+    expect(livingLeft(next)).toBe(997)
   })
 
   it('totals a category from its items, ignoring an amount typed over them', () => {
@@ -292,7 +302,7 @@ describe('categories and items', () => {
     expect(byName(b, 'Subscriptions').amount).toBe(225)
     b = removeItem(b, subs.id, spotify.id)
     expect(byName(b, 'Subscriptions').amount).toBe(208)
-    expect(expensesTotal(b)).toBe(3838)
+    expect(expensesTotal(b)).toBe(2838)
   })
 
   it('drops to $0 when the last item goes', () => {
@@ -308,7 +318,10 @@ describe('categories and items', () => {
     const b = orionBudget()
     const next = removeCategory(b, byName(b, 'Haircut').id)
     expect(next.categories).toHaveLength(6)
-    expect(expensesTotal(next)).toBe(3753)
+    expect(expensesTotal(next)).toBe(2753)
+    const moved = setCategoryBucket(b, byName(b, 'Car').id, 'self')
+    expect(expensesTotal(moved)).toBe(2603)
+    expect(marketInvesting(moved)).toBe(2750)
   })
 })
 
@@ -385,6 +398,25 @@ describe('normalizeBudget', () => {
     // Once it can be marked, what was marked stands.
     const v3 = normalizeBudget({ ...v2, version: 3, steps: [{ id: 'b', text: 'Goes into 401k', amount: 405, beforePay: false }] })!
     expect(v3.steps[0].beforePay).toBe(false)
+  })
+
+  it('moves STNDRD to self investment in saves from before it existed, and the projection with it', () => {
+    const v3 = {
+      version: 3,
+      investing: 4000,
+      categories: [
+        { id: 'a', name: 'STNDRD', amount: 1000, items: [] },
+        { id: 'b', name: 'Food', amount: 800, items: [] },
+      ],
+      projection: { start: 0, monthly: 4000, k401: 810, rate: 0.07, years: 30 },
+    }
+    const b = normalizeBudget(v3)!
+    expect(b.categories.map((c) => c.bucket)).toEqual(['self', 'living'])
+    expect(b.projection.monthly).toBe(3000)
+    // A monthly amount chosen by hand stays.
+    expect(normalizeBudget({ ...v3, projection: { ...v3.projection, monthly: 2500 } })!.projection.monthly).toBe(2500)
+    // Once self investment exists, a category is where it was put.
+    expect(normalizeBudget({ ...v3, version: 4 })!.categories[0].bucket).toBe('living')
   })
 
   it('fills in an empty object as an empty budget', () => {
