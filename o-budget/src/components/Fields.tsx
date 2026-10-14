@@ -109,3 +109,34 @@ export function PercentInput({ id, value, onChange, label, className = '', max =
     </label>
   )
 }
+
+/** A whole number like a count of years, from `min` to `max`, edited the same way. */
+export function WholeInput({ id, value, onChange, label, min = 1, max }: Omit<NumberFieldProps, 'blank'> & { min?: number; max: number }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft ?? String(value)
+  return (
+    <input
+      id={id}
+      className="whole"
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      enterKeyHint="done"
+      aria-label={label}
+      value={text}
+      style={widthFor(text)}
+      onFocus={(e) => {
+        setDraft(String(value))
+        selectAll(e)
+      }}
+      onChange={(e) => {
+        const typed = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+        setDraft(typed)
+        const n = Number(typed)
+        if (typed && n >= min) onChange(Math.min(max, n))
+      }}
+      onBlur={() => setDraft(null)}
+      onKeyDown={doneOnEnter}
+    />
+  )
+}

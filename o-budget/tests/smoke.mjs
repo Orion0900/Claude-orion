@@ -119,6 +119,8 @@ assert.equal(await text(page, '.group-living .spent-total'), '$3,053')
 assert.deepEqual(await page.locator('.group-living .part-total').allInnerTexts(), ['$2,053', '$1,000'])
 assert.equal(await page.locator('.part-fixed .cat').count(), 5)
 assert.equal(await page.locator('.part-variable .cat').count(), 3)
+// Living lists the biggest first.
+assert.deepEqual(await page.locator('.part-variable .cat-name-text').allInnerTexts(), ['Food', 'Random', 'Gas'])
 assert.match(await text(page, '.part-fixed .cat >> nth=2'), /Subscriptions\s+10 items\s+\$223/)
 
 // The subscriptions popout.
@@ -206,7 +208,14 @@ assert.equal(await value(page, '#proj-monthly'), '2,900')
 assert.equal(await value(page, '#proj-401k'), '810')
 assert.match(await text(page, '.proj-facts'), /In 30 years\s+\$4\.\d+M\s+Put in\s+\$1\.3M/)
 await enter(page, '#proj-start', '13780')
+// Years can be typed as well as slid.
+await enter(page, '#proj-years-typed', '25')
+assert.equal(await value(page, '#proj-years'), '25')
+assert.match(await text(page, '.proj-facts'), /In 25 years/)
+await enter(page, '#proj-years-typed', '99')
+assert.equal(await value(page, '#proj-years-typed'), '60')
 await page.locator('#proj-years').fill('20')
+assert.equal(await value(page, '#proj-years-typed'), '20')
 assert.match(await text(page, '.proj-facts'), /In 20 years/)
 const box = await page.locator('.chart svg').boundingBox()
 await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2)

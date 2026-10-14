@@ -72,12 +72,13 @@ month. It starts over each month.
 **Investing** and **Living.** Each total, its share of income and per
 paycheck, then its two halves: markets and self investment (paid from
 Investing, not grown by the projection); fixed and variable, each with the
-card it goes on (tap the card name to rename it). Tap any category for its
+card it goes on (tap the card name to rename it). Living lists the biggest
+expenses first. Tap any category for its
 popout: amount, per paycheck and per year, **Details** (items like each
 subscription, which set the amount), where it goes, notes, and delete.
 
 **Investment projection.** Upfront, each month (starts at the markets
-investing), the 401k each month, a yearly return and the years, drawn as a
+investing), the 401k each month, a yearly return and the years (typed or slid), drawn as a
 line chart against what was put in. Tap or drag across it for any year.
 
 **Gross pay.** Gross income and bonus a year, and the 401k each paycheck.

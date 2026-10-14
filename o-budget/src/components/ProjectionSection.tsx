@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { bucketTotal, k401Monthly, setProjection, type Budget } from '../lib/budget'
 import { money } from '../lib/money'
 import { compactMoney, MAX_RATE, MAX_YEARS, niceTicks, project, type ProjectionPoint } from '../lib/projection'
-import { MoneyInput, PercentInput } from './Fields'
+import { MoneyInput, PercentInput, WholeInput } from './Fields'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -46,20 +46,25 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
             <PercentInput id="proj-rate" value={p.rate} max={MAX_RATE} label="Yearly return, percent" onChange={(n) => set({ rate: n })} />
           </span>
         </div>
-        <label className="pay-field years-field">
-          <span className="field-label">
-            Years <span className="num">{p.years}</span>
-          </span>
-          <input
-            id="proj-years"
-            className="years"
-            type="range"
-            min={1}
-            max={MAX_YEARS}
-            value={p.years}
-            onChange={(e) => set({ years: Number(e.target.value) })}
-          />
-        </label>
+        <div className="pay-field years-field">
+          <span className="field-label">Years</span>
+          <div className="years-row">
+            <span className="well-money years-well num">
+              <WholeInput id="proj-years-typed" value={p.years} max={MAX_YEARS} label="Years" onChange={(n) => set({ years: n })} />
+              <span className="years-unit">yrs</span>
+            </span>
+            <input
+              id="proj-years"
+              className="years"
+              type="range"
+              min={1}
+              max={MAX_YEARS}
+              value={p.years}
+              aria-label="Years"
+              onChange={(e) => set({ years: Number(e.target.value) })}
+            />
+          </div>
+        </div>
       </div>
       {p.monthly !== markets && markets > 0 && (
         <button type="button" className="link-btn" onClick={() => set({ monthly: markets })}>
