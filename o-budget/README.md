@@ -121,7 +121,7 @@ step or category that's closed while still blank isn't kept.
   Take-home is a year of net paychecks as a share of gross income.
 - The paycheck process starts from one paycheck and takes each step's amount
   off in order, except the steps that come out before the paycheck.
-- Amounts keep cents when they have them ($4.99) and round to the cent.
+- Every amount shows and is entered in whole dollars, rounded to the nearest.
 
 ## Where it's saved
 
