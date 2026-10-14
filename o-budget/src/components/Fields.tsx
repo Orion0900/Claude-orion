@@ -48,7 +48,7 @@ export function MoneyInput({ id, value, onChange, label, className = '', autoFoc
       <input
         id={id}
         type="text"
-        inputMode="decimal"
+        inputMode="numeric"
         autoComplete="off"
         enterKeyHint="done"
         aria-label={label}
