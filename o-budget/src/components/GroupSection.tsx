@@ -1,9 +1,12 @@
 import type { CSSProperties } from 'react'
-import { bucketTotal, categoryTotal, inBucket, monthlyIncome, perPaycheck, setCard, type Bucket, type Budget } from '../lib/budget'
+import { bucketTotal, categoryTotal, inBucket, monthlyIncome, perPaycheck, setCard, type Bucket, type Budget, type Category } from '../lib/budget'
 import { money, percent } from '../lib/money'
 import { ChevronIcon, PlusIcon } from './Icons'
 
 type Update = (change: (b: Budget) => Budget) => void
+
+/** Largest monthly amount first; ties keep their order. */
+const bySize = (cs: Category[]) => [...cs].sort((x, y) => categoryTotal(y) - categoryTotal(x))
 
 type Group = 'investing' | 'living'
 
@@ -61,7 +64,8 @@ export function GroupSection({
       </div>
 
       {g.parts.map((p) => {
-        const cats = inBucket(b, p.bucket)
+        // Living lists the biggest expenses first; Investing keeps its own order.
+        const cats = group === 'living' ? bySize(inBucket(b, p.bucket)) : inBucket(b, p.bucket)
         const part = bucketTotal(b, p.bucket)
         const card = p.bucket === 'fixed' || p.bucket === 'variable' ? p.bucket : null
         return (

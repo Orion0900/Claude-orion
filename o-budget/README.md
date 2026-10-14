@@ -72,7 +72,8 @@ month. It starts over each month.
 **Investing** and **Living.** Each total, its share of income and per
 paycheck, then its two halves: markets and self investment (paid from
 Investing, not grown by the projection); fixed and variable, each with the
-card it goes on (tap the card name to rename it). Tap any category for its
+card it goes on (tap the card name to rename it). Living lists the biggest
+expenses first. Tap any category for its
 popout: amount, per paycheck and per year, **Details** (items like each
 subscription, which set the amount), where it goes, notes, and delete.
 

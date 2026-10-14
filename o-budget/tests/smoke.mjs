@@ -119,6 +119,8 @@ assert.equal(await text(page, '.group-living .spent-total'), '$3,053')
 assert.deepEqual(await page.locator('.group-living .part-total').allInnerTexts(), ['$2,053', '$1,000'])
 assert.equal(await page.locator('.part-fixed .cat').count(), 5)
 assert.equal(await page.locator('.part-variable .cat').count(), 3)
+// Living lists the biggest first.
+assert.deepEqual(await page.locator('.part-variable .cat-name-text').allInnerTexts(), ['Food', 'Random', 'Gas'])
 assert.match(await text(page, '.part-fixed .cat >> nth=2'), /Subscriptions\s+10 items\s+\$223/)
 
 // The subscriptions popout.
