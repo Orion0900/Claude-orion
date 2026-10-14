@@ -10,20 +10,19 @@ node tests/smoke.mjs
 ```
 
 It opens on the budget as written down and checks every number: $3,900 twice
-a month making $7,800, the split, the expenses $53 over Living, the 401k
-coming out before the paycheck and the run down to $500. It switches the 401k
-to come out of the paycheck and back. Then it takes a raise and puts it back, tries every
-2 weeks and once a month, fills in gross income and a bonus by dollars and by
-percent, splits by percent, by the slider and by the Living amount, ticks off a payday
-and starts the next one, edits, moves and adds steps (and closes a blank
-one), changes, removes and restores a subscription and adds one, breaks Car
-down into items without its total moving, adds a category, deletes one and
-undoes it, and reloads to find it all still there.
+a month making $7,800, $3,900 Investing and $3,053 Living with $847 left, the
+three rules and each paycheck's rows down to $423 in checking. Then it takes
+a raise, tries every 2 weeks and once a month, ticks off a payday, checks the
+Amazon card under and over its $1,000, renames a card, changes, removes and
+restores a subscription and adds one, breaks Car down without its total
+moving, adds a variable category (and closes a blank one), moves one to self
+investment and back, deletes one and undoes it, runs the projection, fills in
+gross pay, bonus and the 401k, and reloads to find it all still there.
 
 Then the artifact build, with a stand-in for the artifact's database: the
 loading screen, the shared budget arriving, an edit written back, another
 device's change showing up, a budget saved by the first version opening
-unchanged and saving in the new shape, an empty database opening an empty
+on the card system and saving in the new shape, an empty database opening an empty
 budget, and no database at all. It fails on any page or console error. Set
 `SHOTS=<dir>` to save screenshots along the way.
 

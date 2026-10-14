@@ -1,283 +1,208 @@
 import {
   addCategory,
   addItem,
-  addStep,
+  bucketTotal,
   CADENCES,
-  canMoveStep,
   categoryTotal,
   emptyBudget,
-  expensesTotal,
+  investingTotal,
   isBlankCategory,
-  isBlankStep,
-  living,
-  livingLeft,
-  marketInvesting,
-  selfTotal,
-  setCategoryBucket,
+  k401Monthly,
+  leftOver,
+  livingTotal,
+  monthKey,
   monthlyIncome,
-  moveStep,
   normalizeBudget,
   orionBudget,
-  paycheckRun,
+  paycheckPlan,
   paychecksPerMonth,
   perPaycheck,
   removeCategory,
   removeItem,
-  removeStep,
-  resetSteps,
+  resetPaid,
   sameBudget,
   setBonus,
   setBonusShare,
   setCadence,
+  setCard,
+  setCategoryBucket,
   setGross,
-  setInvesting,
-  setInvestingShare,
-  setLiving,
-  setLivingShare,
+  setK401,
   setPaycheck,
-  setStepBeforePay,
-  shares,
+  setSpent,
+  spentThisMonth,
   takeHomeShare,
   takeHomeYear,
-  toggleStep,
+  togglePaid,
   updateCategory,
   updateItem,
-  updateStep,
+  variableCheck,
   type Budget,
 } from './budget'
 
 const byName = (b: Budget, name: string) => b.categories.find((c) => c.name === name)!
+const names = (b: Budget, bucket: string) => b.categories.filter((c) => c.bucket === bucket).map((c) => c.name)
 
 describe("Orion's budget", () => {
   const b = orionBudget()
 
-  it('splits $7,800 into $4,000 Investing and $3,800 Living', () => {
+  it('makes $7,800 a month from $3,900 twice a month', () => {
     expect(monthlyIncome(b)).toBe(7800)
-    expect(b.investing).toBe(4000)
-    expect(living(b)).toBe(3800)
-    expect(shares(b).investing).toBeCloseTo(0.5128, 4)
-    expect(shares(b).living).toBeCloseTo(0.4872, 4)
-  })
-
-  it('comes in two paychecks of $3,900 a month', () => {
-    expect(b.paycheck).toBe(3900)
-    expect(b.cadence).toBe('semimonthly')
+    expect(takeHomeYear(b)).toBe(93600)
     expect(paychecksPerMonth(b)).toBe(2)
-    expect(perPaycheck(b)).toBe(3900)
-    expect(perPaycheck(b, living(b))).toBe(1900)
   })
 
-  it('adds the subscriptions up to $223', () => {
-    const subscriptions = byName(b, 'Subscriptions')
-    expect(subscriptions.items).toHaveLength(10)
-    expect(categoryTotal(subscriptions)).toBe(223)
-    expect(subscriptions.amount).toBe(223)
+  it('sorts every category into markets, self investment, fixed or variable', () => {
+    expect(names(b, 'invest')).toEqual(['VTI'])
+    expect(names(b, 'self')).toEqual(['STNDRD'])
+    expect(names(b, 'fixed')).toEqual(['Rent, utils, park', 'Car', 'Subscriptions', 'Haircut', 'Medical'])
+    expect(names(b, 'variable')).toEqual(['Food', 'Gas', 'Random'])
   })
 
-  it('puts living expenses at $2,853, leaving $947 of Living', () => {
-    expect(expensesTotal(b)).toBe(2853)
-    expect(livingLeft(b)).toBe(947)
+  it('splits into $3,900 Investing and $3,053 Living, $847 left over', () => {
+    expect(bucketTotal(b, 'invest')).toBe(2900)
+    expect(bucketTotal(b, 'self')).toBe(1000)
+    expect(investingTotal(b)).toBe(3900)
+    expect(bucketTotal(b, 'fixed')).toBe(2053)
+    expect(bucketTotal(b, 'variable')).toBe(1000)
+    expect(livingTotal(b)).toBe(3053)
+    expect(leftOver(b)).toBe(847)
   })
 
-  it('pays STNDRD from Investing as self investment, leaving $3,000 for the markets', () => {
-    expect(byName(b, 'STNDRD').bucket).toBe('self')
-    expect(selfTotal(b)).toBe(1000)
-    expect(marketInvesting(b)).toBe(3000)
-    expect(b.projection.monthly).toBe(3000)
+  it('adds up the subscriptions', () => {
+    expect(categoryTotal(byName(b, 'Subscriptions'))).toBe(223)
+    expect(byName(b, 'Subscriptions').items).toHaveLength(10)
   })
 
-  it('takes the 401k out before the paycheck lands', () => {
-    expect(b.steps.map((s) => [s.text, s.beforePay])).toEqual([
-      ['Goes into 401k', true],
-      ['Invest in VTI', false],
-      ['Remains for 2 wks', false],
-    ])
+  it('puts $405 a paycheck in the 401k, $810 a month', () => {
+    expect(b.k401).toBe(405)
+    expect(k401Monthly(b)).toBe(810)
+    expect(b.projection).toMatchObject({ monthly: 2900, k401: 810 })
   })
 
-  it('works the paycheck down step by step and leaves $500 over', () => {
-    expect(paycheckRun(b)).toEqual({ start: 3900, after: [null, 2400, 500], leftOver: 500 })
-  })
-
-  it('gives every step, category and item its own id', () => {
-    const ids = [...b.steps, ...b.categories, ...b.categories.flatMap((c) => c.items)].map((x) => x.id)
-    expect(new Set(ids).size).toBe(ids.length)
+  it('names the cards', () => {
+    expect(b.cards).toEqual({ fixed: 'Chase Sapphire', variable: 'Amazon card' })
   })
 })
 
-describe('the split', () => {
-  const b = orionBudget()
-
-  it('keeps Investing in dollars when the paycheck changes, so Living takes the difference', () => {
-    const raised = setPaycheck(b, 4100)
-    expect(monthlyIncome(raised)).toBe(8200)
-    expect(raised.investing).toBe(4000)
-    expect(living(raised)).toBe(4200)
+describe('paycheck plan', () => {
+  it('runs the 401k before the paycheck, then VTI, STNDRD and each card', () => {
+    const plan = paycheckPlan(orionBudget())
+    expect(plan.rows.map((r) => [r.label, r.amount, r.bucket])).toEqual([
+      ['401k', 405, 'before'],
+      ['Deposit into VTI', 1450, 'invest'],
+      ['Pay STNDRD', 500, 'self'],
+      ['Set aside for Chase Sapphire', 1027, 'fixed'],
+      ['Set aside for Amazon card', 500, 'variable'],
+    ])
+    expect(plan.start).toBe(3900)
+    expect(plan.after).toEqual([null, 2450, 1950, 923, 423])
+    expect(plan.leftOver).toBe(423)
   })
 
-  it('moves Investing when Living is set', () => {
-    expect(setLiving(b, 3500).investing).toBe(4300)
-    expect(setLiving(b, 9000).investing).toBe(0)
+  it('names what each card covers', () => {
+    const plan = paycheckPlan(orionBudget())
+    expect(plan.rows.find((r) => r.key === 'variable')!.detail).toBe('Variable: Food, Gas, Random')
   })
 
-  it('sets either side by percent', () => {
-    expect(setInvestingShare(b, 0.5).investing).toBe(3900)
-    expect(setLivingShare(b, 0.4).investing).toBe(4680)
-    expect(setInvestingShare(b, 2).investing).toBe(7800)
-    expect(setInvestingShare(b, -1).investing).toBe(0)
+  it('follows the categories and the card names', () => {
+    let b = orionBudget()
+    b = updateCategory(b, byName(b, 'Food').id, { amount: 800 })
+    b = setCard(b, 'variable', 'Prime Visa')
+    const row = paycheckPlan(b).rows.find((r) => r.key === 'variable')!
+    expect(row).toMatchObject({ label: 'Set aside for Prime Visa', amount: 600 })
   })
 
-  it('never goes negative or keeps fractions of a cent', () => {
-    expect(setInvesting(b, -10).investing).toBe(0)
-    expect(setPaycheck(b, -1).paycheck).toBe(0)
-    expect(setInvesting(b, 10.556).investing).toBe(10.56)
+  it('shows short when the paycheck runs out', () => {
+    const plan = paycheckPlan(setPaycheck(orionBudget(), 3000))
+    expect(plan.leftOver).toBe(-477)
   })
 
-  it('shows Living below zero when Investing is set above income', () => {
-    expect(living(setInvesting(b, 9000))).toBe(-1200)
+  it('leaves out the 401k when there is none', () => {
+    expect(paycheckPlan(setK401(orionBudget(), 0)).rows[0].key).not.toBe('k401')
   })
 
-  it('has no shares with no income', () => {
-    expect(shares(emptyBudget())).toEqual({ investing: 0, living: 0 })
+  it('ticks rows off and clears them for the next paycheck', () => {
+    let b = togglePaid(orionBudget(), 'k401')
+    b = togglePaid(b, 'fixed')
+    expect(b.paid).toEqual(['k401', 'fixed'])
+    b = togglePaid(b, 'k401')
+    expect(b.paid).toEqual(['fixed'])
+    expect(resetPaid(b).paid).toEqual([])
   })
-
 })
 
-describe('the paycheck and its cadence', () => {
-  const b = orionBudget()
+describe('variable card check-in', () => {
+  const oct10 = new Date(2026, 9, 10)
 
-  it('makes the month from the paychecks in a year', () => {
-    expect(CADENCES.map((c) => [c.id, c.perYear])).toEqual([
-      ['weekly', 52],
-      ['biweekly', 26],
-      ['semimonthly', 24],
-      ['monthly', 12],
-    ])
+  it('measures this month against the $1,000 budget', () => {
+    const b = setSpent(orionBudget(), 400, oct10)
+    expect(b.spent).toEqual({ month: '2026-10', amount: 400 })
+    const v = variableCheck(b, oct10)
+    expect(v).toMatchObject({ budget: 1000, spent: 400, left: 600, days: 31, day: 10, daysLeft: 22 })
+    expect(v.pace).toBe(322.58)
+    expect(v.aheadOfPace).toBe(-77.42)
+    expect(v.perDay).toBeCloseTo(27.27, 2)
+  })
+
+  it('starts each month from nothing', () => {
+    const b = setSpent(orionBudget(), 400, oct10)
+    expect(spentThisMonth(b, new Date(2026, 10, 1))).toBe(0)
+    expect(monthKey(new Date(2026, 0, 31))).toBe('2026-01')
+  })
+
+  it('shows over the budget', () => {
+    const v = variableCheck(setSpent(orionBudget(), 1100, oct10), oct10)
+    expect(v.left).toBe(-100)
+    expect(v.perDay).toBe(0)
+  })
+})
+
+describe('paycheck and gross pay', () => {
+  it('fills income from the paycheck and its cadence', () => {
+    const b = orionBudget()
     expect(monthlyIncome(setCadence(b, 'biweekly'))).toBe(8450)
-    expect(monthlyIncome(setCadence(b, 'weekly'))).toBe(16900)
     expect(monthlyIncome(setCadence(b, 'monthly'))).toBe(3900)
-  })
-
-  it('counts every two weeks as 26 paychecks a year, two months with three', () => {
-    const biweekly = setCadence(b, 'biweekly')
-    expect(paychecksPerMonth(biweekly)).toBeCloseTo(2.1667, 4)
-    expect(takeHomeYear(biweekly)).toBe(101400)
-    // A paycheck is still a paycheck: the process starts from it.
-    expect(perPaycheck(biweekly)).toBe(3900)
-    expect(paycheckRun(biweekly).start).toBe(3900)
-    expect(perPaycheck(biweekly, 4000)).toBe(1846.15)
-  })
-
-  it('ignores a cadence it does not know', () => {
     expect(setCadence(b, 'yearly' as never)).toBe(b)
+    expect(CADENCES.map((c) => c.perYear)).toEqual([52, 26, 24, 12])
   })
 
-  it('keeps cents on a paycheck and never goes below zero', () => {
-    expect(setPaycheck(b, 3333.333).paycheck).toBe(3333.33)
-    expect(monthlyIncome(setPaycheck(b, 0))).toBe(0)
-  })
-})
-
-describe('gross pay and bonus', () => {
-  const b = orionBudget()
-
-  it('starts empty, with no take-home share until there is a gross income', () => {
-    expect(b.gross).toBe(0)
-    expect(b.bonus).toBe(0)
-    expect(takeHomeShare(b)).toBeNull()
+  it('works per paycheck on any cadence', () => {
+    expect(perPaycheck(setCadence(orionBudget(), 'biweekly'), 1300)).toBe(600)
   })
 
-  it('works out the share of gross that comes home', () => {
-    const paid = setGross(b, 120000)
-    expect(takeHomeYear(paid)).toBe(93600)
-    expect(takeHomeShare(paid)).toBeCloseTo(0.78, 4)
+  it('keeps gross pay and bonus beside the budget', () => {
+    let b = setGross(orionBudget(), 120000)
+    expect(takeHomeShare(b)).toBeCloseTo(0.78)
+    b = setBonusShare(b, 0.1)
+    expect(b.bonus).toBe(12000)
+    expect(monthlyIncome(b)).toBe(7800)
+    expect(setBonus(b, -5).bonus).toBe(0)
+    expect(takeHomeShare(emptyBudget())).toBeNull()
   })
 
-  it('takes the bonus in dollars or as a share of gross', () => {
-    const paid = setGross(b, 120000)
-    expect(setBonus(paid, 15000).bonus).toBe(15000)
-    expect(setBonusShare(paid, 0.125).bonus).toBe(15000)
-    expect(setBonusShare(paid, 1.5).bonus).toBe(180000)
-    expect(setBonus(paid, -3).bonus).toBe(0)
-  })
-
-  it('leaves the month alone: the income comes from the paycheck', () => {
-    const paid = setBonus(setGross(b, 120000), 15000)
-    expect(monthlyIncome(paid)).toBe(7800)
+  it('never goes negative', () => {
+    expect(setPaycheck(orionBudget(), -1).paycheck).toBe(0)
+    expect(setK401(orionBudget(), -1).k401).toBe(0)
   })
 })
 
-describe('steps', () => {
-  it('adds a blank step at the end', () => {
-    const [b, id] = addStep(orionBudget())
-    expect(b.steps).toHaveLength(4)
-    expect(b.steps[3]).toMatchObject({ id, text: '', amount: 0, done: false })
-    expect(isBlankStep(b.steps[3])).toBe(true)
+describe('categories', () => {
+  it('adds a blank category to a bucket and knows it is blank', () => {
+    const [b, id] = addCategory(orionBudget(), 'variable')
+    const c = b.categories.find((x) => x.id === id)!
+    expect(c.bucket).toBe('variable')
+    expect(isBlankCategory(c)).toBe(true)
+    expect(isBlankCategory(byName(b, 'Car'))).toBe(false)
   })
 
-  it('edits, reorders and removes', () => {
-    let b = orionBudget()
-    const [k401, vti, rest] = b.steps
-    b = updateStep(b, vti.id, { amount: 2100, text: 'Invest in VTI and VXUS' })
-    expect(paycheckRun(b).leftOver).toBe(-100)
-    b = moveStep(b, rest.id, -1)
-    expect(b.steps.map((s) => s.id)).toEqual([k401.id, rest.id, vti.id])
-    expect(paycheckRun(b).after).toEqual([null, 2000, -100])
-    b = removeStep(b, k401.id)
-    expect(b.steps).toHaveLength(2)
-  })
-
-  it("keeps steps on their own side of payday when they're moved", () => {
+  it('moves a category between buckets', () => {
     const b = orionBudget()
-    const [k401, vti] = b.steps
-    expect(canMoveStep(b, vti.id, -1)).toBe(false)
-    expect(moveStep(b, vti.id, -1)).toBe(b)
-    expect(canMoveStep(b, k401.id, 1)).toBe(false)
-    expect(canMoveStep(b, vti.id, 1)).toBe(true)
-  })
-
-  it('moves a step marked before the paycheck in front of it, and back', () => {
-    let b = orionBudget()
-    const [k401, vti, rest] = b.steps
-    b = setStepBeforePay(b, rest.id, true)
-    expect(b.steps.map((s) => s.id)).toEqual([k401.id, rest.id, vti.id])
-    expect(paycheckRun(b)).toEqual({ start: 3900, after: [null, null, 2400], leftOver: 2400 })
-    b = setStepBeforePay(b, k401.id, false)
-    expect(b.steps.map((s) => s.id)).toEqual([rest.id, k401.id, vti.id])
-    expect(paycheckRun(b).leftOver).toBe(1995)
-  })
-
-  it('ticks steps off and clears them for the next paycheck', () => {
-    let b = orionBudget()
-    b = toggleStep(b, b.steps[0].id)
-    b = toggleStep(b, b.steps[1].id)
-    expect(b.steps.map((s) => s.done)).toEqual([true, true, false])
-    b = toggleStep(b, b.steps[1].id)
-    expect(b.steps.map((s) => s.done)).toEqual([true, false, false])
-    expect(resetSteps(b).steps.every((s) => !s.done)).toBe(true)
-  })
-})
-
-describe('categories and items', () => {
-  it('adds a blank category that can be told apart from a real one', () => {
-    const [b, id] = addCategory(orionBudget())
-    const added = b.categories.find((c) => c.id === id)!
-    expect(isBlankCategory(added)).toBe(true)
-    expect(isBlankCategory(updateCategory(b, id, { name: 'Gifts' }).categories.at(-1)!)).toBe(false)
-  })
-
-  it('changes a plain amount and the totals follow', () => {
-    const b = orionBudget()
-    const food = byName(b, 'Food')
-    const next = updateCategory(b, food.id, { amount: 750 })
-    expect(byName(next, 'Food').amount).toBe(750)
-    expect(livingLeft(next)).toBe(997)
-  })
-
-  it('totals a category from its items, ignoring an amount typed over them', () => {
-    const b = orionBudget()
-    const subs = byName(b, 'Subscriptions')
-    const next = updateCategory(b, subs.id, { amount: 5 })
-    expect(byName(next, 'Subscriptions').amount).toBe(223)
+    const moved = setCategoryBucket(b, byName(b, 'Car').id, 'variable')
+    expect(bucketTotal(moved, 'fixed')).toBe(1803)
+    expect(bucketTotal(moved, 'variable')).toBe(1250)
+    expect(names(moved, 'variable').at(-1)).toBe('Car')
+    expect(setCategoryBucket(b, byName(b, 'Car').id, 'fixed')).toBe(b)
   })
 
   it('starts the first item at the whole amount so the total holds', () => {
@@ -286,10 +211,8 @@ describe('categories and items', () => {
     let itemId: string
     ;[b, itemId] = addItem(b, car.id)
     expect(byName(b, 'Car').items[0]).toMatchObject({ id: itemId, amount: 250 })
-    expect(byName(b, 'Car').amount).toBe(250)
     b = updateItem(b, car.id, itemId, { name: 'Insurance', amount: 150 })
     ;[b] = addItem(b, car.id)
-    expect(byName(b, 'Car').items[1].amount).toBe(0)
     b = updateItem(b, car.id, byName(b, 'Car').items[1].id, { name: 'Gas', amount: 100 })
     expect(byName(b, 'Car').amount).toBe(250)
   })
@@ -302,39 +225,24 @@ describe('categories and items', () => {
     expect(byName(b, 'Subscriptions').amount).toBe(225)
     b = removeItem(b, subs.id, spotify.id)
     expect(byName(b, 'Subscriptions').amount).toBe(208)
-    expect(expensesTotal(b)).toBe(2838)
+    expect(bucketTotal(b, 'fixed')).toBe(2038)
   })
 
-  it('drops to $0 when the last item goes', () => {
+  it('removes a category and its tick', () => {
     let b = orionBudget()
-    const car = byName(b, 'Car')
-    let itemId: string
-    ;[b, itemId] = addItem(b, car.id)
-    b = removeItem(b, car.id, itemId)
-    expect(byName(b, 'Car')).toMatchObject({ amount: 0, items: [] })
-  })
-
-  it('removes a category', () => {
-    const b = orionBudget()
-    const next = removeCategory(b, byName(b, 'Haircut').id)
-    expect(next.categories).toHaveLength(6)
-    expect(expensesTotal(next)).toBe(2753)
-    const moved = setCategoryBucket(b, byName(b, 'Car').id, 'self')
-    expect(expensesTotal(moved)).toBe(2603)
-    expect(marketInvesting(moved)).toBe(2750)
+    const vti = byName(b, 'VTI').id
+    b = togglePaid(b, vti)
+    b = removeCategory(b, vti)
+    expect(investingTotal(b)).toBe(1000)
+    expect(b.paid).toEqual([])
   })
 })
 
 describe('normalizeBudget', () => {
   it('round-trips a budget unchanged', () => {
-    const b = orionBudget()
-    const back = normalizeBudget(JSON.parse(JSON.stringify(b)))
+    const b = setSpent(orionBudget(), 300, new Date(2026, 9, 1))
+    const back = normalizeBudget({ version: 5, ...JSON.parse(JSON.stringify(b)) })
     expect(sameBudget(back, b)).toBe(true)
-  })
-
-  it('ignores extra fields like the version and save time', () => {
-    const b = orionBudget()
-    expect(sameBudget(normalizeBudget({ version: 1, savedAt: 'now', ...b }), b)).toBe(true)
   })
 
   it('rejects things that are not budgets', () => {
@@ -343,83 +251,76 @@ describe('normalizeBudget', () => {
     expect(normalizeBudget([1, 2])).toBeNull()
   })
 
-  it('carries a first-version budget over, keeping its monthly income', () => {
-    const v1 = { version: 1, income: 7800, paychecks: 2, investing: 4000, steps: [], categories: [] }
-    expect(normalizeBudget(v1)).toMatchObject({ paycheck: 3900, cadence: 'semimonthly', gross: 0, bonus: 0 })
-    const monthly = normalizeBudget({ ...v1, paychecks: 1 })!
-    expect(monthly).toMatchObject({ paycheck: 7800, cadence: 'monthly' })
-    const weekly = normalizeBudget({ ...v1, paychecks: 4 })!
-    expect(weekly).toMatchObject({ paycheck: 1800, cadence: 'weekly' })
-    expect(monthlyIncome(weekly)).toBe(7800)
+  it('fills in an empty object as an empty budget', () => {
+    expect(normalizeBudget({})).toEqual(emptyBudget())
   })
 
   it('repairs what it can', () => {
     const b = normalizeBudget({
+      version: 5,
       gross: '120000',
       bonus: -5,
-      paycheck: 3900.123,
+      paycheck: 3900.4,
       cadence: 'yearly',
       paychecks: 12,
-      investing: -4,
-      steps: [{ text: 'Invest', amount: 1500.123, done: 'yes' }, 'junk'],
+      k401: -1,
+      cards: { fixed: '', variable: 7 },
+      paid: ['a', 3],
+      spent: { month: 'October', amount: 50 },
       categories: [
-        { id: 'a', name: 'Food', amount: Infinity, items: 'none' },
-        { id: 'a', name: 'Subs', amount: 1, items: [{ name: 'HBO', amount: 20 }, { name: 'Max', amount: 5 }] },
+        { id: 'a', name: 'Food', amount: Infinity, items: 'none', bucket: 'nope' },
+        { id: 'a', name: 'Subs', amount: 1, items: [{ name: 'HBO', amount: 20 }, { name: 'Max', amount: 5 }], bucket: 'variable' },
       ],
     })!
-    expect(b.gross).toBe(0)
-    expect(b.bonus).toBe(0)
-    expect(b.paycheck).toBe(3900.12)
-    expect(b.cadence).toBe('weekly')
-    expect(b.investing).toBe(0)
-    expect(b.steps).toEqual([{ id: expect.any(String), text: 'Invest', amount: 1500.12, done: false, beforePay: false }])
-    expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '' })
-    // A repeated id gets a fresh one, and an item list sets the amount.
+    expect(b).toMatchObject({ gross: 0, bonus: 0, paycheck: 3900.4, cadence: 'weekly', k401: 0, paid: ['a'] })
+    expect(b.cards).toEqual({ fixed: 'Chase Sapphire', variable: 'Amazon card' })
+    expect(b.spent).toEqual({ month: '', amount: 50 })
+    expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '', bucket: 'fixed' })
     expect(b.categories[1].id).not.toBe('a')
-    expect(b.categories[1].amount).toBe(25)
+    expect(b.categories[1]).toMatchObject({ amount: 25, bucket: 'variable' })
   })
 
-  it('takes the 401k out before the paycheck in budgets saved before that could be marked', () => {
-    const v2 = {
-      version: 2,
+  it('carries a first-version budget over, keeping its monthly income', () => {
+    const v1 = { version: 1, income: 7800, paychecks: 2, investing: 4000, steps: [], categories: [] }
+    expect(normalizeBudget(v1)).toMatchObject({ paycheck: 3900, cadence: 'semimonthly' })
+    expect(normalizeBudget({ ...v1, paychecks: 4 })).toMatchObject({ paycheck: 1800, cadence: 'weekly' })
+  })
+
+  it('moves an older budget onto the card system', () => {
+    const v4 = {
+      version: 4,
       paycheck: 3900,
       cadence: 'semimonthly',
-      steps: [
-        { id: 'a', text: 'Invest in VTI', amount: 1500 },
-        { id: 'b', text: 'Goes into 401(k)', amount: 405 },
-      ],
-    }
-    const b = normalizeBudget(v2)!
-    expect(b.steps.map((s) => [s.id, s.beforePay])).toEqual([
-      ['b', true],
-      ['a', false],
-    ])
-    expect(paycheckRun(b).leftOver).toBe(2400)
-    // Once it can be marked, what was marked stands.
-    const v3 = normalizeBudget({ ...v2, version: 3, steps: [{ id: 'b', text: 'Goes into 401k', amount: 405, beforePay: false }] })!
-    expect(v3.steps[0].beforePay).toBe(false)
-  })
-
-  it('moves STNDRD to self investment in saves from before it existed, and the projection with it', () => {
-    const v3 = {
-      version: 3,
       investing: 4000,
-      categories: [
-        { id: 'a', name: 'STNDRD', amount: 1000, items: [] },
-        { id: 'b', name: 'Food', amount: 800, items: [] },
+      steps: [
+        { id: 's1', text: '401k', amount: 405, beforePay: true },
+        { id: 's2', text: 'VTI', amount: 1500 },
       ],
-      projection: { start: 0, monthly: 4000, k401: 810, rate: 0.07, years: 30 },
+      paid: ['s2'],
+      categories: [
+        { id: 'a', name: 'STNDRD', amount: 1000, items: [], bucket: 'self' },
+        { id: 'b', name: 'Rent, utils, park', amount: 1380, items: [], bucket: 'living' },
+        { id: 'c', name: 'Food', amount: 800, items: [], bucket: 'living' },
+      ],
+      projection: { start: 5000, monthly: 3000, k401: 810, rate: 0.07, years: 30 },
     }
-    const b = normalizeBudget(v3)!
-    expect(b.categories.map((c) => c.bucket)).toEqual(['self', 'living'])
-    expect(b.projection.monthly).toBe(3000)
-    // A monthly amount chosen by hand stays.
-    expect(normalizeBudget({ ...v3, projection: { ...v3.projection, monthly: 2500 } })!.projection.monthly).toBe(2500)
-    // Once self investment exists, a category is where it was put.
-    expect(normalizeBudget({ ...v3, version: 4 })!.categories[0].bucket).toBe('living')
+    const b = normalizeBudget(v4)!
+    expect(b.k401).toBe(405)
+    expect(b.paid).toEqual([])
+    expect(b.categories.map((c) => [c.name, c.amount, c.bucket])).toEqual([
+      ['VTI', 2900, 'invest'],
+      ['STNDRD', 1000, 'self'],
+      ['Rent, utils, park', 1380, 'fixed'],
+      ['Food', 600, 'variable'],
+      ['Gas', 150, 'variable'],
+      ['Random', 250, 'variable'],
+    ])
+    expect(bucketTotal(b, 'variable')).toBe(1000)
+    expect(b.projection).toMatchObject({ start: 5000, monthly: 2900, k401: 810 })
   })
 
-  it('fills in an empty object as an empty budget', () => {
-    expect(normalizeBudget({})).toEqual(emptyBudget())
+  it('finds the 401k in a step from before steps could be marked', () => {
+    const v2 = { version: 2, paycheck: 3900, steps: [{ text: 'Goes into 401(k)', amount: 405 }] }
+    expect(normalizeBudget(v2)!.k401).toBe(405)
   })
 })

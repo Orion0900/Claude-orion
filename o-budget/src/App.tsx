@@ -1,27 +1,17 @@
 import { useEffect, useState } from 'react'
-import {
-  addCategory,
-  addStep,
-  isBlankCategory,
-  isBlankStep,
-  monthlyIncome,
-  removeCategory,
-  removeItem,
-  removeStep,
-  shares,
-  type Bucket,
-  type Budget,
-} from './lib/budget'
+import { addCategory, investingTotal, isBlankCategory, monthlyIncome, removeCategory, removeItem, type Bucket, type Budget } from './lib/budget'
 import type { SyncStatus } from './lib/sync'
-import { CategorySheet, ExpensesSection } from './components/ExpensesSection'
+import { CardCheck } from './components/CardCheck'
+import { CategorySheet } from './components/CategorySheet'
 import { GrossSection } from './components/GrossSection'
-import { IncomeSection } from './components/IncomeSection'
+import { GroupSection } from './components/GroupSection'
 import { Ring } from './components/Marks'
-import { ProcessSection, StepSheet } from './components/ProcessSection'
+import { Overview } from './components/Overview'
+import { PlanSection } from './components/PlanSection'
 import { ProjectionSection } from './components/ProjectionSection'
 import { useBudget } from './useBudget'
 
-type Open = { kind: 'step' | 'category'; id: string; fresh: boolean }
+type Open = { id: string; fresh: boolean }
 
 const SYNC_TEXT: Record<SyncStatus, string> = {
   loading: 'Loading',
@@ -53,32 +43,30 @@ export default function App() {
     update(change)
   }
 
-  const add = (kind: Open['kind'], bucket: Bucket = 'living') => {
+  const add = (bucket: Bucket) => {
     let id = ''
     update((b) => {
-      const [next, added] = kind === 'step' ? addStep(b) : addCategory(b, bucket)
+      const [next, added] = addCategory(b, bucket)
       id = added
       return next
     })
-    setOpen({ kind, id, fresh: true })
+    setOpen({ id, fresh: true })
   }
 
-  /** Closing a step or category that was opened and left blank doesn't keep it. */
+  /** Closing a category that was opened and left blank doesn't keep it. */
   const close = () => {
-    if (open?.kind === 'step') {
-      const s = budget.steps.find((x) => x.id === open.id)
-      if (s && isBlankStep(s)) update((b) => removeStep(b, s.id))
-    } else if (open?.kind === 'category') {
-      const c = budget.categories.find((x) => x.id === open.id)
-      if (c && isBlankCategory(c)) update((b) => removeCategory(b, c.id))
-    }
+    const c = open && budget.categories.find((x) => x.id === open.id)
+    if (c && isBlankCategory(c)) update((b) => removeCategory(b, c.id))
     setOpen(null)
   }
+
+  const income = monthlyIncome(budget)
+  const openCategory = (id: string) => setOpen({ id, fresh: false })
 
   return (
     <div className="app">
       <header className="top">
-        <Ring investing={monthlyIncome(budget) > 0 ? shares(budget).investing : null} />
+        <Ring investing={income > 0 ? investingTotal(budget) / income : null} />
         <h1 className="wordmark">O-Budget</h1>
         <span className="sync" data-status={status} role="status">
           <span className="sync-dot" aria-hidden="true" />
@@ -88,49 +76,19 @@ export default function App() {
 
       <main className="layout">
         <div className="col">
-          <IncomeSection budget={budget} update={update} />
-          <ExpensesSection
-            budget={budget}
-            bucket="self"
-            onOpen={(id) => setOpen({ kind: 'category', id, fresh: false })}
-            onAdd={() => add('category', 'self')}
-          />
-          <ProcessSection
-            budget={budget}
-            update={update}
-            onOpen={(id) => setOpen({ kind: 'step', id, fresh: false })}
-            onAdd={() => add('step')}
-          />
+          <Overview budget={budget} update={update} />
+          <PlanSection budget={budget} update={update} />
+          <CardCheck budget={budget} update={update} />
+          <ProjectionSection budget={budget} update={update} />
         </div>
         <div className="col">
+          <GroupSection budget={budget} group="investing" update={update} onOpen={openCategory} onAdd={add} />
+          <GroupSection budget={budget} group="living" update={update} onOpen={openCategory} onAdd={add} />
           <GrossSection budget={budget} update={update} />
-          <ExpensesSection
-            budget={budget}
-            onOpen={(id) => setOpen({ kind: 'category', id, fresh: false })}
-            onAdd={() => add('category')}
-          />
-          <ProjectionSection budget={budget} update={update} />
         </div>
       </main>
 
-      {open?.kind === 'step' && (
-        <StepSheet
-          key={open.id}
-          budget={budget}
-          id={open.id}
-          fresh={open.fresh}
-          update={update}
-          onClose={close}
-          onRemove={(id) => {
-            const s = budget.steps.find((x) => x.id === id)
-            setOpen(null)
-            if (s && isBlankStep(s)) update((b) => removeStep(b, id))
-            else removeWithUndo(`Deleted ${s?.text.trim() || 'step'}`, (b) => removeStep(b, id))
-          }}
-        />
-      )}
-
-      {open?.kind === 'category' && (
+      {open && (
         <CategorySheet
           key={open.id}
           budget={budget}
@@ -184,17 +142,17 @@ function Loading() {
       <main className="layout">
         {[
           [
-            ['income', 'Income', 3],
-            ['process', 'Paycheck process', 3],
+            ['overview', 'This month', 3],
+            ['process', 'Each paycheck', 4],
           ],
           [
-            ['gross', 'Gross pay', 2],
-            ['expenses', 'Living expenses', 5],
+            ['group', 'Investing', 3],
+            ['group', 'Living', 5],
           ],
         ].map((col, i) => (
           <div className="col" key={i}>
             {col.map(([kind, title, lines]) => (
-              <section className={`section ${kind}`} key={kind}>
+              <section className={`section ${kind}`} key={String(title)}>
                 <h2 className="eyebrow">{title}</h2>
                 <div className="skeleton big" />
                 {Array.from({ length: Number(lines) - 1 }, (_, j) => (
