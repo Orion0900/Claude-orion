@@ -1680,6 +1680,46 @@ output.hero-money {
   grid-column: 1 / -1;
 }
 
+.years-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.years-row .years {
+  flex: 1;
+  min-width: 0;
+}
+
+.years-well {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 46px;
+}
+
+.whole {
+  font: inherit;
+  font-size: 18px;
+  font-weight: 750;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.whole:focus {
+  outline: none;
+}
+
+.years-unit {
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
 .link-btn {
   display: block;
   margin-top: 10px;

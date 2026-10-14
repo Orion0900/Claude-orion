@@ -77,7 +77,7 @@ popout: amount, per paycheck and per year, **Details** (items like each
 subscription, which set the amount), where it goes, notes, and delete.
 
 **Investment projection.** Upfront, each month (starts at the markets
-investing), the 401k each month, a yearly return and the years, drawn as a
+investing), the 401k each month, a yearly return and the years (typed or slid), drawn as a
 line chart against what was put in. Tap or drag across it for any year.
 
 **Gross pay.** Gross income and bonus a year, and the 401k each paycheck.
