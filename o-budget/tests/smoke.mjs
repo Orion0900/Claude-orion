@@ -1,8 +1,11 @@
-// Drives the built app on an iPhone-sized, touch-enabled screen: the net
-// paycheck and its cadence, gross pay and bonus, the split, the paycheck
-// steps, a category's details and the subscriptions, undo, and a reload. Then the artifact build with a stand-in for the artifact's
-// database: loading the shared copy, one saved by the first version, writing
-// edits, another device's change, an empty database and none at all. Fails on any page or console error.
+// Drives the built app on an iPhone-sized, touch-enabled screen: the month
+// at a glance, the paycheck plan and its ticks, the card check-in, the
+// Investing and Living detail with a category's popout and the
+// subscriptions, gross pay and the 401k, the projection, undo, and a reload.
+// Then the artifact build with a stand-in for the artifact's database:
+// loading the shared copy, one saved by the first version, writing edits,
+// another device's change, an empty database and none at all. Fails on any
+// page or console error.
 // Run after `npm run build && npm run artifact`. SHOTS=<dir> saves screenshots.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
@@ -35,141 +38,91 @@ await page.goto(server.url)
 await page.waitForSelector('.hero-money')
 await shot(page, '01-open', true)
 
-// The budget as written down: $3,900 twice a month makes $7,800.
+// The month: $3,900 twice a month makes $7,800, $3,900 Investing, $3,053 Living, $847 left.
 assert.equal(await income(page), '7,800')
 assert.equal(await value(page, '#paycheck'), '3,900')
 assert.equal(await value(page, '#cadence'), 'semimonthly')
 assert.equal(await text(page, '.pay-note'), '24 paychecks a year · $93,600 take-home')
-assert.equal(await value(page, '#investing'), '4,000')
-assert.equal(await value(page, '#living'), '3,800')
-assert.equal(await value(page, '#investing-pct'), '51.3')
-assert.equal(await value(page, '#living-pct'), '48.7')
-assert.match(await text(page, '.bucket.invest'), /\$2,000 a paycheck/)
-assert.match(await text(page, '.bucket.living'), /\$1,900 a paycheck/)
-assert.equal(await text(page, '.expenses .spent-total'), '$2,853')
-assert.equal(await text(page, '.expenses .section-head .pill'), '$947 to spare')
-assert.equal(await page.locator('.expenses .cat').count(), 6)
-// STNDRD is self investment, paid from Investing: $1,000 of $4,000, leaving $3,000 for the markets.
-assert.equal(await page.locator('.self-invest .cat').count(), 1)
-assert.match(await text(page, '.self-invest .cat'), /STNDRD\s+\$1,000/)
-assert.equal(await text(page, '.self-invest .spent-total'), '$1,000')
-assert.equal(await text(page, '.self-invest .section-head .pill'), '$3,000 for markets')
-assert.match(await text(page, '.bucket.invest'), /\$1,000 self · \$3,000 markets/)
-assert.match(await text(page, '.expenses .cat >> nth=2'), /Subscriptions\s+10 items\s+\$223/)
-assert.equal(await page.locator('.step').count(), 3)
-assert.deepEqual(await page.locator('.step-check').allInnerTexts(), ['0', '1', '2'])
-// The 401k comes out before the paycheck lands, so it doesn't come out of it.
-assert.deepEqual(await page.locator('.step-left').allInnerTexts(), ['out before the paycheck lands', 'then $2,400 left', 'then $500 left'])
-assert.match(await text(page, '.step-edge.end'), /Left over\s+\$500/)
+assert.match(await text(page, '.bucket.invest'), /INVESTING\s+\$3,900\s+50% of income\s+\$2,900 markets · \$1,000 self/)
+assert.match(await text(page, '.bucket.living'), /LIVING\s+\$3,053\s+39\.1% of income\s+\$2,053 fixed · \$1,000 variable/)
+assert.match(await text(page, '.left-line'), /\$847 left over, unplanned/)
+assert.equal(await page.locator('.split-bar .seg').count(), 3)
 assert.equal(await text(page, '.sync'), 'Saved on this device')
-assert.match(await text(page, '.gross'), /Add your gross income and bonus/)
 
-// A raise goes to Living, and the expenses fit.
+// Each paycheck: the rules, then every dollar in order.
+assert.deepEqual(await page.locator('.rules li').allInnerTexts(), [
+  '$1,450 into VTI the day it lands.',
+  'Chase Sapphire for fixed bills only, $2,053 a month.',
+  "Amazon card for everything variable (food, gas, random), $1,000 a month. It's the only one to watch.",
+])
+assert.deepEqual(await page.locator('.step-text').allInnerTexts(), [
+  '401k',
+  'Deposit into VTI',
+  'Pay STNDRD',
+  'Set aside for Chase Sapphire',
+  'Set aside for Amazon card',
+])
+assert.deepEqual(await page.locator('.steps .step-amount').allInnerTexts(), ['$405', '$3,900', '$1,450', '$500', '$1,027', '$500', '$423'])
+assert.match(await text(page, '.step-edge.end'), /Left in checking\s+\$423/)
+
+// A raise lands in checking.
 await enter(page, '#paycheck', '4100')
 assert.equal(await income(page), '8,200')
-assert.equal(await value(page, '#living'), '4,200')
-assert.equal(await text(page, '.expenses .section-head .pill'), '$1,347 to spare')
-assert.match(await text(page, '.step-edge'), /Paycheck lands\s+\$4,100/)
+assert.match(await text(page, '.left-line'), /\$1,247 left over/)
+assert.match(await text(page, '.step-edge.lands'), /Paycheck lands\s+\$4,100/)
+assert.match(await text(page, '.step-edge.end'), /Left in checking\s+\$623/)
 await enter(page, '#paycheck', '3900')
 
 // Every two weeks: 26 paychecks a year, averaged over the months.
 await page.selectOption('#cadence', 'biweekly')
 assert.equal(await income(page), '8,450')
 assert.equal(await text(page, '.pay-note'), '26 paychecks a year · $101,400 take-home')
-assert.match(await text(page, '.pay-note.muted'), /Most months bring 2 paychecks \(\$7,800\); two bring 3/)
-assert.match(await text(page, '.bucket.invest'), /\$1,846 a paycheck/)
-assert.match(await text(page, '.step-edge'), /Paycheck lands\s+\$3,900/)
-await shot(page, '02-biweekly')
+assert.match(await text(page, '.step >> nth=1'), /Deposit into VTI\s+\$1,338/)
 await page.selectOption('#cadence', 'monthly')
 assert.equal(await income(page), '3,900')
-assert.equal(await text(page, '.income .note-line.warn'), 'Investing is more than income.')
-assert.equal(await page.locator('.pay-note.muted').count(), 0)
+assert.match(await text(page, '.left-line.short'), /\$3,053 more planned than comes in/)
 await page.selectOption('#cadence', 'semimonthly')
 assert.equal(await income(page), '7,800')
 
-// Gross pay and bonus, beside the take-home and out of the month's income.
-await enter(page, '#gross', '120000')
-await enter(page, '#bonus', '15000')
-assert.equal(await value(page, '#bonus-pct'), '12.5')
-assert.match(await text(page, '.gross-facts'), /Total a year\s+\$135,000\s+Gross a month\s+\$10,000\s+Take-home\s+78%/)
-await enter(page, '#bonus-pct', '10')
-assert.equal(await value(page, '#bonus'), '12,000')
-assert.equal(await income(page), '7,800')
-await shot(page, '03-gross')
-
-// Split by percent, by the slider, and by the Living amount.
-await enter(page, '#investing-pct', '50')
-assert.equal(await value(page, '#investing'), '3,900')
-assert.equal(await value(page, '#living-pct'), '50')
-await page.locator('#split').evaluate((el) => {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '4500')
-  el.dispatchEvent(new Event('input', { bubbles: true }))
-})
-assert.equal(await value(page, '#investing'), '4,500')
-assert.equal(await value(page, '#living'), '3,300')
-await enter(page, '#living', '3800')
-assert.equal(await value(page, '#investing'), '4,000')
-assert.equal(await value(page, '#investing-pct'), '51.3')
-
-// Payday: tick the steps off, then clear them for next time.
+// Payday: tick the rows off, then clear them for next time.
 await page.tap('.step-check >> nth=0')
 await page.tap('.step-check >> nth=1')
-assert.equal(await text(page, '.progress'), '2 of 3 done')
-assert.equal(await page.locator('.step-check[aria-checked="true"]').count(), 2)
-await page.tap('.step-check >> nth=2')
+assert.equal(await text(page, '.progress'), '2 of 5 done')
+for (const n of [2, 3, 4]) await page.tap(`.step-check >> nth=${n}`)
 assert.equal(await text(page, '.progress'), 'All done')
-await shot(page, '04-all-done')
+await shot(page, '02-all-done')
 await page.tap('.btn >> text=Start next paycheck')
 assert.equal(await page.locator('.step-check[aria-checked="true"]').count(), 0)
-assert.equal(await page.locator('.progress').count(), 0)
 
-// The 401k's switch says it comes out before the paycheck; off, the paycheck pays for it.
-await page.tap('.step-main >> nth=0')
-await page.waitForSelector('.sheet')
-assert.equal(await page.locator('#step-before-pay').isChecked(), true)
-assert.equal(await text(page, '.field-hint'), 'Not taken from the $3,900 paycheck.')
-assert.equal(await page.locator('.sheet .btn >> text=Later').isDisabled(), true)
-await page.locator('#step-before-pay').uncheck()
-assert.match(await text(page, '.step-edge.end'), /Left over\s+\$95/)
-assert.match(await text(page, '.field-hint'), /\$3,495 of the paycheck left/)
-await page.locator('#step-before-pay').check()
-assert.match(await text(page, '.step-edge.end'), /Left over\s+\$500/)
-await page.keyboard.press('Escape')
-await page.waitForSelector('.sheet', { state: 'detached' })
+// The card check-in: what's on the Amazon card against $1,000.
+await page.locator('.card-check').scrollIntoViewIfNeeded()
+assert.match(await text(page, '#card-title'), /Amazon card check-in/i)
+assert.equal(await text(page, '.check-left'), '$1,000')
+assert.match(await text(page, '.check-parts'), /Food \$600 · Gas \$150 · Random \$250/)
+await enter(page, '#spent', '400')
+assert.equal(await text(page, '.check-left'), '$600')
+assert.match(await text(page, '.check-line'), /a day/)
+await enter(page, '#spent', '1200')
+assert.equal(await text(page, '.check-left.over'), '$200')
+assert.match(await text(page, '.check-line.warn'), /\$200 over the \$1,000 budget/)
+await shot(page, '03-card-over')
+await enter(page, '#spent', '400')
 
-// Edit a step: more into VTI leaves the paycheck short, and it can move.
-await page.tap('.step-main >> nth=1')
-await page.waitForSelector('.sheet')
-assert.equal(await page.evaluate(() => document.activeElement?.id), '', 'opening a step keeps the keyboard down')
-assert.equal(await page.locator('.sheet .btn >> text=Earlier').isDisabled(), true, 'the paycheck steps stay after the 401k')
-await enter(page, '#step-amount', '2100')
-assert.match(await text(page, '.field-hint'), /\$1,800 of the paycheck left/)
-await page.tap('.sheet .btn >> text=Later')
-assert.match(await text(page, '.sheet .eyebrow'), /Step 2/i)
-await shot(page, '05-step-sheet')
-await page.tap('.sheet [aria-label="Close"]')
-await page.waitForSelector('.sheet', { state: 'detached' })
-assert.deepEqual(await page.locator('.step-text').allInnerTexts(), ['Goes into 401k', 'Remains for 2 wks', 'Invest in VTI'])
-assert.match(await text(page, '.step-edge.end'), /Short\s+\$100/)
-await page.tap('.step-main >> nth=2')
-await page.tap('.sheet .btn >> text=Earlier')
-await enter(page, '#step-amount', '1500')
-await page.keyboard.press('Escape')
-assert.deepEqual(await page.locator('.step-text').allInnerTexts(), ['Goes into 401k', 'Invest in VTI', 'Remains for 2 wks'])
+// The cards can be renamed, and the plan follows.
+await page.locator('#card-variable').fill('Prime Visa')
+assert.match(await text(page, '#card-title'), /Prime Visa check-in/i)
+assert.match(await text(page, '.step >> nth=4'), /Set aside for Prime Visa/)
+await page.locator('#card-variable').fill('Amazon card')
 
-// A new step for the $500 left over; a blank one isn't kept.
-await page.tap('.btn >> text=Add step')
-await page.waitForSelector('.sheet')
-assert.equal(await page.evaluate(() => document.activeElement?.id), 'step-text', 'a new step is ready to type into')
-await page.keyboard.type('Top up savings')
-await enter(page, '#step-amount', '500')
-await page.keyboard.press('Escape')
-assert.equal(await page.locator('.step').count(), 4)
-assert.match(await text(page, '.step-edge.end'), /Left over\s+\$0/)
-await page.tap('.btn >> text=Add step')
-await page.waitForSelector('.sheet')
-await page.tap('.sheet [aria-label="Close"]')
-assert.equal(await page.locator('.step').count(), 4)
+// Investing and Living in detail.
+await page.tap('.bucket.invest')
+assert.equal(await text(page, '.group-investing .spent-total'), '$3,900')
+assert.deepEqual(await page.locator('.group-investing .part-total').allInnerTexts(), ['$2,900', '$1,000'])
+assert.equal(await text(page, '.group-living .spent-total'), '$3,053')
+assert.deepEqual(await page.locator('.group-living .part-total').allInnerTexts(), ['$2,053', '$1,000'])
+assert.equal(await page.locator('.part-fixed .cat').count(), 5)
+assert.equal(await page.locator('.part-variable .cat').count(), 3)
+assert.match(await text(page, '.part-fixed .cat >> nth=2'), /Subscriptions\s+10 items\s+\$223/)
 
 // The subscriptions popout.
 await page.tap('.cat >> text="Subscriptions"')
@@ -177,8 +130,9 @@ await page.waitForSelector('.sheet')
 assert.equal(await value(page, '#category-name'), 'Subscriptions')
 assert.equal(await text(page, '.sheet-total'), '$223')
 assert.equal(await page.locator('.item').count(), 10)
-assert.match(await text(page, '.sheet .facts'), /A paycheck\s+\$112\s+A year\s+\$2,676\s+Of Living\s+5\.9%/)
-await shot(page, '06-subscriptions')
+assert.match(await text(page, '.sheet .facts'), /A paycheck\s+\$112\s+A year\s+\$2,676\s+Of Living\s+7\.3%/)
+assert.equal(await value(page, '#category-bucket'), 'fixed')
+await shot(page, '04-subscriptions')
 const spotify = page.locator('.item', { has: page.locator('input[value="Spotify"]') })
 await spotify.locator('.item-money input').tap()
 await page.waitForTimeout(50)
@@ -187,11 +141,9 @@ await page.keyboard.press('Enter')
 assert.equal(await text(page, '.sheet-total'), '$225')
 await page.locator('.item', { has: page.locator('input[value="HBO"]') }).locator('[aria-label="Remove HBO"]').tap()
 assert.equal(await page.locator('.item').count(), 9)
-assert.equal(await text(page, '.sheet-total'), '$205')
 assert.equal(await text(page, '.toast-text'), 'Removed HBO')
 await page.tap('.toast button')
 assert.equal(await page.locator('.item').count(), 10)
-assert.equal(await text(page, '.sheet-total'), '$225')
 await page.tap('.sheet .btn >> text=Add item')
 assert.equal(await page.evaluate(() => document.activeElement?.className), 'item-name', 'a new item is ready to name')
 await page.keyboard.type('YouTube')
@@ -200,8 +152,8 @@ assert.equal(await text(page, '.sheet-total'), '$239')
 await page.locator('#category-note').fill('Spotify renews on the 3rd')
 await page.keyboard.press('Escape')
 await page.waitForSelector('.sheet', { state: 'detached' })
-assert.match(await text(page, '.expenses .cat >> nth=2'), /Subscriptions\s+11 items\s+\$239/)
-assert.equal(await text(page, '.expenses .spent-total'), '$2,869')
+assert.equal(await text(page, '.part-fixed .part-total'), '$2,069')
+assert.match(await text(page, '.step >> nth=3'), /Set aside for Chase Sapphire\s+\$1,035/)
 
 // Break a plain category down without its total jumping.
 await page.tap('.cat >> text="Car"')
@@ -210,46 +162,78 @@ assert.equal(await value(page, '.item-money input'), '250')
 await page.keyboard.type('Insurance')
 await page.locator('.item-money input').fill('150')
 await page.tap('.sheet .btn >> text=Add item')
-await page.keyboard.type('Gas')
+await page.keyboard.type('Upkeep')
 await page.locator('.item-money input').last().fill('100')
 assert.equal(await text(page, '.sheet-total'), '$250')
 await page.keyboard.press('Escape')
 
-// A new category, renamed and priced; one left blank isn't kept.
-await page.tap('.btn >> text=Add category')
+// A new variable category goes on the Amazon card budget; one left blank isn't kept.
+await page.tap('.part-variable .add-line')
 await page.waitForSelector('.sheet')
 assert.equal(await page.evaluate(() => document.activeElement?.id), 'category-name')
 await page.keyboard.type('Gifts')
 await enter(page, '#category-amount', '50')
 await page.keyboard.press('Escape')
-assert.match(await text(page, '.expenses .cat >> nth=6'), /Gifts\s+\$50/)
-await page.tap('.btn >> text=Add category')
+assert.match(await text(page, '.part-variable .cat >> nth=3'), /Gifts\s+\$50/)
+assert.equal(await text(page, '.part-variable .part-total'), '$1,050')
+assert.match(await text(page, '.check-parts'), /Gifts \$50/)
+await page.tap('.part-variable .add-line')
 await page.waitForSelector('.sheet')
 await page.keyboard.press('Escape')
-assert.equal(await page.locator('.expenses .cat').count(), 7)
+assert.equal(await page.locator('.part-variable .cat').count(), 4)
+
+// A category can move, say to self investment, and back.
+await page.tap('.cat >> text="Gifts"')
+await page.selectOption('#category-bucket', 'self')
+await page.keyboard.press('Escape')
+assert.equal(await page.locator('.part-self .cat').count(), 2)
+assert.equal(await text(page, '.group-investing .spent-total'), '$3,950')
+await page.tap('.cat >> text="Gifts"')
+await page.selectOption('#category-bucket', 'variable')
+await page.keyboard.press('Escape')
+assert.equal(await page.locator('.part-variable .cat').count(), 4)
 
 // Delete a category, then think better of it.
 await page.tap('.cat >> text="Haircut"')
 await page.tap('.sheet .btn >> text=Delete category')
-assert.equal(await page.locator('.expenses .cat').count(), 6)
+assert.equal(await page.locator('.part-fixed .cat').count(), 4)
 assert.equal(await text(page, '.toast-text'), 'Deleted Haircut')
-await shot(page, '07-undo')
+await shot(page, '05-undo')
 await page.tap('.toast button')
-assert.equal(await page.locator('.expenses .cat').count(), 7)
-assert.equal(await text(page, '.expenses .spent-total'), '$2,919')
+assert.equal(await page.locator('.part-fixed .cat').count(), 5)
+assert.equal(await text(page, '.group-living .spent-total'), '$3,119')
 
-// The investment projection: Investing's $4,000 a month at 7% for 30 years, then $13,780 up front and 20 years.
+// The investment projection: VTI's $2,900 and the 401k's $810 a month at 7% for 30 years, then $13,780 up front and 20 years.
 await page.locator('.projection').scrollIntoViewIfNeeded()
-assert.equal(await value(page, '#proj-monthly'), '3,000')
+assert.equal(await value(page, '#proj-monthly'), '2,900')
 assert.equal(await value(page, '#proj-401k'), '810')
-assert.match(await text(page, '.proj-facts'), /In 30 years\s+\$4\.\d+M\s+Put in\s+\$1\.4M/)
+assert.match(await text(page, '.proj-facts'), /In 30 years\s+\$4\.\d+M\s+Put in\s+\$1\.3M/)
 await enter(page, '#proj-start', '13780')
 await page.locator('#proj-years').fill('20')
 assert.match(await text(page, '.proj-facts'), /In 20 years/)
 const box = await page.locator('.chart svg').boundingBox()
 await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2)
-assert.match(await text(page, '.tip'), /Year 20\s+\$[\d,]+ total\s+\$928,180 put in/)
-await shot(page, '07b-projection')
+assert.match(await text(page, '.tip'), /Year 20\s+\$[\d,]+ total\s+\$904,180 put in/)
+await shot(page, '06-projection')
+
+// Gross pay, bonus and the 401k, which comes out before the paycheck.
+await page.locator('.gross').scrollIntoViewIfNeeded()
+assert.match(await text(page, '.gross'), /Add your gross income and bonus/)
+assert.equal(await value(page, '#k401'), '405')
+assert.match(await text(page, '.k401-tile'), /\$810 a month · \$9,720 a year/)
+await enter(page, '#gross', '120000')
+await enter(page, '#bonus', '15000')
+assert.equal(await value(page, '#bonus-pct'), '12.5')
+assert.match(await text(page, '.gross-facts'), /Total a year\s+\$135,000\s+Gross a month\s+\$10,000\s+Take-home\s+78%/)
+await enter(page, '#bonus-pct', '10')
+assert.equal(await value(page, '#bonus'), '12,000')
+assert.equal(await income(page), '7,800')
+await enter(page, '#k401', '500')
+assert.match(await text(page, '.step >> nth=0'), /401k\s+\$500/)
+assert.match(await text(page, '.link-btn'), /Use the paycheck's 401k, \$1,000 a month/)
+await enter(page, '#k401', '405')
+assert.match(await text(page, '.step-edge.end'), /Left in checking\s+\$390/)
+await shot(page, '07-gross')
 
 // Everything is still there after a reload.
 await page.waitForTimeout(600)
@@ -258,20 +242,20 @@ await page.waitForSelector('.hero-money')
 assert.equal(await income(page), '7,800')
 assert.equal(await value(page, '#gross'), '120,000')
 assert.equal(await value(page, '#bonus'), '12,000')
+assert.equal(await value(page, '#spent'), '400')
 assert.equal(await value(page, '#proj-start'), '13,780')
 assert.equal(await value(page, '#proj-years'), '20')
-assert.equal(await page.locator('.step').count(), 4)
-assert.equal(await page.locator('.expenses .cat').count(), 7)
-assert.equal(await text(page, '.expenses .spent-total'), '$2,919')
+assert.equal(await text(page, '.group-living .spent-total'), '$3,119')
 await page.tap('.cat >> text="Subscriptions"')
 assert.equal(await page.locator('#category-note').inputValue(), 'Spotify renews on the 3rd')
 await page.keyboard.press('Escape')
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('o-budget.state')))
-assert.equal(saved.version, 4)
-assert.equal(saved.steps[0].beforePay, true)
+assert.equal(saved.version, 5)
+assert.equal(saved.k401, 405)
+assert.deepEqual(saved.cards, { fixed: 'Chase Sapphire', variable: 'Amazon card' })
+assert.equal(saved.spent.amount, 400)
 assert.equal(saved.paycheck, 3900)
-assert.equal(saved.cadence, 'semimonthly')
-assert.equal('income' in saved, false)
+assert.equal('steps' in saved, false)
 
 // No sideways scrolling on a phone.
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
@@ -323,14 +307,14 @@ await hosted({ doc: saved }, async (p) => {
   await shot(p, '08-artifact-loading')
   await p.waitForSelector('.hero-money')
   assert.equal(await income(p), '7,800')
-  assert.equal(await text(p, '.expenses .spent-total'), '$2,919')
+  assert.equal(await text(p, '.group-living .spent-total'), '$3,119')
   assert.equal(await text(p, '.sync'), 'Saved')
   await enter(p, '#paycheck', '4000')
   await p.waitForTimeout(700)
   const writes = await p.evaluate(() => window.__writes)
   assert.equal(writes.length, 1)
   assert.equal(writes[0].paycheck, 4000)
-  assert.equal(writes[0].version, 4)
+  assert.equal(writes[0].version, 5)
   assert.equal(typeof writes[0].savedAt, 'string')
   assert.equal(await text(p, '.sync'), 'Saved')
   // Another device's change shows up here.
@@ -338,7 +322,7 @@ await hosted({ doc: saved }, async (p) => {
   assert.equal(await income(p), '9,100')
 })
 
-// A shared copy saved by the first version, which kept a monthly income, opens unchanged.
+// A shared copy saved by the first version opens on the card system, keeping its income.
 await hosted(
   {
     doc: { version: 1, income: 7800, paychecks: 2, investing: 4000, steps: [], categories: [{ id: 'food', name: 'Food', amount: 800, note: '', items: [] }] },
@@ -347,12 +331,12 @@ await hosted(
     await p.waitForSelector('.hero-money')
     assert.equal(await income(p), '7,800')
     assert.equal(await value(p, '#paycheck'), '3,900')
-    assert.equal(await value(p, '#cadence'), 'semimonthly')
-    assert.equal(await value(p, '#living'), '3,800')
+    assert.equal(await text(p, '.group-investing .spent-total'), '$2,900')
+    assert.equal(await text(p, '.group-living .spent-total'), '$1,000')
     await enter(p, '#gross', '120000')
     await p.waitForTimeout(700)
     const [written] = await p.evaluate(() => window.__writes)
-    assert.equal(written.version, 4)
+    assert.equal(written.version, 5)
     assert.equal(written.paycheck, 3900)
     assert.equal(written.gross, 120000)
     assert.equal('income' in written, false)
@@ -363,8 +347,8 @@ await hosted(
 await hosted({ doc: undefined }, async (p) => {
   await p.waitForSelector('.hero-money')
   assert.equal(await income(p), '0')
-  assert.match(await text(p, '.income'), /Enter your net paycheck and how often it comes to start/)
-  assert.match(await text(p, '.expenses'), /No expenses yet/)
+  assert.match(await text(p, '.overview'), /Enter your net paycheck and how often it comes to start/)
+  assert.match(await text(p, '.group-living'), /Add rent/)
   assert.equal(await p.locator('.step').count(), 0)
   await shot(p, '09-artifact-empty', true)
   await enter(p, '#paycheck', '2500')

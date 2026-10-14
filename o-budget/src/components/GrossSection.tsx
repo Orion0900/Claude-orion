@@ -1,4 +1,4 @@
-import { setBonus, setBonusShare, setGross, takeHomeShare, type Budget } from '../lib/budget'
+import { k401Monthly, paychecksPerYear, setBonus, setBonusShare, setGross, setK401, takeHomeShare, type Budget } from '../lib/budget'
 import { money, percent } from '../lib/money'
 import { MoneyInput, PercentInput } from './Fields'
 
@@ -14,7 +14,7 @@ export function GrossSection({ budget: b, update }: { budget: Budget; update: Up
   const any = b.gross > 0 || b.bonus > 0
 
   return (
-    <section className="section gross" aria-labelledby="gross-title">
+    <section id="pay" className="section gross" aria-labelledby="gross-title">
       <div className="section-head">
         <h2 className="eyebrow" id="gross-title">
           Gross pay
@@ -41,6 +41,14 @@ export function GrossSection({ budget: b, update }: { budget: Budget; update: Up
             ) : (
               'a year'
             )}
+          </div>
+        </div>
+
+        <div className="bucket pay-tile k401-tile">
+          <div className="bucket-head">401k</div>
+          <MoneyInput id="k401" className="bucket-money" value={b.k401} label="401k each paycheck" onChange={(n) => update((x) => setK401(x, n))} />
+          <div className="bucket-line num">
+            each paycheck, before it lands · {money(k401Monthly(b))} a month · {money(b.k401 * paychecksPerYear(b))} a year
           </div>
         </div>
       </div>

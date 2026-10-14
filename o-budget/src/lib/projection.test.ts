@@ -16,11 +16,11 @@ describe('project', () => {
     expect(project({ start: 10000, monthly: 0, k401: 0, rate: 0.12, years: 1 })[1].value).toBe(11268.25)
   })
 
-  it("projects Orion's $3,000 a month plus $810 into the 401k at 7% for 30 years", () => {
+  it("projects Orion's $2,900 a month plus $810 into the 401k at 7% for 30 years", () => {
     const last = project(orionBudget().projection).at(-1)!
-    expect(last.contributed).toBe(1371600)
+    expect(last.contributed).toBe(1335600)
     const without401k = project({ ...orionBudget().projection, k401: 0 }).at(-1)!
-    expect(without401k.contributed).toBe(1080000)
+    expect(without401k.contributed).toBe(1044000)
     expect(last.value).toBeGreaterThan(without401k.value)
   })
 
@@ -30,8 +30,8 @@ describe('project', () => {
 })
 
 describe('projection settings', () => {
-  it('starts older saves contributing the Investing amount', () => {
-    expect(normalizeBudget({ investing: 3500 })!.projection).toEqual({ start: 0, monthly: 3500, k401: 0, rate: 0.07, years: 30 })
+  it('starts older saves contributing the markets investing', () => {
+    expect(normalizeBudget({ investing: 3500 })!.projection).toEqual({ start: 0, monthly: 2900, k401: 0, rate: 0.07, years: 30 })
     // ...and the steps taken out before the paycheck as the 401k: $405 twice a month.
     const v3 = { version: 3, paycheck: 3900, cadence: 'semimonthly', investing: 4000, steps: [{ text: '401k', amount: 405, beforePay: true }] }
     expect(normalizeBudget(v3)!.projection.k401).toBe(810)
@@ -39,7 +39,7 @@ describe('projection settings', () => {
 
   it('keeps settings in range', () => {
     const b = setProjection(orionBudget(), { rate: 2, years: 500, start: -5 })
-    expect(b.projection).toEqual({ start: 0, monthly: 3000, k401: 810, rate: 0.3, years: 60 })
+    expect(b.projection).toEqual({ start: 0, monthly: 2900, k401: 810, rate: 0.3, years: 60 })
     expect(setProjection(b, { years: 0 }).projection.years).toBe(1)
   })
 })

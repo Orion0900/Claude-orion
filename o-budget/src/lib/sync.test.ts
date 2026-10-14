@@ -105,7 +105,7 @@ describe('sync on the phone', () => {
 describe('sync in an artifact', () => {
   it('loads the shared copy', async () => {
     const saved = orionBudget()
-    const cloud = fakeDoc({ version: 1, ...saved })
+    const cloud = fakeDoc({ version: 5, ...saved })
     const h = harness(async () => cloud.doc)
     h.sync.start(true, null)
     expect(h.last()).toBe('loading')

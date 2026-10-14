@@ -1,6 +1,7 @@
 /*
- * O-Budget. Layout: one column on a phone (income, paycheck process, living
- * expenses), two from 900px wide with living expenses on the right.
+ * O-Budget. Layout: one column on a phone (the month, each paycheck, the
+ * card check-in, Investing, Living, projection, gross pay), two from 900px
+ * wide with the detail on the right.
  * Dark first like the rest of Orion's apps; the light set serves artifact
  * viewers in light mode. Two colors carry meaning everywhere: cobalt is
  * Investing, amber is Living. Red and green only ever mean over and under.
@@ -220,10 +221,10 @@ h3 {
 }
 
 /*
- * Two columns on a wide screen: income above the paycheck process on the
- * left, gross pay above living expenses on the right. On a phone the
- * columns dissolve and the sections stack: income, gross pay, process,
- * expenses.
+ * Two columns on a wide screen: the month, each paycheck, the card check-in
+ * and the projection on the left; Investing, Living and gross pay on the
+ * right. On a phone the columns dissolve and the sections stack: the month,
+ * each paycheck, the card, Investing, Living, projection, gross pay.
  */
 .layout {
   display: flex;
@@ -235,23 +236,23 @@ h3 {
   display: contents;
 }
 
-.layout .income {
+.layout .overview {
   order: 1;
 }
 
-.layout .self-invest {
+.layout .process {
   order: 2;
 }
 
-.layout .gross {
+.layout .card-check {
   order: 3;
 }
 
-.layout .process {
+.layout .group-investing {
   order: 4;
 }
 
-.layout .expenses {
+.layout .group-living {
   order: 5;
 }
 
@@ -259,10 +260,8 @@ h3 {
   order: 6;
 }
 
-/* Self investment is paid from Investing, so it's drawn in Investing's color. */
-.self-invest .meter-fill,
-.self-invest .bar-fill {
-  background: var(--invest);
+.layout .gross {
+  order: 7;
 }
 
 @media (min-width: 900px) {
@@ -538,81 +537,6 @@ output.hero-money {
 }
 
 /* The split: one track, cobalt up to the thumb and amber after it, with a sliver of surface between. */
-.split {
-  -webkit-appearance: none;
-  appearance: none;
-  display: block;
-  width: 100%;
-  height: 40px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-  --split-track: linear-gradient(
-    to right,
-    var(--invest) 0 calc(var(--at) - 1.5px),
-    var(--card) calc(var(--at) - 1.5px) calc(var(--at) + 1.5px),
-    var(--living) calc(var(--at) + 1.5px) 100%
-  );
-}
-
-.split.empty {
-  --split-track: var(--well);
-  cursor: default;
-}
-
-.split::-webkit-slider-runnable-track {
-  height: 16px;
-  border-radius: 8px;
-  background: var(--split-track);
-}
-
-.split::-moz-range-track {
-  height: 16px;
-  border-radius: 8px;
-  background: var(--split-track);
-}
-
-.split::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 28px;
-  height: 28px;
-  margin-top: -6px;
-  border-radius: 50%;
-  background: var(--thumb);
-  border: 3px solid var(--card);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-}
-
-.split::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--thumb);
-  border: 3px solid var(--card);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-}
-
-.split.empty::-webkit-slider-thumb {
-  visibility: hidden;
-}
-
-.split.empty::-moz-range-thumb {
-  visibility: hidden;
-}
-
-.split:focus-visible {
-  outline: none;
-}
-
-.split:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--focus);
-}
-
-.split:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--focus);
-}
-
 .buckets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -676,30 +600,6 @@ output.hero-money {
   font-size: 16px;
   font-weight: 700;
   color: var(--ink);
-}
-
-.income-status {
-  width: 100%;
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line);
-  padding: 10px 12px 10px 14px;
-  font-size: 14px;
-  color: var(--ink-2);
-  text-align: left;
-}
-
-@media (min-width: 900px) {
-  .income-status {
-    display: none;
-  }
 }
 
 /* ----------------------------------------------------------- process */
@@ -1136,6 +1036,301 @@ output.hero-money {
   font-size: 12px;
   color: var(--ink-3);
   text-align: right;
+}
+
+/* ---------------------------------------------------------- overview */
+
+/* Income in one bar: Investing, Living, and what's left. */
+.split-bar {
+  display: flex;
+  gap: 3px;
+  height: 16px;
+  margin: 18px 0 4px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--well);
+}
+
+.seg {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+}
+
+.seg.invest {
+  background: var(--invest);
+}
+
+.seg.living {
+  background: var(--living);
+}
+
+.seg.left {
+  background: repeating-linear-gradient(135deg, var(--line) 0 4px, transparent 4px 8px);
+}
+
+.tile-btn {
+  border: 0;
+  color: inherit;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 0.15s;
+}
+
+.tile-btn .bucket-head svg {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.tile-btn:active {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.bucket.invest {
+  box-shadow: inset 3px 0 0 var(--invest);
+}
+
+.bucket.living {
+  box-shadow: inset 3px 0 0 var(--living);
+}
+
+.left-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.left-line .swatch {
+  background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, transparent 2px 4px);
+}
+
+.left-line.short {
+  color: var(--over-ink);
+}
+
+.left-line.short .swatch {
+  background: var(--over);
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+/* -------------------------------------------------------------- plan */
+
+.rules {
+  margin: 4px 0 14px;
+  padding: 12px 14px 12px 34px;
+  border-radius: 14px;
+  background: var(--well);
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.rules li::marker {
+  color: var(--ink-3);
+  font-weight: 700;
+}
+
+.rules strong {
+  color: var(--ink);
+}
+
+.step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.plan-invest .step-dot,
+.plan-self .step-dot {
+  background: var(--invest);
+}
+
+.plan-fixed .step-dot,
+.plan-variable .step-dot {
+  background: var(--living);
+}
+
+/* --------------------------------------------------------- card check */
+
+.check-left {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  font-stretch: 112%;
+  padding: 8px 0;
+  color: var(--good-ink);
+}
+
+.check-left.over {
+  color: var(--over-ink);
+}
+
+.check-meter {
+  margin-top: 18px;
+}
+
+.pace-mark {
+  background: var(--ink-2);
+}
+
+.check-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.check-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  background: var(--good-wash);
+  color: var(--good-ink);
+}
+
+.check-line.warn {
+  background: var(--over-wash);
+  color: var(--over-ink);
+}
+
+.check-line svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.check-parts {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------ groups */
+
+.part {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.part-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.part-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-stretch: 112%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.part-total {
+  font-weight: 800;
+  font-stretch: 112%;
+}
+
+.part-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.card-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-name {
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  padding: 2px 0;
+  width: 14em;
+  max-width: 60vw;
+}
+
+.card-name:focus {
+  outline: none;
+  border-bottom-color: var(--focus);
+  color: var(--ink);
+}
+
+.part-self .swatch {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--invest);
+}
+
+.part-fixed .swatch,
+.part-variable .swatch {
+  background: var(--living);
+}
+
+.part-variable .swatch {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--living);
+}
+
+.group-investing .bar-fill,
+.group-investing .meter-fill {
+  background: var(--invest);
+}
+
+.group-investing .spent-total {
+  color: var(--invest);
+}
+
+.group-living .spent-total {
+  color: var(--living);
+}
+
+.add-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.add-line svg {
+  width: 16px;
+  height: 16px;
+}
+
+.k401-tile {
+  grid-column: 1 / -1;
 }
 
 /* ----------------------------------------------------------- buttons */

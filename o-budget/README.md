@@ -1,27 +1,26 @@
 # O-Budget
 
-Orion's budget as an app. The net paycheck and how often it comes, which make
-the month's income, and how that splits between **Investing** and **Living**;
-gross pay and bonus beside it; the steps to run every payday in order; and
-where Living goes, category by category, with a popout for the details, like
-each subscription. Every number can be changed in place, and every total
-follows.
+Orion's budget as an app, built around a budgeting system that runs itself:
+
+1. **$1,450 straight into VTI** every paycheck.
+2. **Chase Sapphire for fixed expenses only.**
+3. **The Amazon card for everything variable** (food, gas, random), $1,000 a
+   month. It's the only account to watch.
+
+The app shows the month split into **Investing** and **Living**, where every
+dollar of each paycheck goes, a check-in for the Amazon card against its
+$1,000, and every category in detail with a popout.
 
 It opens on the budget as written down:
 
 | | |
 |---|---|
-| Income | $7,800 a month: a $3,900 net paycheck, twice a month |
-| Gross pay | gross income and bonus, a year, to fill in |
-| Investing | $4,000 (51.3%) |
-| Living | $3,800 (48.7%) |
-| Paycheck process | 0 — $405 into the 401k, before the paycheck lands · 1 — $1,500 into VTI · 2 — $1,900 for the next 2 weeks |
-| Living expenses | Rent, utils, park $1,380 · STNDRD $1,000 · Car $250 · Subscriptions $223 (RCF, Cap Hill Fitness, Claude, HBO, Spotify, iCloud, NFL, Soundcloud, WSJ, Chase) · Food $800 · Haircut $100 · Medical $100 |
-
-Two things the app shows that the note didn't add up: the expenses come to
-**$3,853**, not $3,740, which is **$53 more than Living**; and with the 401k
-taken out before the paycheck, VTI and the next two weeks use $3,400 of each
-$3,900 paycheck, leaving **$500** that no step accounts for.
+| Income | $7,800 a month: a $3,900 net paycheck, twice a month ($405 into the 401k comes out before it) |
+| Investing | $3,900: VTI $2,900 (markets) · STNDRD $1,000 (self investment) |
+| Living, fixed (Chase Sapphire) | $2,053: Rent, utils, park $1,380 · Car $250 · Subscriptions $223 (10 items) · Haircut $100 · Medical $100 |
+| Living, variable (Amazon card) | $1,000: Food $600 · Gas $150 · Random $250 |
+| Left over | $847 a month |
+| Each paycheck | 401k $405 before it lands · VTI $1,450 · STNDRD $500 · set aside $1,027 for Chase · $500 for Amazon · $423 stays in checking |
 
 ## Installing it on an iPhone
 
@@ -52,85 +51,60 @@ loads the budget from that database.
 
 ## What it does
 
-**Income.** The month's income, big, made from the **net paycheck** and how
-often it's **paid**: every week, every 2 weeks, twice a month or once a month.
-Under them, the paychecks in a year and the year's take-home. One slider sets
-the split: cobalt for Investing, amber for Living. Or type either side in
-dollars or as a percent of income. Each side shows what it is per paycheck,
-and a line under them says how the living expenses compare: "$53 over" or
-"$47 to spare".
+**This month.** The month's income, big, from the **net paycheck** and how
+often it's **paid**. One bar splits it: cobalt Investing, amber Living,
+hatched for what's left over. Tap the Investing or Living tile to jump to its
+detail.
 
-**Gross pay.** Gross income and bonus, a year, before taxes. The bonus can be
-typed in dollars or as a percent of gross. Under them: the two together, gross
-income a month, and take-home as a share of gross. Neither is part of the
-monthly income, which runs on the paycheck.
+**Each paycheck.** The three rules of the system, then the paycheck dollar by
+dollar: the 401k before it lands, each investment, what to set aside for each
+card's bill, and what stays in checking. It's built from the categories, so
+it always matches the budget. Tick rows off on payday; **Start next
+paycheck** clears them.
 
-**Paycheck process.** The steps to run each payday, numbered from 0 the way
-the note numbers them, starting from the paycheck and ending with what's left
-over. Under each step is what's left of the paycheck after it. A step can be
-marked as coming out before the paycheck, like the 401k: it sits above
-"Paycheck lands" with a dashed ring, and the paycheck doesn't pay for it. Tap a step's
-circle to tick it off; **Start next paycheck** clears the ticks. Tap the step
-itself to change its words and amount, move it earlier or later, or delete
-it. A step that asks for more than is left shows the paycheck as short.
+**Amazon card check-in.** Type what's on the card so far this month, whenever
+you look. It shows what's left of the variable budget, a meter with where an
+even pace would be today, and how much a day is left for the rest of the
+month. It starts over each month.
 
-**Living expenses.** The total against Living, on a bar that runs red past
-Living when spending is over, then every category with its amount, a bar for
-its share of Living and that share as a percent. Tap a category for its
-popout:
+**Investing** and **Living.** Each total, its share of income and per
+paycheck, then its two halves: markets and self investment (paid from
+Investing, not grown by the projection); fixed and variable, each with the
+card it goes on (tap the card name to rename it). Tap any category for its
+popout: amount, per paycheck and per year, **Details** (items like each
+subscription, which set the amount), where it goes, notes, and delete.
 
-- its name and monthly amount, and what that is per paycheck and per year
-  (the subscriptions come to $2,676 a year);
-- **Details**: the items it's made of, each with its own amount. With items,
-  the category's amount is their total. The first item added starts with the
-  category's whole amount, so breaking a category down never drops it to $0
-  on the way;
-- notes, for due dates, accounts or anything else;
-- **Delete category**.
+**Investment projection.** Upfront, each month (starts at the markets
+investing), the 401k each month, a yearly return and the years, drawn as a
+line chart against what was put in. Tap or drag across it for any year.
 
-**Self investment.** Categories paid from Investing instead of Living, like
-STNDRD: listed under Income against the Investing amount, with what's left
-for the markets ($3,000 of $4,000). They don't count as living expenses, and
-the projection grows only what's left for the markets. Any category's
-popout can move it between Living and Investing.
+**Gross pay.** Gross income and bonus a year, and the 401k each paycheck.
 
-**Investment projection.** Enter an upfront amount, what goes in each
-month (it starts at Investing less self investment), the 401k each month (it starts
-at the steps taken out before the paycheck, $810), a yearly return and the years,
-and a line chart shows the total value year by year against what was put
-in, with the end total, the amount put in and the growth above it. Tap or
-drag across the chart for any year. It compounds monthly at a steady
-return, before taxes and inflation.
-
-Deleting a category, step or item offers **Undo** for a few seconds. A new
-step or category that's closed while still blank isn't kept.
+Deleting a category or item offers **Undo** for a few seconds. A new category
+closed while still blank isn't kept.
 
 ## How the numbers work
 
 - The month's income is the net paycheck times the paychecks in a year (52,
-  26, 24 or 12), over twelve months. Every two weeks is an average: $3,900
-  makes $8,450 a month, though most months bring two paychecks ($7,800) and
-  two months bring three, and the app says so under the paycheck.
-- Per-paycheck amounts divide by the paychecks a month (26 ÷ 12 for every two
-  weeks). On the Investing and Living tiles they round to whole dollars.
-- Investing is kept in dollars and Living is the rest of income. A bigger
-  paycheck keeps Investing where it is and moves Living, so a raise shows up
-  as room in the living expenses. A percent typed into either side sets
-  Investing to that share of the current income.
-- Gross income and bonus are a year and stay out of the monthly income.
-  Take-home is a year of net paychecks as a share of gross income.
-- The paycheck process starts from one paycheck and takes each step's amount
-  off in order, except the steps that come out before the paycheck.
-- Every amount shows and is entered in whole dollars, rounded to the nearest.
+  26, 24 or 12), over twelve months. The 401k comes out before the net
+  paycheck, so it's not part of it.
+- Investing and Living are the sums of their categories; left over is income
+  less both.
+- Each paycheck's rows are the monthly amounts over the paychecks a month,
+  rounded to whole dollars so they add up to the paycheck exactly.
+- The card check-in's pace is the variable budget spread evenly over the
+  month's days; a balance typed last month counts as $0 this month.
+- Every amount shows and is entered in whole dollars.
 
 ## Where it's saved
 
 In the installed app, in the phone's `localStorage` under `o-budget.state`,
 written a moment after each change and straight away when the app is put
 away. A budget saved by the first version, which kept a monthly income,
-opens unchanged: its paycheck is worked back from that income. In a budget
-saved before steps could be marked as coming out before the paycheck, a 401k
-step is moved there. In the artifact, in the artifact's database as the document
+opens unchanged: its paycheck is worked back from that income. A budget saved
+before the card system moves onto it: the 401k from its steps, VTI at $1,450
+a paycheck if there was no investment, and food, gas and random as the
+$1,000 variable budget. In the artifact, in the artifact's database as the document
 `budget/main`, with a copy in the browser. Edits show at once and are written
 one at a time; a change made on another device shows up unless an edit made
 here is still on its way. The header says where the budget is saved.
@@ -149,8 +123,8 @@ npm run icons      # redraws the Home Screen icons
 ## Tests
 
 Unit tests (`npm test`) cover the sums (income from the paycheck and its
-cadence, take-home against gross, the split, per paycheck, the paycheck run,
-category totals and the expenses against Living), every edit, reading back
+cadence, take-home against gross, the four buckets, the paycheck plan, the
+card check-in and its pace, category totals), every edit, reading back
 saved budgets, including broken ones and the first version's, and the save
 and sync rules with a stand-in database. The browser checks in [`tests/`](tests/README.md) drive
 the built app on an iPhone-sized screen.
@@ -164,8 +138,8 @@ src/
   lib/storage.ts      the phone's copy
   lib/sync.ts         saving, and the artifact's database
   useBudget.ts        the budget on screen and the one way to change it
-  App.tsx             the three sections, the popouts and Undo
-  components/         Income, Gross pay, Paycheck process, Living expenses, the popout, fields
+  App.tsx             the sections, the popout and Undo
+  components/         This month, Each paycheck, card check-in, Investing/Living, projection, gross pay, the popout, fields
 scripts/
   make-icons.mjs      the Home Screen icons
   build-artifact.mjs  the single-page artifact
