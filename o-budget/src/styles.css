@@ -1160,6 +1160,143 @@ output.hero-money {
   background: var(--living);
 }
 
+/* ---------------------------------------------------------- checklist */
+
+.checklist {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.checklist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.checks {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.check {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-areas:
+    'box text'
+    'box hint';
+  gap: 2px 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--well);
+  color: var(--ink);
+  text-align: left;
+}
+
+.check-box {
+  grid-area: box;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid var(--ink-3);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.check-box svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 3;
+}
+
+.check.on .check-box {
+  background: var(--good);
+  border-color: var(--good);
+  color: #fff;
+}
+
+.check-text {
+  grid-area: text;
+  font-weight: 700;
+}
+
+.check-hint {
+  grid-area: hint;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.check.on .check-text {
+  color: var(--good-ink);
+}
+
+.history {
+  margin-top: 8px;
+}
+
+.history summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+
+.history-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.history-list > li {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.history-period {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.history-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 13px;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mark svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+.mark.ok {
+  color: var(--good-ink);
+}
+
+.mark.miss {
+  color: var(--over-ink);
+}
+
 /* --------------------------------------------------------- card check */
 
 .check-left {

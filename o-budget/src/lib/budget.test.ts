@@ -19,7 +19,6 @@ import {
   perPaycheck,
   removeCategory,
   removeItem,
-  resetPaid,
   sameBudget,
   setBonus,
   setBonusShare,
@@ -33,7 +32,12 @@ import {
   spentThisMonth,
   takeHomeShare,
   takeHomeYear,
-  togglePaid,
+  toggleCheck,
+  currentChecks,
+  checkHistory,
+  periodKey,
+  periodLabel,
+  investPerPaycheck,
   updateCategory,
   updateItem,
   variableCheck,
@@ -121,13 +125,43 @@ describe('paycheck plan', () => {
     expect(paycheckPlan(orionBudget()).rows.some((r) => r.label.includes('401k'))).toBe(false)
   })
 
-  it('ticks rows off and clears them for the next paycheck', () => {
-    let b = togglePaid(orionBudget(), 'variable')
-    b = togglePaid(b, 'fixed')
-    expect(b.paid).toEqual(['variable', 'fixed'])
-    b = togglePaid(b, 'variable')
-    expect(b.paid).toEqual(['fixed'])
-    expect(resetPaid(b).paid).toEqual([])
+})
+
+describe('payday checklist', () => {
+  const oct3 = new Date(2026, 9, 3)
+  const oct14 = new Date(2026, 9, 14)
+  const oct15 = new Date(2026, 9, 15)
+  const nov1 = new Date(2026, 10, 1)
+
+  it('splits the month at the 15th', () => {
+    expect(periodKey(oct3)).toBe('2026-10-1')
+    expect(periodKey(oct14)).toBe('2026-10-1')
+    expect(periodKey(oct15)).toBe('2026-10-15')
+    expect(periodLabel('2026-10-1')).toBe('Oct 1–14, 2026')
+    expect(periodLabel('2026-10-15')).toBe('Oct 15–31, 2026')
+    expect(periodLabel('2027-02-15')).toBe('Feb 15–28, 2027')
+  })
+
+  it('ticks items for the period, in a fixed order, with what went into VTI', () => {
+    expect(investPerPaycheck(orionBudget())).toBe(1450)
+    let b = toggleCheck(orionBudget(), 'variable', oct3)
+    b = toggleCheck(b, 'invest', oct3)
+    expect(currentChecks(b, oct14)).toEqual(['invest', 'variable'])
+    expect(b.checks['2026-10-1']).toEqual({ done: ['invest', 'variable'], invest: 1450 })
+    b = toggleCheck(b, 'variable', oct3)
+    expect(currentChecks(b, oct3)).toEqual(['invest'])
+  })
+
+  it('starts over on the 1st and the 15th and keeps the rest as history', () => {
+    let b = toggleCheck(orionBudget(), 'invest', oct3)
+    expect(currentChecks(b, oct15)).toEqual([])
+    b = toggleCheck(b, 'fixed', oct15)
+    expect(currentChecks(b, nov1)).toEqual([])
+    expect(checkHistory(b, nov1).map((h) => [h.period, h.done])).toEqual([
+      ['2026-10-15', ['fixed']],
+      ['2026-10-1', ['invest']],
+    ])
+    expect(checkHistory(b, oct15).map((h) => h.period)).toEqual(['2026-10-1'])
   })
 })
 
@@ -227,19 +261,15 @@ describe('categories', () => {
     expect(bucketTotal(b, 'fixed')).toBe(2038)
   })
 
-  it('removes a category and its tick', () => {
-    let b = orionBudget()
-    const vti = byName(b, 'VTI').id
-    b = togglePaid(b, vti)
-    b = removeCategory(b, vti)
-    expect(investingTotal(b)).toBe(1000)
-    expect(b.paid).toEqual([])
+  it('removes a category', () => {
+    const b = orionBudget()
+    expect(investingTotal(removeCategory(b, byName(b, 'VTI').id))).toBe(1000)
   })
 })
 
 describe('normalizeBudget', () => {
   it('round-trips a budget unchanged', () => {
-    const b = setSpent(orionBudget(), 300, new Date(2026, 9, 1))
+    const b = toggleCheck(setSpent(orionBudget(), 300, new Date(2026, 9, 1)), 'fixed', new Date(2026, 9, 1))
     const back = normalizeBudget({ version: 5, ...JSON.parse(JSON.stringify(b)) })
     expect(sameBudget(back, b)).toBe(true)
   })
@@ -264,14 +294,15 @@ describe('normalizeBudget', () => {
       paychecks: 12,
       k401: -1,
       cards: { fixed: '', variable: 7 },
-      paid: ['a', 3],
+      checks: { '2026-10-15': { done: ['fixed', 'nope', 'invest'], invest: 1450 }, '2026-10-7': { done: [] }, junk: 1 },
       spent: { month: 'October', amount: 50 },
       categories: [
         { id: 'a', name: 'Food', amount: Infinity, items: 'none', bucket: 'nope' },
         { id: 'a', name: 'Subs', amount: 1, items: [{ name: 'HBO', amount: 20 }, { name: 'Max', amount: 5 }], bucket: 'variable' },
       ],
     })!
-    expect(b).toMatchObject({ gross: 0, bonus: 0, paycheck: 3900.4, cadence: 'weekly', k401: 0, paid: ['a'] })
+    expect(b).toMatchObject({ gross: 0, bonus: 0, paycheck: 3900.4, cadence: 'weekly', k401: 0 })
+    expect(b.checks).toEqual({ '2026-10-15': { done: ['invest', 'fixed'], invest: 1450 } })
     expect(b.cards).toEqual({ fixed: 'Chase Sapphire', variable: 'Amazon card' })
     expect(b.spent).toEqual({ month: '', amount: 50 })
     expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '', bucket: 'fixed' })
@@ -295,7 +326,6 @@ describe('normalizeBudget', () => {
         { id: 's1', text: '401k', amount: 405, beforePay: true },
         { id: 's2', text: 'VTI', amount: 1500 },
       ],
-      paid: ['s2'],
       categories: [
         { id: 'a', name: 'STNDRD', amount: 1000, items: [], bucket: 'self' },
         { id: 'b', name: 'Rent, utils, park', amount: 1380, items: [], bucket: 'living' },
@@ -305,7 +335,7 @@ describe('normalizeBudget', () => {
     }
     const b = normalizeBudget(v4)!
     expect(b.k401).toBe(405)
-    expect(b.paid).toEqual([])
+    expect(b.checks).toEqual({})
     expect(b.categories.map((c) => [c.name, c.amount, c.bucket])).toEqual([
       ['VTI', 2900, 'invest'],
       ['STNDRD', 1000, 'self'],

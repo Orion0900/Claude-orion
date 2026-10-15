@@ -70,8 +70,8 @@ export interface Budget {
   /** The card each kind of Living goes on. */
   cards: { fixed: string; variable: string }
   categories: Category[]
-  /** The plan's rows ticked off for the paycheck in hand, by key. */
-  paid: string[]
+  /** The payday checklist, kept for every pay period ("2026-10-15") it was ticked in. */
+  checks: Record<string, PeriodCheck>
   /** What's on the variable card so far this month ("2026-10"). */
   spent: { month: string; amount: number }
   /** The investing projection's inputs. */
@@ -127,7 +127,7 @@ export function orionBudget(): Budget {
       category('Medical', 100, 'fixed'),
       ...variableCategories(),
     ],
-    paid: [],
+    checks: {},
     spent: { month: '', amount: 0 },
     projection: { start: 0, monthly: 2900, k401: 810, rate: 0.07, years: 30 },
   }
@@ -142,7 +142,7 @@ export function emptyBudget(): Budget {
     k401: 0,
     cards: { ...DEFAULT_CARDS },
     categories: [],
-    paid: [],
+    checks: {},
     spent: { month: '', amount: 0 },
     projection: { start: 0, monthly: 0, k401: 0, rate: 0.07, years: 30 },
   }
@@ -260,6 +260,55 @@ export function variableCheck(b: Budget, now: Date) {
   return { budget, spent, left, daysLeft, perDay: left > 0 ? left / daysLeft : 0, pace, aheadOfPace: roundCents(pace - spent), day, days }
 }
 
+// ------------------------------------------------------ the payday checklist
+
+/** What to confirm each paycheck: the investing went in, the fixed bills came as expected, the variable card is under budget. */
+export type CheckKey = 'invest' | 'fixed' | 'variable'
+export const CHECK_KEYS: CheckKey[] = ['invest', 'fixed', 'variable']
+
+export interface PeriodCheck {
+  done: CheckKey[]
+  /** What went into investing that paycheck, as planned when it was ticked. */
+  invest: number
+}
+
+/** The pay period a day falls in: the 1st to the 14th, or the 15th to the month's end ("2026-10-1", "2026-10-15"). */
+export const periodKey = (d: Date) => `${monthKey(d)}-${d.getDate() < 15 ? 1 : 15}`
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "Oct 15–31, 2026". */
+export function periodLabel(key: string): string {
+  const [y, m, start] = key.split('-').map(Number)
+  const end = start === 1 ? 14 : new Date(y, m, 0).getDate()
+  return `${MONTH_NAMES[m - 1]} ${start}–${end}, ${y}`
+}
+
+/** What goes into investing (markets) each paycheck. */
+export const investPerPaycheck = (b: Budget) => sum(paycheckPlan(b).rows.filter((r) => r.bucket === 'invest').map((r) => r.amount))
+
+/** This period's checklist; a new period starts empty, which is the reset on the 1st and the 15th. */
+export const currentChecks = (b: Budget, now: Date): CheckKey[] => b.checks[periodKey(now)]?.done ?? []
+
+export function toggleCheck(b: Budget, key: CheckKey, now: Date): Budget {
+  const period = periodKey(now)
+  const done = currentChecks(b, now)
+  const next = done.includes(key) ? done.filter((k) => k !== key) : CHECK_KEYS.filter((k) => k === key || done.includes(k))
+  return { ...b, checks: { ...b.checks, [period]: { done: next, invest: investPerPaycheck(b) } } }
+}
+
+/** Earlier periods, newest first. */
+export const checkHistory = (b: Budget, now: Date) =>
+  Object.entries(b.checks)
+    .filter(([k]) => k !== periodKey(now))
+    .sort(([x], [y]) => periodOrder(y) - periodOrder(x))
+    .map(([period, c]) => ({ period, ...c }))
+
+const periodOrder = (key: string) => {
+  const [y, m, d] = key.split('-').map(Number)
+  return y * 10000 + m * 100 + d
+}
+
 // --------------------------------------------------------------- the edits
 
 /** Amounts are never negative and never hold fractions of a cent. */
@@ -287,14 +336,6 @@ export const setSpent = (b: Budget, amount: number, now: Date): Budget => ({
   ...b,
   spent: { month: monthKey(now), amount: dollars(amount) },
 })
-
-export const togglePaid = (b: Budget, key: string): Budget => ({
-  ...b,
-  paid: b.paid.includes(key) ? b.paid.filter((k) => k !== key) : [...b.paid, key],
-})
-
-/** Clears the ticks for the next paycheck. */
-export const resetPaid = (b: Budget): Budget => (b.paid.length ? { ...b, paid: [] } : b)
 
 // Categories and their items
 
@@ -324,7 +365,6 @@ export const setCategoryBucket = (b: Budget, id: string, bucket: Bucket): Budget
 export const removeCategory = (b: Budget, id: string): Budget => ({
   ...b,
   categories: b.categories.filter((c) => c.id !== id),
-  paid: b.paid.filter((k) => k !== id),
 })
 
 /**
@@ -369,6 +409,17 @@ const idOf = (v: unknown, seen: Set<string>) => {
   const id = typeof v === 'string' && /^[\w-]{1,40}$/.test(v) && !seen.has(v) ? v : newId()
   seen.add(id)
   return id
+}
+
+const checksOf = (raw: unknown): Record<string, PeriodCheck> => {
+  const out: Record<string, PeriodCheck> = {}
+  if (!isObject(raw)) return out
+  for (const [k, v] of Object.entries(raw)) {
+    if (!/^\d{4}-\d{2}-(1|15)$/.test(k) || !isObject(v)) continue
+    const done = Array.isArray(v.done) ? CHECK_KEYS.filter((c) => (v.done as unknown[]).includes(c)) : []
+    out[k] = { done, invest: amountOf(v.invest) }
+  }
+  return out
 }
 
 /**
@@ -437,7 +488,7 @@ export function normalizeBudget(raw: unknown): Budget | null {
       variable: textOf(cards.variable, 40) || DEFAULT_CARDS.variable,
     },
     categories,
-    paid: version < 5 ? [] : (Array.isArray(raw.paid) ? raw.paid : []).filter((k): k is string => typeof k === 'string').slice(0, 100),
+    checks: checksOf(raw.checks),
     spent: { month: /^\d{4}-\d{2}$/.test(textOf(spent.month)) ? textOf(spent.month) : '', amount: amountOf(spent.amount) },
     projection,
   }
