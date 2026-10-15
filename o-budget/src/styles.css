@@ -1374,6 +1374,37 @@ output.hero-money {
   gap: 10px;
 }
 
+.part-toggle {
+  justify-content: flex-start;
+  width: 100%;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.fold-chev {
+  display: grid;
+  margin-left: -4px;
+  color: var(--ink-3);
+  transition: transform 0.15s;
+  transform: rotate(90deg);
+}
+
+.fold-chev svg {
+  width: 18px;
+  height: 18px;
+}
+
+.part.open .fold-chev {
+  transform: rotate(-90deg);
+}
+
+.part-toggle .part-total {
+  margin-left: auto;
+}
+
 .part-title {
   display: flex;
   align-items: center;
