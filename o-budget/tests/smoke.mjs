@@ -81,15 +81,18 @@ assert.match(await text(page, '.left-line.short'), /\$3,053 more planned than co
 await page.selectOption('#cadence', 'semimonthly')
 assert.equal(await income(page), '7,800')
 
-// Payday: tick the rows off, then clear them for next time.
-await page.tap('.step-check >> nth=0')
-await page.tap('.step-check >> nth=1')
-assert.equal(await text(page, '.progress'), '2 of 3 done')
-await page.tap('.step-check >> nth=2')
-assert.equal(await text(page, '.progress'), 'All done')
+// Payday checklist: VTI, fixed bills, the variable budget, for this pay period.
+assert.deepEqual(await page.locator('.check-text').allInnerTexts(), ['$1,450 VTI', 'Fixed expenses as expected', 'Under variable budget'])
+assert.match(await text(page, '.checklist-head'), /(1–14|15–\d\d), 20\d\d · 0 of 3/)
+await page.tap('#check-invest')
+await page.tap('#check-variable')
+assert.equal(await page.locator('.check[aria-checked="true"]').count(), 2)
+assert.match(await text(page, '.checklist-head'), /2 of 3/)
+await page.tap('#check-fixed')
+assert.match(await text(page, '.checklist-head'), /All done/)
 await shot(page, '02-all-done')
-await page.tap('.btn >> text=Start next paycheck')
-assert.equal(await page.locator('.step-check[aria-checked="true"]').count(), 0)
+await page.tap('#check-fixed')
+assert.equal(await page.locator('.history').count(), 0)
 
 // The card check-in: what's on the Amazon card against $1,000.
 await page.locator('.card-check').scrollIntoViewIfNeeded()
@@ -263,6 +266,23 @@ assert.deepEqual(saved.cards, { fixed: 'Chase Sapphire', variable: 'Amazon card'
 assert.equal(saved.spent.amount, 400)
 assert.equal(saved.paycheck, 3900)
 assert.equal('steps' in saved, false)
+
+// Earlier pay periods are kept as history; this one starts fresh each 1st and 15th.
+await page.evaluate(() => {
+  const saved = JSON.parse(localStorage.getItem('o-budget.state'))
+  saved.checks['2026-09-15'] = { done: ['invest', 'fixed'], invest: 1500 }
+  saved.checks['2026-09-1'] = { done: ['invest', 'fixed', 'variable'], invest: 1450 }
+  localStorage.setItem('o-budget.state', JSON.stringify(saved))
+})
+await page.reload()
+await page.waitForSelector('.hero-money')
+assert.equal(await page.locator('.check[aria-checked="true"]').count(), 2)
+await page.tap('.history summary')
+assert.match(await text(page, '.history summary'), /History · 2 pay periods/)
+assert.deepEqual(await page.locator('.history-period').allInnerTexts(), ['Sep 15–30, 2026', 'Sep 1–14, 2026'])
+assert.equal(await page.locator('.history-list li >> nth=0').locator('.mark.miss').count(), 1)
+assert.match(await text(page, '.history-list li >> nth=0'), /\$1,500 VTI/)
+await shot(page, '07c-history')
 
 // No sideways scrolling on a phone.
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)

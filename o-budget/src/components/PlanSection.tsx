@@ -1,6 +1,19 @@
-import { bucketTotal, inBucket, paycheckPlan, resetPaid, togglePaid, type Budget } from '../lib/budget'
+import {
+  bucketTotal,
+  checkHistory,
+  currentChecks,
+  inBucket,
+  investPerPaycheck,
+  paycheckPlan,
+  periodKey,
+  periodLabel,
+  toggleCheck,
+  variableCheck,
+  type Budget,
+  type CheckKey,
+} from '../lib/budget'
 import { money } from '../lib/money'
-import { CheckIcon, ResetIcon } from './Icons'
+import { CheckIcon, CloseIcon } from './Icons'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -8,12 +21,14 @@ const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavio
 
 /**
  * Each paycheck, dollar by dollar: built from the categories, so it always
- * matches the budget. The system it follows is spelled out on top, the
- * steps tick off on payday, and "Start next paycheck" clears them.
+ * matches the budget. The system it follows is spelled out on top, and a
+ * short checklist below starts over on the 1st and the 15th, keeping every
+ * earlier pay period's answers as history.
  */
-export function PlanSection({ budget: b, update }: { budget: Budget; update: Update }) {
+export function PlanSection({ budget: b, update, now = new Date() }: { budget: Budget; update: Update; now?: Date }) {
   const plan = paycheckPlan(b)
-  const done = plan.rows.filter((r) => b.paid.includes(r.key)).length
+  const checks = currentChecks(b, now)
+  const done = checks.length
   const short = plan.leftOver < 0
   const invest = inBucket(b, 'invest')
   const variable = inBucket(b, 'variable')
@@ -25,7 +40,6 @@ export function PlanSection({ budget: b, update }: { budget: Budget; update: Upd
         <h2 className="eyebrow" id="plan-title">
           Each paycheck
         </h2>
-        {done > 0 && <span className="progress num">{done === plan.rows.length ? 'All done' : `${done} of ${plan.rows.length} done`}</span>}
       </div>
 
       <ol className="rules">
@@ -56,20 +70,12 @@ export function PlanSection({ budget: b, update }: { budget: Budget; update: Upd
           </div>
         </li>
         {plan.rows.map((r, i) => {
-          const paid = b.paid.includes(r.key)
           const after = plan.after[i]
           return (
-            <li key={r.key} className={`step${paid ? ' done' : ''} plan-${r.bucket}`}>
-              <button
-                type="button"
-                className="step-check"
-                role="checkbox"
-                aria-checked={paid}
-                aria-label={`${r.label}, ${money(r.amount)}`}
-                onClick={() => update((x) => togglePaid(x, r.key))}
-              >
-                {paid ? <CheckIcon /> : <span className="step-dot" aria-hidden="true" />}
-              </button>
+            <li key={r.key} className={`step plan-${r.bucket}`}>
+              <span className="step-check" aria-hidden="true">
+                <span className="step-dot" />
+              </span>
               <button
                 type="button"
                 className="step-main"
@@ -94,14 +100,83 @@ export function PlanSection({ budget: b, update }: { budget: Budget; update: Upd
         </li>
       </ol>
 
-      {done > 0 && (
-        <div className="actions">
-          <button type="button" className="btn quiet" onClick={() => update(resetPaid)}>
-            <ResetIcon />
-            Start next paycheck
-          </button>
-        </div>
-      )}
+      <Checklist budget={b} update={update} now={now} done={done} checks={checks} />
     </section>
+  )
+}
+
+const CHECK_TEXT: Record<CheckKey, string> = { invest: '', fixed: 'Fixed expenses as expected', variable: 'Under variable budget' }
+
+function Checklist({ budget: b, update, now, done, checks }: { budget: Budget; update: Update; now: Date; done: number; checks: CheckKey[] }) {
+  const invest = inBucket(b, 'invest')
+  const v = variableCheck(b, now)
+  const history = checkHistory(b, now)
+  const investName = invest.map((c) => c.name.trim() || 'investing').join(' + ') || 'investing'
+  const items: { key: CheckKey; text: string; hint: string }[] = [
+    { key: 'invest', text: `${money(investPerPaycheck(b))} ${investName}`, hint: 'Deposited this paycheck' },
+    { key: 'fixed', text: CHECK_TEXT.fixed, hint: `${b.cards.fixed} bills, no surprises` },
+    { key: 'variable', text: CHECK_TEXT.variable, hint: `${b.cards.variable}: ${money(v.spent)} of ${money(v.budget)} so far` },
+  ]
+  const label = (key: CheckKey, invested: number) => (key === 'invest' ? `${money(invested)} ${investName}` : CHECK_TEXT[key])
+
+  return (
+    <div className="checklist">
+      <div className="checklist-head">
+        <h3 className="eyebrow">This pay period</h3>
+        <span className="section-aside num">
+          {periodLabel(periodKey(now))} · {done === items.length ? 'All done' : `${done} of ${items.length}`}
+        </span>
+      </div>
+      <ul className="checks">
+        {items.map((it) => {
+          const on = checks.includes(it.key)
+          return (
+            <li key={it.key}>
+              <button
+                type="button"
+                id={`check-${it.key}`}
+                className={`check${on ? ' on' : ''}`}
+                role="checkbox"
+                aria-checked={on}
+                onClick={() => update((x) => toggleCheck(x, it.key, now))}
+              >
+                <span className="check-box" aria-hidden="true">
+                  {on && <CheckIcon />}
+                </span>
+                <span className="check-text">{it.text}</span>
+                <span className="check-hint num">{it.hint}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="note-line">Starts over on the 1st and the 15th.</p>
+
+      {history.length > 0 && (
+        <details className="history">
+          <summary>
+            History <span className="muted num">· {history.length} pay period{history.length === 1 ? '' : 's'}</span>
+          </summary>
+          <ul className="history-list">
+            {history.map((h) => (
+              <li key={h.period}>
+                <span className="history-period num">{periodLabel(h.period)}</span>
+                <span className="history-marks">
+                  {(['invest', 'fixed', 'variable'] as CheckKey[]).map((k) => {
+                    const ok = h.done.includes(k)
+                    return (
+                      <span key={k} className={`mark${ok ? ' ok' : ' miss'}`}>
+                        {ok ? <CheckIcon /> : <CloseIcon />}
+                        <span className="num">{label(k, h.invest)}</span>
+                      </span>
+                    )
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   )
 }

@@ -60,9 +60,12 @@ detail.
 dollar from the moment it lands: each investment, what to set aside for each
 card's bill (self investment like STNDRD is pulled from the fixed card, so
 it's set aside with the fixed bills), and what stays in checking. The 401k
-comes out before the paycheck, so it's noted under the net paycheck instead. It's built from the categories, so
-it always matches the budget. Tick rows off on payday; **Start next
-paycheck** clears them.
+comes out before the paycheck, so it's noted under the net paycheck instead.
+Under it, a checklist for the pay period: the VTI deposit, fixed expenses as
+expected, and under the variable budget. It starts over on the 1st and the
+15th by itself, and every earlier pay period's ticks are kept under
+**History**. It's built from the categories, so
+it always matches the budget.
 
 **Amazon card check-in.** Type what's on the card so far this month, whenever
 you look. It shows what's left of the variable budget, a meter with where an
