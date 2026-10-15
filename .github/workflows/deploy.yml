@@ -155,6 +155,19 @@ jobs:
           mkdir -p dist/o-budget
           cp -r o-budget/dist/. dist/o-budget/
 
+      - name: Build O-Plan
+        working-directory: o-plan
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add O-Plan to the site
+        run: |
+          mkdir -p dist/o-plan
+          cp -r o-plan/dist/. dist/o-plan/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5
