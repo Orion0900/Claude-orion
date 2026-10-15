@@ -109,12 +109,13 @@ const CHECK_TEXT: Record<CheckKey, string> = { invest: '', fixed: 'Fixed expense
 
 function Checklist({ budget: b, update, now, done, checks }: { budget: Budget; update: Update; now: Date; done: number; checks: CheckKey[] }) {
   const invest = inBucket(b, 'invest')
+  const self = inBucket(b, 'self')
   const v = variableCheck(b, now)
   const history = checkHistory(b, now)
   const investName = invest.map((c) => c.name.trim() || 'investing').join(' + ') || 'investing'
   const items: { key: CheckKey; text: string; hint: string }[] = [
     { key: 'invest', text: `${money(investPerPaycheck(b))} ${investName}`, hint: 'Deposited this paycheck' },
-    { key: 'fixed', text: CHECK_TEXT.fixed, hint: `${b.cards.fixed} bills, no surprises` },
+    { key: 'fixed', text: CHECK_TEXT.fixed, hint: `${b.cards.fixed}: ${money(bucketTotal(b, 'fixed', 'self'))} a month expected${self.length ? `, with ${self.map((c) => c.name.trim() || 'self investment').join(', ')}` : ''}` },
     { key: 'variable', text: CHECK_TEXT.variable, hint: `${b.cards.variable}: ${money(v.spent)} of ${money(v.budget)} so far` },
   ]
   const label = (key: CheckKey, invested: number) => (key === 'invest' ? `${money(invested)} ${investName}` : CHECK_TEXT[key])
