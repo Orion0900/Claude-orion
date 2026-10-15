@@ -84,6 +84,8 @@ assert.equal(await income(page), '7,800')
 // Payday checklist: VTI, fixed bills, the variable budget, for this pay period.
 assert.deepEqual(await page.locator('.check-text').allInnerTexts(), ['$1,450 VTI', 'Fixed expenses as expected', 'Under variable budget'])
 assert.match(await text(page, '.checklist-head'), /(1–14|15–\d\d), 20\d\d · 0 of 3/)
+assert.match(await text(page, '#check-fixed .check-hint'), /Chase Sapphire: \$3,053 a month expected, with STNDRD/)
+assert.match(await text(page, '#check-variable .check-hint'), /Amazon card: \$\d[\d,]* of \$1,000 so far/)
 await page.tap('#check-invest')
 await page.tap('#check-variable')
 assert.equal(await page.locator('.check[aria-checked="true"]').count(), 2)
