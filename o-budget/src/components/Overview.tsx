@@ -7,12 +7,12 @@ import {
   monthlyIncome,
   paychecksPerYear,
   setCadence,
-  setPaycheck,
+  setMonthlyIncome,
   takeHomeYear,
   type Budget,
   type Cadence,
 } from '../lib/budget'
-import { money, moneyField, percent } from '../lib/money'
+import { money, percent } from '../lib/money'
 import { MoneyInput } from './Fields'
 import { ChevronIcon } from './Icons'
 
@@ -43,20 +43,15 @@ export function Overview({ budget: b, update }: { budget: Budget; update: Update
         <span className="section-aside">take-home</span>
       </div>
 
-      <div className="hero" aria-live="polite">
-        <output className="hero-money" aria-label={`Income ${money(income)} a month`}>
-          <span className="money-sign" aria-hidden="true">
-            $
-          </span>
-          <span className="num">{moneyField(income)}</span>
-        </output>
+      <div className="hero">
+        <MoneyInput id="income" className="hero-money" value={income} label="Net pay a month" lazy onChange={(n) => update((x) => setMonthlyIncome(x, n))} />
         <span className="hero-unit">a month</span>
       </div>
 
       <div className="pay-row">
         <div className="pay-field">
-          <span className="field-label">Net paycheck</span>
-          <MoneyInput id="paycheck" className="well-money" value={b.paycheck} label="Net paycheck" onChange={(n) => update((x) => setPaycheck(x, n))} />
+          <span className="field-label">Each paycheck</span>
+          <output id="paycheck" className="well-money paycheck-out num">{money(b.paycheck)}</output>
         </div>
         <label className="pay-field">
           <span className="field-label">Paid</span>
@@ -124,7 +119,7 @@ export function Overview({ budget: b, update }: { budget: Budget; update: Update
         {left < 0 ? `${money(-left)} more planned than comes in` : `${money(left)} left over, unplanned`}
         <span className="muted"> · {share(Math.abs(left))}</span>
       </p>
-      {income <= 0 && <p className="note-line">Enter your net paycheck and how often it comes to start.</p>}
+      {income <= 0 && <p className="note-line">Enter your net pay a month and how often it comes to start.</p>}
     </section>
   )
 }

@@ -321,9 +321,30 @@ export const setBonus = (b: Budget, bonus: number): Budget => ({ ...b, bonus: do
 /** The bonus as a share of gross income. */
 export const setBonusShare = (b: Budget, share: number): Budget => setBonus(b, b.gross * Math.max(0, share))
 
-export const setPaycheck = (b: Budget, paycheck: number): Budget => ({ ...b, paycheck: dollars(paycheck) })
+/**
+ * A change in pay goes to investing: the first market category without
+ * items takes the difference in monthly income, so a raise is invested and
+ * a cut comes out of investing, while Living stays as budgeted. The
+ * projection's monthly amount follows when it was matching the markets.
+ */
+function trickle(before: Budget, after: Budget): Budget {
+  const delta = roundCents(monthlyIncome(after) - monthlyIncome(before))
+  const target = after.categories.find((c) => c.bucket === 'invest' && !c.items.length)
+  if (!delta || !target) return after
+  const markets = bucketTotal(after, 'invest')
+  const next = withCategory(after, target.id, (c) => ({ ...c, amount: dollars(c.amount + delta) }))
+  return next.projection.monthly === markets ? { ...next, projection: { ...next.projection, monthly: bucketTotal(next, 'invest') } } : next
+}
 
-export const setCadence = (b: Budget, cadence: Cadence): Budget => (isCadence(cadence) ? { ...b, cadence } : b)
+export const setPaycheck = (b: Budget, paycheck: number): Budget => trickle(b, { ...b, paycheck: dollars(paycheck) })
+
+/** Monthly net pay; the paycheck is worked out from it and the cadence. */
+export const setMonthlyIncome = (b: Budget, income: number): Budget =>
+  trickle(b, { ...b, paycheck: (Math.max(0, income) * 12) / paychecksPerYear(b) })
+
+/** A new cadence keeps the month's income and changes what each paycheck is. */
+export const setCadence = (b: Budget, cadence: Cadence): Budget =>
+  isCadence(cadence) ? { ...b, cadence, paycheck: (monthlyIncome(b) * 12) / CADENCES.find((c) => c.id === cadence)!.perYear } : b
 
 export const setK401 = (b: Budget, k401: number): Budget => ({ ...b, k401: dollars(k401) })
 

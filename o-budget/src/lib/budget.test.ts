@@ -28,6 +28,7 @@ import {
   setGross,
   setK401,
   setPaycheck,
+  setMonthlyIncome,
   setSpent,
   spentThisMonth,
   takeHomeShare,
@@ -117,7 +118,7 @@ describe('paycheck plan', () => {
   })
 
   it('shows short when the paycheck runs out', () => {
-    const plan = paycheckPlan(setPaycheck(orionBudget(), 3000))
+    const plan = paycheckPlan({ ...orionBudget(), paycheck: 3000 })
     expect(plan.leftOver).toBe(-477)
   })
 
@@ -194,14 +195,17 @@ describe('variable card check-in', () => {
 describe('paycheck and gross pay', () => {
   it('fills income from the paycheck and its cadence', () => {
     const b = orionBudget()
-    expect(monthlyIncome(setCadence(b, 'biweekly'))).toBe(8450)
-    expect(monthlyIncome(setCadence(b, 'monthly'))).toBe(3900)
+    // A new cadence keeps the month's income and reworks the paycheck.
+    expect(monthlyIncome(setCadence(b, 'biweekly'))).toBe(7800)
+    expect(setCadence(b, 'biweekly').paycheck).toBeCloseTo(3600)
+    expect(setCadence(b, 'monthly').paycheck).toBe(7800)
     expect(setCadence(b, 'yearly' as never)).toBe(b)
     expect(CADENCES.map((c) => c.perYear)).toEqual([52, 26, 24, 12])
   })
 
   it('works per paycheck on any cadence', () => {
     expect(perPaycheck(setCadence(orionBudget(), 'biweekly'), 1300)).toBe(600)
+    expect(perPaycheck({ ...orionBudget(), cadence: 'biweekly' }, 1300)).toBe(600)
   })
 
   it('keeps gross pay and bonus beside the budget', () => {
@@ -212,6 +216,32 @@ describe('paycheck and gross pay', () => {
     expect(monthlyIncome(b)).toBe(7800)
     expect(setBonus(b, -5).bonus).toBe(0)
     expect(takeHomeShare(emptyBudget())).toBeNull()
+  })
+
+  it('puts a raise into VTI and leaves Living alone', () => {
+    const b = orionBudget()
+    const raised = setMonthlyIncome(b, 8800)
+    expect(raised.paycheck).toBe(4400)
+    expect(monthlyIncome(raised)).toBe(8800)
+    expect(byName(raised, 'VTI').amount).toBe(3900)
+    expect(livingTotal(raised)).toBe(livingTotal(b))
+    expect(leftOver(raised)).toBe(leftOver(b))
+    expect(paycheckPlan(raised).rows[0]).toMatchObject({ label: 'Deposit into VTI', amount: 1950 })
+    expect(raised.projection.monthly).toBe(3900)
+    // A cut comes out of VTI, never below $0.
+    expect(byName(setMonthlyIncome(b, 7000), 'VTI').amount).toBe(2100)
+    expect(byName(setMonthlyIncome(b, 1000), 'VTI').amount).toBe(0)
+    // Typing the paycheck does the same.
+    expect(byName(setPaycheck(b, 4100), 'VTI').amount).toBe(3300)
+    // A projection set by hand stays.
+    const custom = setMonthlyIncome({ ...b, projection: { ...b.projection, monthly: 2000 } }, 8800)
+    expect(custom.projection.monthly).toBe(2000)
+  })
+
+  it('works out the paycheck from monthly net on any cadence', () => {
+    const b = setMonthlyIncome(setCadence(orionBudget(), 'biweekly'), 8800)
+    expect(b.paycheck).toBeCloseTo(4061.54, 2)
+    expect(monthlyIncome(b)).toBe(8800)
   })
 
   it('never goes negative', () => {

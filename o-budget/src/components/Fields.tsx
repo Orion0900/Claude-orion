@@ -11,6 +11,8 @@ interface NumberFieldProps {
   autoFocus?: boolean
   /** Shows $0 as an empty field waiting to be filled in, for amounts not entered yet. */
   blank?: boolean
+  /** Hands the amount over once, when typing is done, instead of on every keystroke. */
+  lazy?: boolean
 }
 
 /** Typing replaces the whole number, the way a calculator would. */
@@ -37,7 +39,7 @@ const widthFor = (text: string) => {
  * exactly what was typed; each readable keystroke updates the budget, and
  * leaving the field tidies it up ("7800" back to "7,800").
  */
-export function MoneyInput({ id, value, onChange, label, className = '', autoFocus, blank }: NumberFieldProps) {
+export function MoneyInput({ id, value, onChange, label, className = '', autoFocus, blank, lazy }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? (blank && value === 0 ? '' : moneyField(value))
   return (
@@ -63,11 +65,18 @@ export function MoneyInput({ id, value, onChange, label, className = '', autoFoc
         onChange={(e) => {
           const typed = e.target.value
           setDraft(typed)
+          if (lazy) return
           const n = parseMoney(typed)
           if (n !== null) onChange(n)
           else if (!typed.trim()) onChange(0)
         }}
-        onBlur={() => setDraft(null)}
+        onBlur={() => {
+          if (lazy && draft !== null) {
+            const n = draft.trim() ? parseMoney(draft) : 0
+            if (n !== null && n !== Math.round(value)) onChange(n)
+          }
+          setDraft(null)
+        }}
         onKeyDown={doneOnEnter}
       />
     </label>
