@@ -2110,3 +2110,9 @@ output.hero-money {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The paycheck follows from the monthly net and the cadence, so it's read-only. */
+.paycheck-out {
+  display: flex;
+  color: var(--ink-2);
+}

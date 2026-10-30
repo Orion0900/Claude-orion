@@ -51,9 +51,13 @@ loads the budget from that database.
 
 ## What it does
 
-**This month.** The month's income, big, from the **net paycheck** and how
-often it's **paid**. One bar splits it: cobalt Investing, amber Living,
-hatched for what's left over. Tap the Investing or Living tile to jump to its
+**This month.** The month's **net pay**, big and typed in directly, with how
+often it's **paid**; each paycheck is worked out from the two. A change in
+pay goes into VTI: a raise from $7,800 to $8,800 a month adds $1,000 to VTI
+($500 more each paycheck) and leaves Living and what's left over as they
+were. Changing how often you're paid keeps the month's pay and reworks the
+paycheck. One bar splits the month: cobalt Investing, amber Living, hatched
+for what's left over. Tap the Investing or Living tile to jump to its
 detail.
 
 **Each paycheck.** The three rules of the system, then the paycheck dollar by
