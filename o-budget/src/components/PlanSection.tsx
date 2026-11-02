@@ -14,6 +14,7 @@ import {
 } from '../lib/budget'
 import { money } from '../lib/money'
 import { CheckIcon, CloseIcon } from './Icons'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -34,12 +35,14 @@ export function PlanSection({ budget: b, update, now = new Date() }: { budget: B
   const variable = inBucket(b, 'variable')
   const self = inBucket(b, 'self')
 
+  const f = useFold('plan')
   return (
-    <section id="plan" className="section process" aria-labelledby="plan-title">
-      <div className="section-head">
+    <section id="plan" className={`section process${f.fold}`} aria-labelledby="plan-title">
+      <div {...f.headProps}>
         <h2 className="eyebrow" id="plan-title">
           Each paycheck
         </h2>
+        {f.button('Each paycheck')}
       </div>
 
       <ol className="rules">

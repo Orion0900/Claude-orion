@@ -318,6 +318,23 @@ assert.equal(await page.locator('.history-list li >> nth=0').locator('.mark.miss
 assert.match(await text(page, '.history-list li >> nth=0'), /\$1,500 VTI/)
 await shot(page, '07c-history')
 
+// Every section folds to its heading, by its arrow or the heading itself, and stays folded after a reload.
+assert.equal(await page.locator('.fold-btn').count(), 7)
+await page.tap('#plan .fold-btn')
+assert.equal(await page.locator('#plan .steps').isVisible(), false)
+assert.equal(await page.locator('#plan .fold-btn').getAttribute('aria-expanded'), 'false')
+await page.tap('#investing .section-head h2')
+assert.equal(await page.locator('#investing .spent').isVisible(), false)
+await page.reload()
+await page.waitForSelector('.hero-money')
+assert.equal(await page.locator('#plan .steps').isVisible(), false)
+assert.equal(await page.locator('#investing .spent').isVisible(), false)
+await shot(page, '08-folded', true)
+await page.tap('#plan .fold-btn')
+await page.tap('#investing .fold-btn')
+assert.equal(await page.locator('#plan .steps').isVisible(), true)
+assert.equal(await page.locator('#investing .spent').isVisible(), true)
+
 // No sideways scrolling on a phone.
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
 

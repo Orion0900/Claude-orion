@@ -2,6 +2,7 @@ import { inBucket, categoryTotal, setSpent, variableCheck, type Budget } from '.
 import { money } from '../lib/money'
 import { MoneyInput } from './Fields'
 import { AlertIcon, OkIcon } from './Icons'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -22,13 +23,15 @@ export function CardCheck({ budget: b, update, now = new Date() }: { budget: Bud
   const pace = v.budget > 0 ? v.pace / scale : 0
   const parts = inBucket(b, 'variable')
 
+  const f = useFold('card')
   return (
-    <section id="card" className="section card-check" aria-labelledby="card-title">
-      <div className="section-head">
+    <section id="card" className={`section card-check${f.fold}`} aria-labelledby="card-title">
+      <div {...f.headProps}>
         <h2 className="eyebrow" id="card-title">
           {b.cards.variable} check-in
         </h2>
         <span className="section-aside">{MONTHS[now.getMonth()]}</span>
+        {f.button('card check-in')}
       </div>
 
       <div className="pay-row">

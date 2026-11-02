@@ -3,6 +3,7 @@ import { bucketTotal, k401Monthly, setProjection, type Budget } from '../lib/bud
 import { money, percent } from '../lib/money'
 import { compactMoney, MAX_INFLATION, MAX_RATE, MAX_YEARS, niceTicks, pointsInTodaysDollars, project, type ProjectionPoint } from '../lib/projection'
 import { MoneyInput, PercentInput, WholeInput } from './Fields'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -23,12 +24,14 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
   // Self investment comes out of Investing but doesn't grow with the markets.
   const markets = bucketTotal(b, 'invest')
 
+  const f = useFold('projection')
   return (
-    <section className="section projection" aria-labelledby="projection-title">
-      <div className="section-head">
+    <section className={`section projection${f.fold}`} aria-labelledby="projection-title">
+      <div {...f.headProps}>
         <h2 className="eyebrow" id="projection-title">
           Investment projection
         </h2>
+        {f.button('Investment projection')}
       </div>
 
       <div className="proj-fields">

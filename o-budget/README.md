@@ -97,6 +97,9 @@ years buys what $1.9M buys today".
 Deleting a category or item offers **Undo** for a few seconds. A new category
 closed while still blank isn't kept.
 
+Every section folds to just its heading: tap the heading or its arrow. The
+phone remembers which are folded.
+
 ## How the numbers work
 
 - The month's income is the net paycheck times the paychecks in a year (52,
