@@ -239,6 +239,26 @@ await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2)
 assert.match(await text(page, '.tip'), /Year 20\s+\$[\d,]+ total\s+\$904,180 put in/)
 await shot(page, '06-projection')
 
+// Spending power in today's dollars: off by default, then 3% inflation a year.
+await page.mouse.move(0, 0)
+assert.equal(await page.locator('.spending-line').count(), 0)
+const faceValue = (await text(page, '.proj-facts div >> nth=0')).match(/\$[\d.]+[Mk]?/)[0]
+await page.locator('#proj-real').check()
+assert.equal(await value(page, '#proj-inflation'), '3')
+assert.match(await text(page, '.proj-facts'), /In 20 years \(today's \$\)/)
+const line = await text(page, '.spending-line')
+assert.ok(line.startsWith(`${faceValue} in 20 years buys what $`) && line.endsWith(' buys today.'), line)
+const real = line.match(/buys what (\$[\d.]+[Mk]?)/)[1]
+assert.notEqual(real, faceValue)
+assert.match(await text(page, '.projection .note-line'), /in today's dollars at 3% inflation a year/)
+// No inflation: today's dollars match the face value.
+await enter(page, '#proj-inflation', '0')
+assert.ok((await text(page, '.spending-line')).includes(`buys what ${faceValue} buys today`))
+await enter(page, '#proj-inflation', '3')
+await shot(page, '06b-todays-dollars')
+await page.locator('#proj-real').uncheck()
+assert.equal(await page.locator('.spending-line').count(), 0)
+
 // Gross pay, bonus and the 401k, which comes out before the paycheck.
 await page.locator('.gross').scrollIntoViewIfNeeded()
 assert.match(await text(page, '.gross'), /Add your gross income and bonus/)
