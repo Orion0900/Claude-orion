@@ -129,7 +129,7 @@ export function orionBudget(): Budget {
     ],
     checks: {},
     spent: { month: '', amount: 0 },
-    projection: { start: 0, monthly: 2900, k401: 810, rate: 0.07, years: 30 },
+    projection: { start: 0, monthly: 2900, k401: 810, rate: 0.07, years: 30, inflation: 0.03, real: false },
   }
 }
 
@@ -144,7 +144,7 @@ export function emptyBudget(): Budget {
     categories: [],
     checks: {},
     spent: { month: '', amount: 0 },
-    projection: { start: 0, monthly: 0, k401: 0, rate: 0.07, years: 30 },
+    projection: { start: 0, monthly: 0, k401: 0, rate: 0.07, years: 30, inflation: 0.03, real: false },
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { bucketTotal, k401Monthly, setProjection, type Budget } from '../lib/budget'
-import { money } from '../lib/money'
-import { compactMoney, MAX_RATE, MAX_YEARS, niceTicks, project, type ProjectionPoint } from '../lib/projection'
+import { money, percent } from '../lib/money'
+import { compactMoney, MAX_INFLATION, MAX_RATE, MAX_YEARS, niceTicks, pointsInTodaysDollars, project, type ProjectionPoint } from '../lib/projection'
 import { MoneyInput, PercentInput, WholeInput } from './Fields'
 
 type Update = (change: (b: Budget) => Budget) => void
@@ -12,8 +12,12 @@ type Update = (change: (b: Budget) => Budget) => void
  */
 export function ProjectionSection({ budget: b, update }: { budget: Budget; update: Update }) {
   const p = b.projection
-  const points = project(p)
+  const nominal = project(p)
+  // With inflation on, everything below is shown in today's dollars: what it will buy.
+  const points = p.real ? pointsInTodaysDollars(nominal, p.inflation) : nominal
   const last = points[points.length - 1]
+  const faceValue = nominal[nominal.length - 1].value
+  const today = p.real ? " (today's $)" : ''
   const set = (patch: Partial<typeof p>) => update((x) => setProjection(x, patch))
   const k401Steps = k401Monthly(b)
   // Self investment comes out of Investing but doesn't grow with the markets.
@@ -77,9 +81,36 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
         </button>
       )}
 
+      <div className="spending">
+        <h3 className="eyebrow">Spending power in today's dollars</h3>
+        <label className="toggle">
+          <input id="proj-real" type="checkbox" role="switch" checked={p.real} onChange={(e) => set({ real: e.target.checked })} />
+          <span className="toggle-track" aria-hidden="true" />
+          <span className="toggle-text">
+            <span className="toggle-label">Adjust for inflation</span>
+            <span className="field-hint">Show what the money will actually buy</span>
+          </span>
+        </label>
+        {p.real && (
+          <>
+            <div className="pay-field spending-rate">
+              <span className="field-label">Inflation a year</span>
+              <span className="well-money pct-well">
+                <PercentInput id="proj-inflation" value={p.inflation} max={MAX_INFLATION} label="Yearly inflation, percent" onChange={(n) => set({ inflation: n })} />
+              </span>
+            </div>
+            <p className="spending-line num">
+              {compactMoney(faceValue)} in {p.years} years buys what <strong>{compactMoney(last.value)}</strong> buys today.
+            </p>
+          </>
+        )}
+      </div>
+
       <dl className="facts proj-facts">
         <div>
-          <dt>In {last.year} years</dt>
+          <dt>
+            In {last.year} years{today}
+          </dt>
           <dd className="num">{compactMoney(last.value)}</dd>
         </div>
         <div>
@@ -92,8 +123,10 @@ export function ProjectionSection({ budget: b, update }: { budget: Budget; updat
         </div>
       </dl>
 
-      <ProjectionChart points={points} />
-      <p className="note-line">Compounded monthly at a steady return, before taxes and inflation. Real returns rise and fall.</p>
+      <ProjectionChart points={points} real={p.real} />
+      <p className="note-line">
+        Compounded monthly at a steady return, before taxes{p.real ? `, in today's dollars at ${percent(p.inflation)} inflation a year` : ' and inflation'}. Real returns rise and fall.
+      </p>
     </section>
   )
 }
@@ -102,7 +135,7 @@ const HEIGHT = 220
 const PAD = { top: 12, right: 14, bottom: 26, left: 50 }
 
 /** Total value as a line over an area, what was put in as a dashed line; tap or hover for any year. */
-function ProjectionChart({ points }: { points: ProjectionPoint[] }) {
+function ProjectionChart({ points, real }: { points: ProjectionPoint[]; real: boolean }) {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(320)
   const [active, setActive] = useState<number | null>(null)
@@ -142,7 +175,7 @@ function ProjectionChart({ points }: { points: ProjectionPoint[] }) {
     <div className="chart" ref={box}>
       <div className="legend" aria-hidden="true">
         <span>
-          <i className="key value" /> Total value
+          <i className="key value" /> Total value{real ? " (today's $)" : ''}
         </span>
         <span>
           <i className="key put-in" /> Put in

@@ -88,6 +88,9 @@ subscription, which set the amount), where it goes, notes, and delete.
 **Investment projection.** Upfront, each month (starts at the markets
 investing), the 401k each month, a yearly return and the years (typed or slid), drawn as a
 line chart against what was put in. Tap or drag across it for any year.
+**Spending power in today's dollars** switches the whole projection to what
+the money will buy, at an inflation rate you set (3% to start): "$4.5M in 30
+years buys what $1.9M buys today".
 
 **Gross pay.** Gross income and bonus a year, and the 401k each paycheck.
 

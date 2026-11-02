@@ -2116,3 +2116,31 @@ output.hero-money {
   display: flex;
   color: var(--ink-2);
 }
+
+/* --------------------------------------------- spending power, today's dollars */
+
+.spending {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.spending .toggle {
+  margin-top: 10px;
+}
+
+.spending-rate {
+  margin-top: 14px;
+  max-width: 50%;
+}
+
+.spending-line {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--ink-2);
+}
+
+.spending-line strong {
+  color: var(--invest);
+  font-weight: 800;
+}

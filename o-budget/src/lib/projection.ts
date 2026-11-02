@@ -14,10 +14,23 @@ export interface Projection {
   /** Yearly return as a fraction: 0.07 is 7%. */
   rate: number
   years: number
+  /** Yearly inflation as a fraction, for showing amounts in today's dollars. */
+  inflation: number
+  /** Show the projection in today's dollars: what the money will buy, not its face value. */
+  real: boolean
 }
 
 export const MAX_YEARS = 60
 export const MAX_RATE = 0.3
+export const MAX_INFLATION = 0.15
+export const DEFAULT_INFLATION = 0.03
+
+/** What `value`, that many years out, buys in today's dollars. */
+export const inTodaysDollars = (value: number, years: number, inflation: number) => roundCents(value / (1 + inflation) ** years)
+
+/** The projection's points as today's dollars. */
+export const pointsInTodaysDollars = (points: ProjectionPoint[], inflation: number): ProjectionPoint[] =>
+  points.map((pt) => ({ ...pt, value: inTodaysDollars(pt.value, pt.year, inflation), contributed: inTodaysDollars(pt.contributed, pt.year, inflation) }))
 
 export interface ProjectionPoint {
   year: number
@@ -28,7 +41,7 @@ export interface ProjectionPoint {
 }
 
 /** Year 0 to the last year, month by month underneath: each month earns its share of the return, then the contribution goes in. */
-export function project(p: Projection): ProjectionPoint[] {
+export function project(p: Pick<Projection, 'start' | 'monthly' | 'k401' | 'rate' | 'years'>): ProjectionPoint[] {
   const monthlyRate = p.rate / 12
   const points: ProjectionPoint[] = [{ year: 0, value: p.start, contributed: p.start }]
   let value = p.start
@@ -50,6 +63,8 @@ export function normalizeProjection(raw: unknown, monthlyFallback: number, k401F
     k401: Math.max(0, roundCents(finite(r.k401, k401Fallback))),
     rate: clamp(finite(r.rate, 0.07), 0, MAX_RATE),
     years: clamp(Math.round(finite(r.years, 30)), 1, MAX_YEARS),
+    inflation: clamp(finite(r.inflation, DEFAULT_INFLATION), 0, MAX_INFLATION),
+    real: r.real === true,
   }
 }
 
