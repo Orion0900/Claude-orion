@@ -5,6 +5,7 @@ import { CardCheck } from './components/CardCheck'
 import { CategorySheet } from './components/CategorySheet'
 import { GrossSection } from './components/GrossSection'
 import { GroupSection } from './components/GroupSection'
+import { FoldProvider } from './components/Fold'
 import { Ring } from './components/Marks'
 import { Overview } from './components/Overview'
 import { PlanSection } from './components/PlanSection'
@@ -74,6 +75,7 @@ export default function App() {
         </span>
       </header>
 
+      <FoldProvider>
       <main className="layout">
         <div className="col">
           <Overview budget={budget} update={update} />
@@ -87,6 +89,7 @@ export default function App() {
           <GrossSection budget={budget} update={update} />
         </div>
       </main>
+      </FoldProvider>
 
       {open && (
         <CategorySheet

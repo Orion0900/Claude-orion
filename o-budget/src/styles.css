@@ -2144,3 +2144,52 @@ output.hero-money {
   color: var(--invest);
   font-weight: 800;
 }
+
+/* ------------------------------------------------------- folding sections */
+
+.fold-head {
+  justify-content: flex-start;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fold-head .section-aside {
+  margin-left: auto;
+}
+
+.fold-head > .eyebrow + .fold-btn {
+  margin-left: auto;
+}
+
+.fold-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.fold-btn svg {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+
+.section.folded .fold-btn svg {
+  transform: rotate(90deg);
+}
+
+.section.folded > :not(.section-head) {
+  display: none;
+}
+
+.section.folded .section-head {
+  margin-bottom: 0;
+}

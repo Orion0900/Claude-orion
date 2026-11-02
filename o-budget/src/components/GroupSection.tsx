@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react'
 import { bucketTotal, categoryTotal, inBucket, monthlyIncome, perPaycheck, setCard, type Bucket, type Budget, type Category } from '../lib/budget'
 import { money, percent } from '../lib/money'
 import { ChevronIcon, PlusIcon } from './Icons'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -52,13 +53,15 @@ export function GroupSection({
   const folds = group === 'investing'
   const [open, setOpen] = useState<Partial<Record<Bucket, boolean>>>({})
 
+  const f = useFold(`${group}`)
   return (
-    <section id={group} className={`section group group-${group}`} aria-labelledby={`${group}-title`}>
-      <div className="section-head">
+    <section id={group} className={`section group group-${group}${f.fold}`} aria-labelledby={`${group}-title`}>
+      <div {...f.headProps}>
         <h2 className="eyebrow" id={`${group}-title`}>
           {g.title}
         </h2>
         <span className="section-aside num">{income > 0 ? `${percent(total / income)} of income` : ''}</span>
+        {f.button(g.title)}
       </div>
 
       <div className="spent">

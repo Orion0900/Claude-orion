@@ -1,6 +1,7 @@
 import { k401Monthly, paychecksPerYear, setBonus, setBonusShare, setGross, setK401, takeHomeShare, type Budget } from '../lib/budget'
 import { money, percent } from '../lib/money'
 import { MoneyInput, PercentInput } from './Fields'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -13,13 +14,15 @@ export function GrossSection({ budget: b, update }: { budget: Budget; update: Up
   const kept = takeHomeShare(b)
   const any = b.gross > 0 || b.bonus > 0
 
+  const f = useFold('pay')
   return (
-    <section id="pay" className="section gross" aria-labelledby="gross-title">
-      <div className="section-head">
+    <section id="pay" className={`section gross${f.fold}`} aria-labelledby="gross-title">
+      <div {...f.headProps}>
         <h2 className="eyebrow" id="gross-title">
           Gross pay
         </h2>
         <span className="section-aside">before taxes</span>
+        {f.button('Gross pay')}
       </div>
 
       <div className="buckets">

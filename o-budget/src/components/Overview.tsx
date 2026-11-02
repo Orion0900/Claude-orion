@@ -15,6 +15,7 @@ import {
 import { money, percent } from '../lib/money'
 import { MoneyInput } from './Fields'
 import { ChevronIcon } from './Icons'
+import { useFold } from './Fold'
 
 type Update = (change: (b: Budget) => Budget) => void
 
@@ -34,13 +35,15 @@ export function Overview({ budget: b, update }: { budget: Budget; update: Update
   const width = (n: number) => `${(Math.max(0, n) / whole) * 100}%`
   const share = (n: number) => (income > 0 ? percent(n / income) : '–')
 
+  const f = useFold('overview')
   return (
-    <section className="section overview" aria-labelledby="overview-title">
-      <div className="section-head">
+    <section className={`section overview${f.fold}`} aria-labelledby="overview-title">
+      <div {...f.headProps}>
         <h2 className="eyebrow" id="overview-title">
           This month
         </h2>
         <span className="section-aside">take-home</span>
+        {f.button('This month')}
       </div>
 
       <div className="hero">
