@@ -249,7 +249,7 @@ S('mycoloss', 'MYCOLOSS', ['PLANT', 'VENOM'], [72, 70, 80, 42, 98], {
   dex: 'Its huge cap can be seen from far off. A single puff from it can send a whole forest to sleep.',
 })
 S('jerbolt', 'JERBOLT', ['SPARK'], [34, 48, 30, 88, 50], {
-  catchRate: 190, exp: 62, growth: 'mediumFast', pal: 'yellow', shinyPal: 'orange',
+  catchRate: 190, exp: 62, growth: 'mediumFast', pal: 'brown', shinyPal: 'teal',
   learn: [[1, 'zap'], [1, 'snarl'], [8, 'quickDash'], [14, 'static'], [20, 'twinKick'], [26, 'shockFist']],
   evolves: [{ to: 'amparoo', level: 28 }],
   discs: ['bodyThrow'],
@@ -257,7 +257,7 @@ S('jerbolt', 'JERBOLT', ['SPARK'], [34, 48, 30, 88, 50], {
   dex: 'Its long ears crackle with static. It can leap ten times its own length to escape a hungry hawk.',
 })
 S('amparoo', 'AMPAROO', ['SPARK'], [64, 88, 56, 112, 88], {
-  catchRate: 75, exp: 164, growth: 'mediumFast', pal: 'yellow', shinyPal: 'orange',
+  catchRate: 75, exp: 164, growth: 'mediumFast', pal: 'brown', shinyPal: 'teal',
   learn: [[1, 'zap'], [1, 'snarl'], [1, 'quickDash'], [14, 'static'], [20, 'twinKick'], [28, 'shockFist'], [34, 'sweep'], [40, 'arcBolt'], [46, 'haste'], [52, 'lightning']],
   discs: ['bodyThrow', 'suplex', 'heave'],
   kind: 'BOUNDER', height: 1.4, weight: 36.0,
