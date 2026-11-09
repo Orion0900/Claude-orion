@@ -155,6 +155,17 @@ jobs:
           mkdir -p dist/o-budget
           cp -r o-budget/dist/. dist/o-budget/
 
+      - name: Build Capsule Critters
+        working-directory: capsule-critters
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Add Capsule Critters to the site
+        run: |
+          mkdir -p dist/capsule-critters
+          cp -r capsule-critters/dist/. dist/capsule-critters/
+
       # enablement turns Pages on via the API if it isn't configured yet, so
       # there's no manual repository setting to find first.
       - uses: actions/configure-pages@v5

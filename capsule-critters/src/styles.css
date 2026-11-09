@@ -1,0 +1,286 @@
+/* The page is a handheld: a dark shell, the screen in its bezel, and on touch devices the buttons. */
+:root {
+  --shell: #17161d;
+  --shell-hi: #26242f;
+  --btn: #36333f;
+  --btn-hi: #504c5e;
+  --btn-a: #b02c5c;
+  --btn-b: #b02c5c;
+  --label: #b4adc4;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--shell);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /* No long-press menus or magnifier over the buttons on iPhone. */
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Reads back the notch / Dynamic Island / home-bar margins for the layout. */
+.safe-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.lcd {
+  display: block;
+  flex: none;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  -webkit-user-drag: none;
+  background: #000;
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 6px #2c2a36,
+    0 0 0 8px #0b0a10,
+    0 14px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* ─── Touch pad ─────────────────────────────────────────────── */
+
+.pad {
+  display: none;
+}
+
+.touch .pad {
+  display: block;
+}
+
+.touch.portrait {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: calc(env(safe-area-inset-top) + 12px);
+}
+
+.touch.portrait .pad {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  flex: 1;
+  margin-top: 8px;
+}
+
+.touch.landscape .pad {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dpad,
+.face,
+.meta {
+  position: absolute;
+  pointer-events: auto;
+}
+
+/* Upright, the D-pad and A/B are centred in the room between the screen and
+   SELECT/START (which take the bottom 49px), where thumbs rest. */
+.touch.portrait .dpad {
+  left: 6%;
+  top: calc(50% - 24px);
+  transform: translateY(-50%);
+}
+.touch.portrait .face {
+  right: 5%;
+  top: calc(50% - 24px);
+  transform: translateY(-50%);
+}
+/* The narrowest phones (320pt wide): smaller controls so they don't touch. */
+@media (max-width: 359px) {
+  .touch.portrait .dpad {
+    --arm: 40px;
+    width: 120px;
+    height: 120px;
+  }
+  .touch.portrait .face {
+    width: 140px;
+    height: 112px;
+  }
+  .touch.portrait .btn {
+    width: 58px;
+    height: 58px;
+    font-size: 19px;
+  }
+}
+/* Upright, the page is already padded clear of the home bar. */
+.touch.portrait .meta {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+}
+
+/* Sideways the controls fit in the columns beside the screen, with SELECT
+   and START tucked into the bottom corners so nothing covers the game. */
+.touch.landscape .dpad {
+  --arm: 43px;
+  left: calc(env(safe-area-inset-left) + 14px);
+  top: 50%;
+  width: 128px;
+  height: 128px;
+  transform: translateY(-55%);
+}
+.touch.landscape .face {
+  right: calc(env(safe-area-inset-right) + 12px);
+  top: 50%;
+  width: 140px;
+  height: 118px;
+  transform: translateY(-60%);
+}
+.touch.landscape .btn {
+  width: 58px;
+  height: 58px;
+  font-size: 19px;
+}
+.touch.landscape .meta {
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  justify-content: space-between;
+  padding: 0 calc(env(safe-area-inset-right) + 12px) 0 calc(env(safe-area-inset-left) + 12px);
+  pointer-events: none;
+}
+.touch.landscape .pill {
+  pointer-events: auto;
+  padding: 6px 12px;
+  font-size: 10px;
+}
+
+.dpad {
+  --arm: 50px;
+  width: 150px;
+  height: 150px;
+  touch-action: none;
+}
+
+/* The cross is two bars; the pressed arm is a third, lighter square on top. */
+.dpad-cross {
+  position: absolute;
+  inset: 0;
+  --hi-at: center;
+  background:
+    linear-gradient(var(--btn-hi), var(--btn-hi)) var(--hi-at) / var(--arm) var(--arm) no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / var(--arm) 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% var(--arm) no-repeat;
+  border-radius: 10px;
+  filter: drop-shadow(0 4px 0 #0b0a10);
+}
+
+.dpad-cross:not([data-dir='up']):not([data-dir='down']):not([data-dir='left']):not([data-dir='right']) {
+  background:
+    linear-gradient(var(--btn), var(--btn)) center / var(--arm) 100% no-repeat,
+    linear-gradient(var(--btn), var(--btn)) center / 100% var(--arm) no-repeat;
+}
+
+.dpad-cross::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: var(--shell-hi);
+}
+
+.dpad-cross[data-dir='up'] {
+  --hi-at: center top;
+}
+.dpad-cross[data-dir='down'] {
+  --hi-at: center bottom;
+}
+.dpad-cross[data-dir='left'] {
+  --hi-at: left center;
+}
+.dpad-cross[data-dir='right'] {
+  --hi-at: right center;
+}
+
+.face {
+  width: 170px;
+  height: 130px;
+}
+
+.btn {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 22px;
+  box-shadow: 0 5px 0 #0b0a10;
+  touch-action: none;
+}
+
+.btn-a {
+  right: 0;
+  top: 0;
+  background: var(--btn-a);
+}
+.btn-b {
+  left: 0;
+  bottom: 0;
+  background: var(--btn-b);
+}
+
+.btn.on {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #0b0a10;
+  filter: brightness(1.15);
+}
+
+.meta {
+  display: flex;
+  gap: 22px;
+}
+
+.pill {
+  padding: 8px 16px;
+  border-radius: 14px;
+  border: none;
+  background: var(--btn);
+  color: var(--label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 3px 0 #0b0a10;
+  touch-action: none;
+}
+
+.pill.on {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0b0a10;
+  filter: brightness(1.2);
+}
