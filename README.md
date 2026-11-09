@@ -59,6 +59,10 @@ end at your door.
 > paycheck in order with what's left after each, and every living expense
 > with a popout for the details, like each subscription. Ships at
 > `/o-budget/`. See [o-budget/README.md](o-budget/README.md).
+> [O-Plan](o-plan/) — Orion's life plan as an app: every goal on a card that
+> drops down to its plan of attack, step by step to the finish line, and can
+> be marked changed, complete or scrapped at any time, with each mark kept.
+> Ships at `/o-plan/`. See [o-plan/README.md](o-plan/README.md).
 
 ## What it does
 
