@@ -1,7 +1,8 @@
 // Drives the built app on an iPhone-sized, touch-enabled screen: the month
 // at a glance, the paycheck plan and its ticks, the card check-in, the
-// Investing and Living detail with a category's popout and the
-// subscriptions, gross pay and the 401k, the projection, undo, and a reload.
+// Investing and Living detail with every half folded until opened, a
+// category's popout and the subscriptions, gross pay and the 401k, the
+// projection, undo, and a reload.
 // Then the artifact build with a stand-in for the artifact's database:
 // loading the shared copy, one saved by the first version, writing edits,
 // another device's change, an empty database and none at all. Fails on any
@@ -18,6 +19,8 @@ const browser = await launch()
 
 const text = (page, selector) => page.locator(selector).first().innerText()
 const value = (page, selector) => page.locator(selector).first().inputValue()
+/** Each match's aria-expanded, in order. */
+const expanded = (page, selector) => page.locator(selector).evaluateAll((els) => els.map((e) => e.getAttribute('aria-expanded')))
 /** The month's income, which the paycheck fills in. */
 const income = (page) => value(page, '#income')
 const shot = (page, name, fullPage = false) => shots && page.screenshot({ path: `${shots}/${name}.png`, fullPage })
@@ -114,17 +117,11 @@ assert.match(await text(page, '.check-line.warn'), /\$200 over the \$1,000 budge
 await shot(page, '03-card-over')
 await enter(page, '#spent', '400')
 
-// The cards can be renamed, and the plan follows.
-await page.locator('#card-variable').fill('Prime Visa')
-assert.match(await text(page, '#card-title'), /Prime Visa check-in/i)
-assert.match(await text(page, '.step >> nth=2'), /Set aside for Prime Visa/)
-await page.locator('#card-variable').fill('Amazon card')
-
 // Investing and Living in detail.
 await page.tap('.bucket.invest')
 assert.equal(await text(page, '.group-investing .spent-total'), '$3,900')
 assert.deepEqual(await page.locator('.group-investing .part-total').allInnerTexts(), ['$2,900', '$1,000'])
-// Investing's halves start folded: just their totals until opened.
+// Every half starts folded: just its total until opened.
 assert.equal(await page.locator('.group-investing .cat').count(), 0)
 assert.equal(await page.locator('.part-invest .part-toggle').getAttribute('aria-expanded'), 'false')
 await page.tap('.part-invest .part-toggle')
@@ -133,11 +130,26 @@ await page.tap('.part-invest .part-toggle')
 assert.equal(await page.locator('.part-invest .cat').count(), 0)
 assert.equal(await text(page, '.group-living .spent-total'), '$3,053')
 assert.deepEqual(await page.locator('.group-living .part-total').allInnerTexts(), ['$2,053', '$1,000'])
+// Fixed and variable too, card and all, and each opens on its own.
+assert.equal(await page.locator('.group-living .cat').count(), 0)
+assert.equal(await page.locator('.group-living .card-name').count(), 0)
+assert.deepEqual(await expanded(page, '.group-living .part-toggle'), ['false', 'false'])
+await shot(page, '03b-living-folded')
+await page.tap('.part-fixed .part-toggle')
+assert.deepEqual(await expanded(page, '.group-living .part-toggle'), ['true', 'false'])
 assert.equal(await page.locator('.part-fixed .cat').count(), 5)
+assert.equal(await page.locator('.part-variable .cat').count(), 0)
+await page.tap('.part-variable .part-toggle')
 assert.equal(await page.locator('.part-variable .cat').count(), 3)
 // Living lists the biggest first.
 assert.deepEqual(await page.locator('.part-variable .cat-name-text').allInnerTexts(), ['Food', 'Random', 'Gas'])
 assert.match(await text(page, '.part-fixed .cat >> nth=2'), /Subscriptions\s+10 items\s+\$223/)
+
+// The cards can be renamed, and the plan follows.
+await page.locator('#card-variable').fill('Prime Visa')
+assert.match(await text(page, '#card-title'), /Prime Visa check-in/i)
+assert.match(await text(page, '.step >> nth=2'), /Set aside for Prime Visa/)
+await page.locator('#card-variable').fill('Amazon card')
 
 // The subscriptions popout.
 await page.tap('.cat >> text="Subscriptions"')
@@ -290,6 +302,9 @@ assert.equal(await value(page, '#spent'), '400')
 assert.equal(await value(page, '#proj-start'), '13,780')
 assert.equal(await value(page, '#proj-years'), '20')
 assert.equal(await text(page, '.group-living .spent-total'), '$3,119')
+// The halves open folded again.
+assert.equal(await page.locator('.group .cat').count(), 0)
+await page.tap('.part-fixed .part-toggle')
 await page.tap('.cat >> text="Subscriptions"')
 assert.equal(await page.locator('#category-note').inputValue(), 'Spotify renews on the 3rd')
 await page.keyboard.press('Escape')
@@ -426,6 +441,7 @@ await hosted({ doc: undefined }, async (p) => {
   await p.waitForSelector('.hero-money')
   assert.equal(await income(p), '0')
   assert.match(await text(p, '.overview'), /Enter your net pay a month and how often it comes to start/)
+  await p.tap('.part-fixed .part-toggle')
   assert.match(await text(p, '.group-living'), /Add rent/)
   assert.equal(await p.locator('.step').count(), 0)
   await shot(p, '09-artifact-empty', true)

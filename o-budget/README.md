@@ -80,8 +80,9 @@ month. It starts over each month.
 paycheck, then its two halves: markets and self investment (paid from
 Investing, not grown by the projection); fixed and variable, each with the
 card it goes on (tap the card name to rename it). Living lists the biggest
-expenses first. Investing's halves fold up to just their totals; tap one to see its
-categories. Tap any category for its
+expenses first. Every half is a dropdown: markets, self investment, fixed and
+variable each show just their total, with their categories hidden until you
+tap it, and open folded again next time. Tap any category for its
 popout: amount, per paycheck and per year, **Details** (items like each
 subscription, which set the amount), where it goes, notes, and delete.
 
