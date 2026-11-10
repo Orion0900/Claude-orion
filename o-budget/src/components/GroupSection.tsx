@@ -31,7 +31,8 @@ const GROUPS: Record<Group, { title: string; parts: { bucket: Bucket; title: str
 /**
  * Investing or Living in detail: the total and its share of income, then
  * each half (markets and self investment; fixed and variable, with the
- * card each goes on) with its categories. Tap one for its popout.
+ * card each goes on) as a dropdown: just its total, with its categories
+ * hidden until it's tapped open. Tap a category for its popout.
  */
 export function GroupSection({
   budget: b,
@@ -49,8 +50,7 @@ export function GroupSection({
   const g = GROUPS[group]
   const income = monthlyIncome(b)
   const total = bucketTotal(b, ...g.parts.map((p) => p.bucket))
-  // Investing's halves fold away behind their totals until opened; Living stays open.
-  const folds = group === 'investing'
+  // Every half starts folded behind its total. Which are open isn't saved, so the app always opens with them folded.
   const [open, setOpen] = useState<Partial<Record<Bucket, boolean>>>({})
 
   const f = useFold(`${group}`)
@@ -74,36 +74,25 @@ export function GroupSection({
         const cats = group === 'living' ? bySize(inBucket(b, p.bucket)) : inBucket(b, p.bucket)
         const part = bucketTotal(b, p.bucket)
         const card = p.bucket === 'fixed' || p.bucket === 'variable' ? p.bucket : null
-        const shown = !folds || open[p.bucket] === true
-        const head = (
-          <>
-            <span className="part-title">
-              <span className="swatch" aria-hidden="true" />
-              {p.title}
-            </span>
-            <span className="part-total num">{money(part)}</span>
-            {folds && (
+        const shown = open[p.bucket] === true
+        return (
+          <div key={p.bucket} className={`part part-${p.bucket}${shown ? ' open' : ''}`}>
+            <button
+              type="button"
+              className="part-head part-toggle"
+              aria-expanded={shown}
+              aria-controls={`part-${p.bucket}-body`}
+              onClick={() => setOpen((o) => ({ ...o, [p.bucket]: !o[p.bucket] }))}
+            >
+              <span className="part-title">
+                <span className="swatch" aria-hidden="true" />
+                {p.title}
+              </span>
+              <span className="part-total num">{money(part)}</span>
               <span className="fold-chev" aria-hidden="true">
                 <ChevronIcon />
               </span>
-            )}
-          </>
-        )
-        return (
-          <div key={p.bucket} className={`part part-${p.bucket}${folds ? ' folds' : ''}${shown ? ' open' : ''}`}>
-            {folds ? (
-              <button
-                type="button"
-                className="part-head part-toggle"
-                aria-expanded={shown}
-                aria-controls={`part-${p.bucket}-body`}
-                onClick={() => setOpen((o) => ({ ...o, [p.bucket]: !shown }))}
-              >
-                {head}
-              </button>
-            ) : (
-              <div className="part-head">{head}</div>
-            )}
+            </button>
             {shown && (
               <div id={`part-${p.bucket}-body`}>
                 <div className="part-sub">
@@ -125,7 +114,7 @@ export function GroupSection({
                     <span>{p.hint}</span>
                   )}
                 </div>
-    
+
                 {cats.length === 0 ? (
                   <p className="note-line">{p.empty}</p>
                 ) : (
