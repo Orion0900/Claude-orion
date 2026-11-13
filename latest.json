@@ -1,0 +1,57 @@
+{
+  "checked_at": "2026-11-13T23:38:59.879Z",
+  "date": "2026-11-13",
+  "source": "https://www.essexapartmenthomes.com/apartments/seattle/vox/floor-plans-and-pricing",
+  "units": [
+    {
+      "unit": "103",
+      "plan": "Plan 1C",
+      "beds": 1,
+      "baths": 1,
+      "sqft": 729,
+      "rent": 2177,
+      "available_on": "2026-11-25",
+      "facing": "South & West",
+      "special": null
+    },
+    {
+      "unit": "209",
+      "plan": "Plan 2A",
+      "beds": 2,
+      "baths": 2,
+      "sqft": 944,
+      "rent": 3047,
+      "available_on": "2026-11-13",
+      "facing": "East",
+      "special": null
+    },
+    {
+      "unit": "406",
+      "plan": "Plan 1A",
+      "beds": 1,
+      "baths": 1,
+      "sqft": 534,
+      "rent": 1949,
+      "available_on": "2026-11-13",
+      "facing": "South",
+      "special": null
+    },
+    {
+      "unit": "608",
+      "plan": "Plan 1E",
+      "beds": 1,
+      "baths": 1,
+      "sqft": 736,
+      "rent": 2189,
+      "available_on": "2026-11-13",
+      "facing": "North & East",
+      "special": null
+    }
+  ],
+  "baseline": [
+    "103",
+    "209",
+    "406",
+    "608"
+  ]
+}
