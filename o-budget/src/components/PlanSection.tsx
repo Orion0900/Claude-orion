@@ -119,7 +119,11 @@ function Checklist({ budget: b, update, now, done, checks }: { budget: Budget; u
   const items: { key: CheckKey; text: string; hint: string }[] = [
     { key: 'invest', text: `${money(investPerPaycheck(b))} ${investName}`, hint: 'Deposited this paycheck' },
     { key: 'fixed', text: CHECK_TEXT.fixed, hint: `${b.cards.fixed}: ${money(bucketTotal(b, 'fixed', 'self'))} a month expected${self.length ? `, with ${self.map((c) => c.name.trim() || 'self investment').join(', ')}` : ''}` },
-    { key: 'variable', text: CHECK_TEXT.variable, hint: `${b.cards.variable}: ${money(v.spent)} of ${money(v.budget)} so far` },
+    {
+      key: 'variable',
+      text: CHECK_TEXT.variable,
+      hint: v.checked === null ? `${b.cards.variable}: not checked yet this month` : `${b.cards.variable}: ${money(v.spent)} of ${money(v.budget)} so far`,
+    },
   ]
   const label = (key: CheckKey, invested: number) => (key === 'invest' ? `${money(invested)} ${investName}` : CHECK_TEXT[key])
 

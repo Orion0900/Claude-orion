@@ -72,9 +72,14 @@ expected, and under the variable budget. It starts over on the 1st and the
 it always matches the budget.
 
 **Amazon card check-in.** Type what's on the card so far this month, whenever
-you look. It shows what's left of the variable budget, a meter with where an
-even pace would be today, and how much a day is left for the rest of the
-month. It starts over each month.
+you look. It shows what's left of the variable budget, a meter with today's
+pace written over its mark, and how much a day is left for the rest of the
+month. It says when the figure was typed in ("Checked today", "Checked Nov
+12"), so a balance from days ago reads as one, and a new month asks for the
+card's balance instead of calling $0 under pace. It starts over each month,
+and every month is kept: **Past months** shows how each earlier one ended up
+against the budget it had, over or under, how many stayed under, and the
+average a month.
 
 **Investing** and **Living.** Each total, its share of income and per
 paycheck, then its two halves: markets and self investment (paid from
@@ -95,8 +100,9 @@ years buys what $1.9M buys today".
 
 **Gross pay.** Gross income and bonus a year, and the 401k each paycheck.
 
-Deleting a category or item offers **Undo** for a few seconds. A new category
-closed while still blank isn't kept.
+Deleting a category or item offers **Undo** for a few seconds. Undo puts back
+just what was deleted, where it was, so anything changed in the meantime
+stays. A new category closed while still blank isn't kept.
 
 Every section folds to just its heading: tap the heading or its arrow. The
 phone remembers which are folded.
@@ -111,7 +117,13 @@ phone remembers which are folded.
 - Each paycheck's rows are the monthly amounts over the paychecks a month,
   rounded to whole dollars so they add up to the paycheck exactly.
 - The card check-in's pace is the variable budget spread evenly over the
-  month's days; a balance typed last month counts as $0 this month.
+  month's days. A new month starts at $0; the month before keeps its last
+  balance, the day it was typed and the variable budget, which follows any
+  change to the categories until the month is over.
+- The checklist and the card start over by themselves: the date is read
+  again whenever the app comes back on screen and at midnight, so an app left
+  open, or in the background for days, moves to the new pay period or month
+  without being reopened, and a tick or a balance goes on the right one.
 - Every amount shows and is entered in whole dollars.
 
 ## Where it's saved
@@ -122,7 +134,8 @@ away. A budget saved by the first version, which kept a monthly income,
 opens unchanged: its paycheck is worked back from that income. A budget saved
 before the card system moves onto it: the 401k from its steps, VTI at $1,450
 a paycheck if there was no investment, and food, gas and random as the
-$1,000 variable budget. In the artifact, in the artifact's database as the document
+$1,000 variable budget. A budget saved before every month on the card was
+kept carries its one month's balance over. In the artifact, in the artifact's database as the document
 `budget/main`, with a copy in the browser. Edits show at once and are written
 one at a time; a change made on another device shows up unless an edit made
 here is still on its way. The header says where the budget is saved.
@@ -142,7 +155,8 @@ npm run icons      # redraws the Home Screen icons
 
 Unit tests (`npm test`) cover the sums (income from the paycheck and its
 cadence, take-home against gross, the four buckets, the paycheck plan, the
-card check-in and its pace, category totals), every edit, reading back
+card check-in and its pace, every month on the card, category totals), every
+edit and its undo, reading back
 saved budgets, including broken ones and the first version's, and the save
 and sync rules with a stand-in database. The browser checks in [`tests/`](tests/README.md) drive
 the built app on an iPhone-sized screen.
@@ -156,6 +170,7 @@ src/
   lib/storage.ts      the phone's copy
   lib/sync.ts         saving, and the artifact's database
   useBudget.ts        the budget on screen and the one way to change it
+  useToday.ts         today's date, kept current while the app stays open
   App.tsx             the sections, the popout and Undo
   components/         This month, Each paycheck, card check-in, Investing/Living, projection, gross pay, the popout, fields
 scripts/

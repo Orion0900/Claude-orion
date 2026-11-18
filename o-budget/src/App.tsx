@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { addCategory, investingTotal, isBlankCategory, monthlyIncome, removeCategory, removeItem, type Bucket, type Budget } from './lib/budget'
+import {
+  addCategory,
+  investingTotal,
+  isBlankCategory,
+  monthlyIncome,
+  removeCategory,
+  removeItem,
+  restoreCategory,
+  restoreItem,
+  type Bucket,
+  type Budget,
+} from './lib/budget'
 import type { SyncStatus } from './lib/sync'
 import { CardCheck } from './components/CardCheck'
 import { CategorySheet } from './components/CategorySheet'
@@ -11,6 +22,7 @@ import { Overview } from './components/Overview'
 import { PlanSection } from './components/PlanSection'
 import { ProjectionSection } from './components/ProjectionSection'
 import { useBudget } from './useBudget'
+import { useToday } from './useToday'
 
 type Open = { id: string; fresh: boolean }
 
@@ -26,8 +38,9 @@ const SYNC_TEXT: Record<SyncStatus, string> = {
 
 export default function App() {
   const { budget, status, update } = useBudget()
+  const today = useToday()
   const [open, setOpen] = useState<Open | null>(null)
-  const [undo, setUndo] = useState<{ label: string; before: Budget } | null>(null)
+  const [undo, setUndo] = useState<{ label: string; restore: (b: Budget) => Budget } | null>(null)
 
   // The undo offer goes after a few seconds.
   useEffect(() => {
@@ -38,9 +51,13 @@ export default function App() {
 
   if (!budget) return <Loading />
 
-  /** Removes something, keeping what was there for Undo. */
-  const removeWithUndo = (label: string, change: (b: Budget) => Budget) => {
-    setUndo({ label, before: budget })
+  /**
+   * Removes something, keeping how to put it back for Undo. Undo puts back
+   * only what was removed, so an edit made since (here or on another device)
+   * stays.
+   */
+  const removeWithUndo = (label: string, change: (b: Budget) => Budget, restore: (b: Budget) => Budget) => {
+    setUndo({ label, restore })
     update(change)
   }
 
@@ -79,8 +96,8 @@ export default function App() {
       <main className="layout">
         <div className="col">
           <Overview budget={budget} update={update} />
-          <PlanSection budget={budget} update={update} />
-          <CardCheck budget={budget} update={update} />
+          <PlanSection budget={budget} update={update} now={today} />
+          <CardCheck budget={budget} update={update} now={today} />
           <ProjectionSection budget={budget} update={update} />
         </div>
         <div className="col">
@@ -100,14 +117,19 @@ export default function App() {
           update={update}
           onClose={close}
           onRemove={(id) => {
-            const c = budget.categories.find((x) => x.id === id)
+            const index = budget.categories.findIndex((x) => x.id === id)
+            const c = budget.categories[index]
             setOpen(null)
-            if (c && isBlankCategory(c)) update((b) => removeCategory(b, id))
-            else removeWithUndo(`Deleted ${c?.name.trim() || 'category'}`, (b) => removeCategory(b, id))
+            if (!c) return
+            if (isBlankCategory(c)) update((b) => removeCategory(b, id))
+            else removeWithUndo(`Deleted ${c.name.trim() || 'category'}`, (b) => removeCategory(b, id), (b) => restoreCategory(b, c, index))
           }}
           onRemoveItem={(categoryId, itemId) => {
-            const item = budget.categories.find((x) => x.id === categoryId)?.items.find((x) => x.id === itemId)
-            removeWithUndo(`Removed ${item?.name.trim() || 'item'}`, (b) => removeItem(b, categoryId, itemId))
+            const items = budget.categories.find((x) => x.id === categoryId)?.items ?? []
+            const index = items.findIndex((x) => x.id === itemId)
+            const item = items[index]
+            if (!item) return
+            removeWithUndo(`Removed ${item.name.trim() || 'item'}`, (b) => removeItem(b, categoryId, itemId), (b) => restoreItem(b, categoryId, item, index))
           }}
         />
       )}
@@ -118,7 +140,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
-              update(() => undo.before)
+              update(undo.restore)
               setUndo(null)
             }}
           >

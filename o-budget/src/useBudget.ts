@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { emptyBudget, orionBudget, type Budget } from './lib/budget'
+import { emptyBudget, holdCardBudget, orionBudget, type Budget } from './lib/budget'
 import { loadBudget } from './lib/storage'
 import { createSync, isHosted, type Sync, type SyncStatus } from './lib/sync'
 
@@ -45,8 +45,10 @@ export function useBudget() {
   const update = useCallback((change: (b: Budget) => Budget) => {
     const prev = latest.current
     if (!prev) return
-    const next = change(prev)
-    if (next === prev) return
+    const changed = change(prev)
+    if (changed === prev) return
+    // This month on the card follows the variable budget until the month is over.
+    const next = holdCardBudget(changed, new Date())
     latest.current = next
     setBudget(next)
     sync.current?.edit(next)

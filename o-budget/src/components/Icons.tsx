@@ -26,4 +26,5 @@ export const DownIcon = () => <Icon d="M12 5v14M6 13l6 6 6-6" />
 export const TrashIcon = () => <Icon d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5" />
 export const AlertIcon = () => <Icon d="M12 3.5L2.5 20h19L12 3.5zM12 10v4.5M12 17.2v.3" />
 export const OkIcon = () => <Icon d="M12 21a9 9 0 100-18 9 9 0 000 18zM8 12.3l2.8 2.8L16.2 9.6" />
+export const ClockIcon = () => <Icon d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 7.5V12l3 2" />
 export const ResetIcon = () => <Icon d="M4 12a8 8 0 108-8 8.6 8.6 0 00-6 2.5L4 8.5M4 4v4.5h4.5" />

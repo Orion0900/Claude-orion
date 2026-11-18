@@ -1312,8 +1312,29 @@ output.hero-money {
   color: var(--over-ink);
 }
 
-.check-meter {
-  margin-top: 18px;
+/* The meter with today's pace written over its mark. */
+.check-gauge {
+  margin-top: 16px;
+}
+
+.check-gauge .meter {
+  margin: 0 0 6px;
+}
+
+.pace-row {
+  position: relative;
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+.pace-label {
+  position: absolute;
+  top: 0;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--ink-2);
 }
 
 .pace-mark {
@@ -1346,6 +1367,12 @@ output.hero-money {
   color: var(--over-ink);
 }
 
+/* Nothing typed in yet this month: no verdict, just what there is to spend. */
+.check-line.idle {
+  background: var(--well);
+  color: var(--ink-2);
+}
+
 .check-line svg {
   flex: none;
   width: 18px;
@@ -1357,6 +1384,68 @@ output.hero-money {
   margin: 10px 0 0;
   font-size: 13px;
   color: var(--ink-3);
+}
+
+/* Earlier months on the card, each against the budget it had. */
+.past-months {
+  margin-top: 10px;
+}
+
+.past-average {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.past-month {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+}
+
+.past-month .past-bar,
+.past-month .past-note {
+  grid-column: 1 / -1;
+}
+
+.past-spent {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.past-bar {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--well);
+  overflow: hidden;
+}
+
+.past-fill,
+.past-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.past-fill {
+  left: 0;
+  background: var(--living);
+  border-radius: 0 3px 3px 0;
+}
+
+.past-over {
+  background: var(--over);
+  border-left: 2px solid var(--card);
+}
+
+.past-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-size: 13px;
 }
 
 /* ------------------------------------------------------------ groups */
