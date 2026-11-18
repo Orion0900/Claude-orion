@@ -1,8 +1,9 @@
 // Drives the built app on an iPhone-sized, touch-enabled screen: the month
-// at a glance, the paycheck plan and its ticks, the card check-in, the
-// Investing and Living detail with every half folded until opened, a
-// category's popout and the subscriptions, gross pay and the 401k, the
-// projection, undo, and a reload.
+// at a glance, the paycheck plan and its ticks, the card check-in and its
+// past months, the Investing and Living detail with every half folded until
+// opened, a category's popout and the subscriptions, gross pay and the 401k,
+// the projection, undo, a reload, and the date turning over while the app
+// is open or in the background.
 // Then the artifact build with a stand-in for the artifact's database:
 // loading the shared copy, one saved by the first version, writing edits,
 // another device's change, an empty database and none at all. Fails on any
@@ -92,7 +93,7 @@ assert.equal(await income(page), '7,800')
 assert.deepEqual(await page.locator('.check-text').allInnerTexts(), ['$1,450 VTI', 'Fixed expenses as expected', 'Under variable budget'])
 assert.match(await text(page, '.checklist-head'), /(1–14|15–\d\d), 20\d\d · 0 of 3/)
 assert.match(await text(page, '#check-fixed .check-hint'), /Chase Sapphire: \$3,053 a month expected, with STNDRD/)
-assert.match(await text(page, '#check-variable .check-hint'), /Amazon card: \$\d[\d,]* of \$1,000 so far/)
+assert.match(await text(page, '#check-variable .check-hint'), /Amazon card: not checked yet this month/)
 await page.tap('#check-invest')
 await page.tap('#check-variable')
 assert.equal(await page.locator('.check[aria-checked="true"]').count(), 2)
@@ -108,9 +109,20 @@ await page.locator('.card-check').scrollIntoViewIfNeeded()
 assert.match(await text(page, '#card-title'), /Amazon card check-in/i)
 assert.equal(await text(page, '.check-left'), '$1,000')
 assert.match(await text(page, '.check-parts'), /Food \$600 · Gas \$150 · Random \$250/)
+// Before a balance is typed this month there's no verdict, just what there is to spend.
+assert.equal(await text(page, '#checked'), 'Not checked yet this month')
+assert.match(await text(page, '.check-line.idle'), /^Type what's on the card so far to see where \w+ stands against its \$1,000\.$/)
+// Today's pace is written over its mark, wherever in the month that is.
+const paceLabel = await page.locator('.pace-label').boundingBox()
+const paceMark = await page.locator('.pace-mark').boundingBox()
+assert.match(await text(page, '.pace-label'), /^today's pace \$[\d,]+$/)
+assert.ok(paceMark.x >= paceLabel.x && paceMark.x + paceMark.width <= paceLabel.x + paceLabel.width, 'the pace label sits on its mark')
 await enter(page, '#spent', '400')
 assert.equal(await text(page, '.check-left'), '$600')
 assert.match(await text(page, '.check-line'), /a day/)
+assert.equal(await page.locator('.check-line.idle').count(), 0)
+assert.equal(await text(page, '#checked'), 'Checked today')
+assert.match(await text(page, '#check-variable .check-hint'), /Amazon card: \$400 of \$1,000 so far/)
 await enter(page, '#spent', '1200')
 assert.equal(await text(page, '.check-left.over'), '$200')
 assert.match(await text(page, '.check-line.warn'), /\$200 over the \$1,000 budget/)
@@ -309,12 +321,18 @@ await page.tap('.cat >> text="Subscriptions"')
 assert.equal(await page.locator('#category-note').inputValue(), 'Spotify renews on the 3rd')
 await page.keyboard.press('Escape')
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('o-budget.state')))
-assert.equal(saved.version, 5)
+const thisMonth = await page.evaluate(() => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+})
+assert.equal(saved.version, 6)
 assert.equal(saved.k401, 405)
 assert.deepEqual(saved.cards, { fixed: 'Chase Sapphire', variable: 'Amazon card' })
-assert.equal(saved.spent.amount, 400)
+assert.equal(saved.cardMonths[thisMonth].spent, 400)
+assert.equal(saved.cardMonths[thisMonth].budget, 1050)
 assert.equal(saved.paycheck, 3900)
 assert.equal('steps' in saved, false)
+assert.equal('spent' in saved, false)
 
 // Earlier pay periods are kept as history; this one starts fresh each 1st and 15th.
 await page.evaluate(() => {
@@ -332,6 +350,26 @@ assert.deepEqual(await page.locator('.history-period').allInnerTexts(), ['Sep 15
 assert.equal(await page.locator('.history-list li >> nth=0').locator('.mark.miss').count(), 1)
 assert.match(await text(page, '.history-list li >> nth=0'), /\$1,500 VTI/)
 await shot(page, '07c-history')
+
+// Every earlier month on the card is kept, each held to the budget it had.
+await page.evaluate(() => {
+  const saved = JSON.parse(localStorage.getItem('o-budget.state'))
+  saved.cardMonths['2026-09'] = { spent: 1080, day: 30, budget: 1000 }
+  saved.cardMonths['2026-08'] = { spent: 940, day: 24, budget: 1000 }
+  localStorage.setItem('o-budget.state', JSON.stringify(saved))
+})
+await page.reload()
+await page.waitForSelector('.hero-money')
+assert.equal(await value(page, '#spent'), '400')
+assert.match(await text(page, '.past-months summary'), /Past months · 1 of 2 under budget/)
+await page.tap('.past-months summary')
+assert.match(await text(page, '.past-average'), /\$1,010 a month on average/)
+assert.deepEqual(await page.locator('.past-month .history-period').allInnerTexts(), ['September 2026', 'August 2026'])
+assert.match(await text(page, '.past-month >> nth=0'), /\$1,080 of \$1,000[\s\S]*\$80 over/)
+assert.equal(await page.locator('.past-month >> nth=0').locator('.past-over').count(), 1)
+assert.match(await text(page, '.past-month >> nth=1'), /\$940 of \$1,000[\s\S]*\$60 under[\s\S]*last checked Aug 24/)
+await page.locator('.past-months').scrollIntoViewIfNeeded()
+await shot(page, '07d-past-months')
 
 // Every section folds to its heading, by its arrow or the heading itself, and stays folded after a reload.
 assert.equal(await page.locator('.fold-btn').count(), 7)
@@ -352,6 +390,49 @@ assert.equal(await page.locator('#investing .spent').isVisible(), true)
 
 // No sideways scrolling on a phone.
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true)
+
+// ------------------------------------------------------- the date keeps up
+
+// Open at a minute to midnight on the 14th and leave the app open.
+{
+  const ctx = await browser.newContext({ ...IPHONE, timezoneId: 'America/Los_Angeles' })
+  await ctx.clock.install({ time: new Date('2026-11-14T23:58:00-08:00') })
+  const p = await ctx.newPage()
+  pageErrors.push(...watchErrors(p))
+  await p.goto(server.url)
+  await p.waitForSelector('.hero-money')
+  assert.match(await text(p, '.checklist-head'), /Nov 1–14, 2026 · 0 of 3/)
+  await p.tap('#check-invest')
+  await enter(p, '#spent', '830')
+  assert.equal(await text(p, '#checked'), 'Checked today')
+  // Past midnight the checklist starts over by itself, and the tick from the 14th is history.
+  await p.clock.fastForward('03:00')
+  await p.waitForFunction(() => /Nov 15–30/.test(document.querySelector('.checklist-head')?.textContent ?? ''))
+  assert.match(await text(p, '.checklist-head'), /Nov 15–30, 2026 · 0 of 3/)
+  assert.match(await text(p, '.history summary'), /History · 1 pay period/)
+  assert.equal(await text(p, '#checked'), 'Checked yesterday')
+  // A tick now goes on the new pay period.
+  await p.tap('#check-fixed')
+  assert.match(await text(p, '.checklist-head'), /Nov 15–30, 2026 · 1 of 3/)
+  // Back to the app on December 1st after a fortnight in the background: a new month on the card.
+  await p.clock.setSystemTime(new Date('2026-12-01T09:00:00-08:00'))
+  await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await p.waitForFunction(() => /December/.test(document.querySelector('#card .section-aside')?.textContent ?? ''))
+  assert.equal(await value(p, '#spent'), '0')
+  assert.equal(await text(p, '#checked'), 'Not checked yet this month')
+  assert.match(await text(p, '.checklist-head'), /Dec 1–14, 2026 · 0 of 3/)
+  assert.match(await text(p, '.past-months summary'), /Past months · 1 of 1 under budget/)
+  await p.tap('.past-months summary')
+  assert.match(await text(p, '.past-month'), /November 2026\s+\$830 of \$1,000[\s\S]*\$170 under[\s\S]*last checked Nov 14/)
+  // December's balance is December's.
+  await enter(p, '#spent', '75')
+  await p.waitForTimeout(600)
+  const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('o-budget.state')))
+  assert.deepEqual(kept.cardMonths, { '2026-11': { spent: 830, day: 14, budget: 1000 }, '2026-12': { spent: 75, day: 1, budget: 1000 } })
+  assert.deepEqual(Object.keys(kept.checks).sort(), ['2026-11-1', '2026-11-15'])
+  await shot(p, '08b-new-month')
+  await ctx.close()
+}
 
 // ------------------------------------------------------- as an artifact
 
@@ -407,7 +488,7 @@ await hosted({ doc: saved }, async (p) => {
   const writes = await p.evaluate(() => window.__writes)
   assert.equal(writes.length, 1)
   assert.equal(writes[0].paycheck, 4000)
-  assert.equal(writes[0].version, 5)
+  assert.equal(writes[0].version, 6)
   assert.equal(typeof writes[0].savedAt, 'string')
   assert.equal(await text(p, '.sync'), 'Saved')
   // Another device's change shows up here.
@@ -429,7 +510,7 @@ await hosted(
     await enter(p, '#gross', '120000')
     await p.waitForTimeout(700)
     const [written] = await p.evaluate(() => window.__writes)
-    assert.equal(written.version, 5)
+    assert.equal(written.version, 6)
     assert.equal(written.paycheck, 3900)
     assert.equal(written.gross, 120000)
     assert.equal('income' in written, false)

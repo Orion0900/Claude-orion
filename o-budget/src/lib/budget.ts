@@ -72,8 +72,8 @@ export interface Budget {
   categories: Category[]
   /** The payday checklist, kept for every pay period ("2026-10-15") it was ticked in. */
   checks: Record<string, PeriodCheck>
-  /** What's on the variable card so far this month ("2026-10"). */
-  spent: { month: string; amount: number }
+  /** The variable card month by month ("2026-10"): this month so far, and where every earlier month ended up. */
+  cardMonths: Record<string, CardMonth>
   /** The investing projection's inputs. */
   projection: Projection
 }
@@ -128,7 +128,7 @@ export function orionBudget(): Budget {
       ...variableCategories(),
     ],
     checks: {},
-    spent: { month: '', amount: 0 },
+    cardMonths: {},
     projection: { start: 0, monthly: 2900, k401: 810, rate: 0.07, years: 30, inflation: 0.03, real: false },
   }
 }
@@ -143,7 +143,7 @@ export function emptyBudget(): Budget {
     cards: { ...DEFAULT_CARDS },
     categories: [],
     checks: {},
-    spent: { month: '', amount: 0 },
+    cardMonths: {},
     projection: { start: 0, monthly: 0, k401: 0, rate: 0.07, years: 30, inflation: 0.03, real: false },
   }
 }
@@ -238,26 +238,61 @@ export function paycheckPlan(b: Budget): { rows: PlanRow[]; start: number; after
 
 // ------------------------------------------------------ the variable card
 
+/** One month on the variable card, as it stood when it was last checked. */
+export interface CardMonth {
+  /** What was on the card. */
+  spent: number
+  /** The day of the month it was typed in; 0 when that isn't known (kept before days were). */
+  day: number
+  /** The variable budget then, so an earlier month is held to its own budget. */
+  budget: number
+}
+
 /** "2026-10" for any day in October 2026. */
 export const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 
-/** What's on the variable card this month; a figure from last month counts as nothing yet. */
-export const spentThisMonth = (b: Budget, now: Date) => (b.spent.month === monthKey(now) ? b.spent.amount : 0)
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
+
+const daysIn = (year: number, month: number) => new Date(year, month, 0).getDate()
+
+/** What's on the variable card this month; a new month starts at nothing. */
+export const spentThisMonth = (b: Budget, now: Date) => b.cardMonths[monthKey(now)]?.spent ?? 0
 
 /**
  * Where the variable card stands: spent against the budget, what's left,
  * what's left a day for the rest of the month, and where spending would be
- * if it went evenly through the month.
+ * if it went evenly through the month. `checked` is the day of the month the
+ * balance was last typed in: null before it has been this month, 0 when the
+ * day isn't known.
  */
 export function variableCheck(b: Budget, now: Date) {
   const budget = bucketTotal(b, 'variable')
-  const spent = spentThisMonth(b, now)
-  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const month = b.cardMonths[monthKey(now)]
+  const spent = month?.spent ?? 0
+  const days = daysIn(now.getFullYear(), now.getMonth() + 1)
   const day = now.getDate()
   const daysLeft = days - day + 1
   const left = roundCents(budget - spent)
   const pace = roundCents((budget * day) / days)
-  return { budget, spent, left, daysLeft, perDay: left > 0 ? left / daysLeft : 0, pace, aheadOfPace: roundCents(pace - spent), day, days }
+  const checked = month ? month.day : null
+  return { budget, spent, left, daysLeft, perDay: left > 0 ? left / daysLeft : 0, pace, aheadOfPace: roundCents(pace - spent), day, days, checked }
+}
+
+/** Every other month on the variable card, newest first, with what was left of its budget (negative when over). */
+export const cardHistory = (b: Budget, now: Date) =>
+  Object.entries(b.cardMonths)
+    .filter(([month]) => month !== monthKey(now))
+    .sort(([x], [y]) => (x < y ? 1 : x > y ? -1 : 0))
+    .map(([month, m]) => {
+      const [y, mo] = month.split('-').map(Number)
+      return { month, ...m, left: roundCents(m.budget - m.spent), days: daysIn(y, mo) }
+    })
+
+/** How those months went: how many stayed within their budget, and the average on the card. */
+export function cardRecord(history: { spent: number; budget: number }[]) {
+  const months = history.length
+  const under = history.filter((m) => m.spent <= m.budget).length
+  return { months, under, average: months ? roundCents(sum(history.map((m) => m.spent)) / months) : 0 }
 }
 
 // ------------------------------------------------------ the payday checklist
@@ -275,7 +310,14 @@ export interface PeriodCheck {
 /** The pay period a day falls in: the 1st to the 14th, or the 15th to the month's end ("2026-10-1", "2026-10-15"). */
 export const periodKey = (d: Date) => `${monthKey(d)}-${d.getDate() < 15 ? 1 : 15}`
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** "October 2026". */
+export function monthLabel(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  return `${MONTH_FULL[m - 1]} ${y}`
+}
 
 /** "Oct 15–31, 2026". */
 export function periodLabel(key: string): string {
@@ -353,9 +395,22 @@ export const setCard = (b: Budget, which: 'fixed' | 'variable', name: string): B
   cards: { ...b.cards, [which]: name.slice(0, 40) },
 })
 
+/**
+ * This month's card figure is held to the variable budget as it stands, so a
+ * budget changed after the last check-in counts. Once the month is over it's
+ * left as it was: each month keeps the budget it ended with.
+ */
+export function holdCardBudget(b: Budget, now: Date): Budget {
+  const key = monthKey(now)
+  const month = b.cardMonths[key]
+  const budget = bucketTotal(b, 'variable')
+  return month && month.budget !== budget ? { ...b, cardMonths: { ...b.cardMonths, [key]: { ...month, budget } } } : b
+}
+
+/** What's on the variable card today, kept as this month's figure with the day and the budget it's held to. */
 export const setSpent = (b: Budget, amount: number, now: Date): Budget => ({
   ...b,
-  spent: { month: monthKey(now), amount: dollars(amount) },
+  cardMonths: { ...b.cardMonths, [monthKey(now)]: { spent: dollars(amount), day: now.getDate(), budget: bucketTotal(b, 'variable') } },
 })
 
 // Categories and their items
@@ -413,6 +468,23 @@ export const removeItem = (b: Budget, categoryId: string, itemId: string): Budge
     return items.length ? settle({ ...c, items }) : { ...c, items, amount: 0 }
   })
 
+/** Puts a removed category back where it was, leaving everything changed since as it is. */
+export function restoreCategory(b: Budget, c: Category, index: number): Budget {
+  if (b.categories.some((x) => x.id === c.id)) return b
+  const categories = [...b.categories]
+  categories.splice(Math.max(0, Math.min(index, categories.length)), 0, c)
+  return { ...b, categories }
+}
+
+/** Puts a removed item back where it was in its category, and the category's total with it. */
+export function restoreItem(b: Budget, categoryId: string, it: Item, index: number): Budget {
+  const c = b.categories.find((x) => x.id === categoryId)
+  if (!c || c.items.some((x) => x.id === it.id)) return b
+  const items = [...c.items]
+  items.splice(Math.max(0, Math.min(index, items.length)), 0, it)
+  return withCategory(b, categoryId, () => settle({ ...c, items }))
+}
+
 /** A category opened, left blank and closed again isn't kept. */
 export const isBlankCategory = (c: Category) => !c.name.trim() && c.amount === 0 && !c.items.length && !c.note.trim()
 
@@ -436,9 +508,27 @@ const checksOf = (raw: unknown): Record<string, PeriodCheck> => {
   const out: Record<string, PeriodCheck> = {}
   if (!isObject(raw)) return out
   for (const [k, v] of Object.entries(raw)) {
-    if (!/^\d{4}-\d{2}-(1|15)$/.test(k) || !isObject(v)) continue
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(1|15)$/.test(k) || !isObject(v)) continue
     const done = Array.isArray(v.done) ? CHECK_KEYS.filter((c) => (v.done as unknown[]).includes(c)) : []
     out[k] = { done, invest: amountOf(v.invest) }
+  }
+  return out
+}
+
+/**
+ * The card's months. Before version 6 only this month's figure was kept, as
+ * `spent`; it carries over as its month, held to today's variable budget.
+ */
+const cardMonthsOf = (raw: unknown, legacy: unknown, budget: number): Record<string, CardMonth> => {
+  const out: Record<string, CardMonth> = {}
+  if (isObject(raw)) {
+    for (const [k, v] of Object.entries(raw)) {
+      if (!MONTH_KEY.test(k) || !isObject(v)) continue
+      const day = typeof v.day === 'number' && Number.isInteger(v.day) && v.day >= 0 && v.day <= 31 ? v.day : 0
+      out[k] = { spent: amountOf(v.spent), day, budget: typeof v.budget === 'number' ? amountOf(v.budget) : budget }
+    }
+  } else if (isObject(legacy) && MONTH_KEY.test(textOf(legacy.month))) {
+    out[textOf(legacy.month)] = { spent: amountOf(legacy.amount), day: 0, budget }
   }
   return out
 }
@@ -497,7 +587,7 @@ export function normalizeBudget(raw: unknown): Budget | null {
   }
 
   const cards = isObject(raw.cards) ? raw.cards : {}
-  const spent = isObject(raw.spent) ? raw.spent : {}
+  const variableBudget = sum(categories.filter((c) => c.bucket === 'variable').map(categoryTotal))
   return {
     gross: amountOf(raw.gross),
     bonus: amountOf(raw.bonus),
@@ -510,7 +600,7 @@ export function normalizeBudget(raw: unknown): Budget | null {
     },
     categories,
     checks: checksOf(raw.checks),
-    spent: { month: /^\d{4}-\d{2}$/.test(textOf(spent.month)) ? textOf(spent.month) : '', amount: amountOf(spent.amount) },
+    cardMonths: cardMonthsOf(raw.cardMonths, raw.spent, variableBudget),
     projection,
   }
 }

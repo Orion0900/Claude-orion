@@ -7,11 +7,13 @@ import { normalizeBudget, type Budget } from './budget'
 
 export const STORAGE_KEY = 'o-budget.state'
 /**
- * 5 builds the paycheck plan from the categories, with fixed and variable
- * Living on their own cards; 4 adds self investment, paid from Investing; 3 marks steps taken out before the paycheck; 2 added the paycheck and its
+ * 6 keeps the variable card month by month instead of this month alone; 5
+ * builds the paycheck plan from the categories, with fixed and variable
+ * Living on their own cards; 4 adds self investment, paid from Investing; 3
+ * marks steps taken out before the paycheck; 2 added the paycheck and its
  * cadence; 1 kept a monthly income.
  */
-export const STORAGE_VERSION = 5
+export const STORAGE_VERSION = 6
 
 export interface KeyValueStore {
   getItem(key: string): string | null

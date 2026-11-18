@@ -3,6 +3,8 @@ import {
   addItem,
   bucketTotal,
   CADENCES,
+  cardHistory,
+  cardRecord,
   categoryTotal,
   emptyBudget,
   investingTotal,
@@ -11,6 +13,7 @@ import {
   leftOver,
   livingTotal,
   monthKey,
+  monthLabel,
   monthlyIncome,
   normalizeBudget,
   orionBudget,
@@ -19,6 +22,8 @@ import {
   perPaycheck,
   removeCategory,
   removeItem,
+  restoreCategory,
+  restoreItem,
   sameBudget,
   setBonus,
   setBonusShare,
@@ -36,6 +41,7 @@ import {
   toggleCheck,
   currentChecks,
   checkHistory,
+  holdCardBudget,
   periodKey,
   periodLabel,
   investPerPaycheck,
@@ -171,18 +177,59 @@ describe('variable card check-in', () => {
 
   it('measures this month against the $1,000 budget', () => {
     const b = setSpent(orionBudget(), 400, oct10)
-    expect(b.spent).toEqual({ month: '2026-10', amount: 400 })
+    expect(b.cardMonths).toEqual({ '2026-10': { spent: 400, day: 10, budget: 1000 } })
     const v = variableCheck(b, oct10)
-    expect(v).toMatchObject({ budget: 1000, spent: 400, left: 600, days: 31, day: 10, daysLeft: 22 })
+    expect(v).toMatchObject({ budget: 1000, spent: 400, left: 600, days: 31, day: 10, daysLeft: 22, checked: 10 })
     expect(v.pace).toBe(322.58)
     expect(v.aheadOfPace).toBe(-77.42)
     expect(v.perDay).toBeCloseTo(27.27, 2)
+  })
+
+  it('knows when it has not been checked this month', () => {
+    expect(variableCheck(orionBudget(), oct10).checked).toBeNull()
+    const b = setSpent(orionBudget(), 400, oct10)
+    expect(variableCheck(b, new Date(2026, 9, 17)).checked).toBe(10)
+    expect(variableCheck(b, new Date(2026, 10, 2)).checked).toBeNull()
   })
 
   it('starts each month from nothing', () => {
     const b = setSpent(orionBudget(), 400, oct10)
     expect(spentThisMonth(b, new Date(2026, 10, 1))).toBe(0)
     expect(monthKey(new Date(2026, 0, 31))).toBe('2026-01')
+  })
+
+  it('keeps every month: the last figure typed, the day, and the budget it had', () => {
+    let b = setSpent(orionBudget(), 400, new Date(2026, 8, 12))
+    b = setSpent(b, 1080, new Date(2026, 8, 30))
+    b = updateCategory(b, byName(b, 'Food').id, { amount: 700 })
+    b = setSpent(b, 950, new Date(2026, 9, 28))
+    b = setSpent(b, 120, new Date(2026, 10, 4))
+    const nov = new Date(2026, 10, 18)
+    expect(spentThisMonth(b, nov)).toBe(120)
+    const history = cardHistory(b, nov)
+    expect(history).toEqual([
+      { month: '2026-10', spent: 950, day: 28, budget: 1100, left: 150, days: 31 },
+      { month: '2026-09', spent: 1080, day: 30, budget: 1000, left: -80, days: 30 },
+    ])
+    expect(cardRecord(history)).toEqual({ months: 2, under: 1, average: 1015 })
+    expect(cardRecord([])).toEqual({ months: 0, under: 0, average: 0 })
+    expect(monthLabel('2026-09')).toBe('September 2026')
+  })
+
+  it('holds this month to the budget as it stands, and earlier months to the one they ended with', () => {
+    let b = setSpent(orionBudget(), 900, new Date(2026, 8, 20))
+    b = setSpent(b, 400, oct10)
+    b = updateCategory(b, byName(b, 'Gas').id, { amount: 250 })
+    const held = holdCardBudget(b, oct10)
+    expect(held.cardMonths).toEqual({ '2026-09': { spent: 900, day: 20, budget: 1000 }, '2026-10': { spent: 400, day: 10, budget: 1100 } })
+    expect(holdCardBudget(held, oct10)).toBe(held)
+    // Not checked yet this month: nothing to hold.
+    expect(holdCardBudget(b, new Date(2026, 10, 3))).toBe(b)
+  })
+
+  it('counts a month right on budget as under it', () => {
+    const b = setSpent(orionBudget(), 1000, oct10)
+    expect(cardRecord(cardHistory(b, new Date(2026, 10, 1))).under).toBe(1)
   })
 
   it('shows over the budget', () => {
@@ -295,12 +342,48 @@ describe('categories', () => {
     const b = orionBudget()
     expect(investingTotal(removeCategory(b, byName(b, 'VTI').id))).toBe(1000)
   })
+
+  it('puts a removed category back in its place, keeping edits made since', () => {
+    const b = orionBudget()
+    const car = byName(b, 'Car')
+    const index = b.categories.indexOf(car)
+    let after = removeCategory(b, car.id)
+    after = updateCategory(after, byName(after, 'Food').id, { amount: 650 })
+    const back = restoreCategory(after, car, index)
+    expect(back.categories.map((c) => c.name)).toEqual(b.categories.map((c) => c.name))
+    expect(byName(back, 'Food').amount).toBe(650)
+    expect(restoreCategory(back, car, index)).toBe(back)
+  })
+
+  it('puts a removed item back in its place, and the total with it', () => {
+    const b = orionBudget()
+    const subs = byName(b, 'Subscriptions')
+    const hbo = subs.items[3]
+    let after = removeItem(b, subs.id, hbo.id)
+    expect(byName(after, 'Subscriptions').amount).toBe(203)
+    after = updateItem(after, subs.id, subs.items[0].id, { amount: 70 })
+    const back = restoreItem(after, subs.id, hbo, 3)
+    expect(byName(back, 'Subscriptions').items.map((i) => i.name)).toEqual(subs.items.map((i) => i.name))
+    expect(byName(back, 'Subscriptions').amount).toBe(228)
+    expect(restoreItem(back, subs.id, hbo, 3)).toBe(back)
+    expect(restoreItem(removeCategory(after, subs.id), subs.id, hbo, 3).categories.some((c) => c.id === subs.id)).toBe(false)
+  })
+
+  it('brings back the last item of a category, and its amount', () => {
+    let b = orionBudget()
+    const car = byName(b, 'Car')
+    ;[b] = addItem(b, car.id)
+    const only = byName(b, 'Car').items[0]
+    const emptied = removeItem(b, car.id, only.id)
+    expect(byName(emptied, 'Car').amount).toBe(0)
+    expect(byName(restoreItem(emptied, car.id, only, 0), 'Car').amount).toBe(250)
+  })
 })
 
 describe('normalizeBudget', () => {
   it('round-trips a budget unchanged', () => {
     const b = toggleCheck(setSpent(orionBudget(), 300, new Date(2026, 9, 1)), 'fixed', new Date(2026, 9, 1))
-    const back = normalizeBudget({ version: 5, ...JSON.parse(JSON.stringify(b)) })
+    const back = normalizeBudget({ version: 6, ...JSON.parse(JSON.stringify(b)) })
     expect(sameBudget(back, b)).toBe(true)
   })
 
@@ -324,8 +407,14 @@ describe('normalizeBudget', () => {
       paychecks: 12,
       k401: -1,
       cards: { fixed: '', variable: 7 },
-      checks: { '2026-10-15': { done: ['fixed', 'nope', 'invest'], invest: 1450 }, '2026-10-7': { done: [] }, junk: 1 },
-      spent: { month: 'October', amount: 50 },
+      checks: { '2026-10-15': { done: ['fixed', 'nope', 'invest'], invest: 1450 }, '2026-10-7': { done: [] }, '2026-13-1': { done: [] }, junk: 1 },
+      cardMonths: {
+        '2026-09': { spent: 900, day: 30, budget: 1000 },
+        '2026-10': { spent: -5, day: 40, budget: 'lots' },
+        '2026-13': { spent: 1, day: 1, budget: 1 },
+        October: { spent: 50 },
+        '2026-11': 7,
+      },
       categories: [
         { id: 'a', name: 'Food', amount: Infinity, items: 'none', bucket: 'nope' },
         { id: 'a', name: 'Subs', amount: 1, items: [{ name: 'HBO', amount: 20 }, { name: 'Max', amount: 5 }], bucket: 'variable' },
@@ -334,10 +423,24 @@ describe('normalizeBudget', () => {
     expect(b).toMatchObject({ gross: 0, bonus: 0, paycheck: 3900.4, cadence: 'weekly', k401: 0 })
     expect(b.checks).toEqual({ '2026-10-15': { done: ['invest', 'fixed'], invest: 1450 } })
     expect(b.cards).toEqual({ fixed: 'Chase Sapphire', variable: 'Amazon card' })
-    expect(b.spent).toEqual({ month: '', amount: 50 })
+    expect(b.cardMonths).toEqual({
+      '2026-09': { spent: 900, day: 30, budget: 1000 },
+      '2026-10': { spent: 0, day: 0, budget: 25 },
+    })
     expect(b.categories[0]).toMatchObject({ id: 'a', amount: 0, items: [], note: '', bucket: 'fixed' })
     expect(b.categories[1].id).not.toBe('a')
     expect(b.categories[1]).toMatchObject({ amount: 25, bucket: 'variable' })
+  })
+
+  it("carries over the card's figure from before every month was kept", () => {
+    const v5 = { ...JSON.parse(JSON.stringify(orionBudget())), version: 5, spent: { month: '2026-10', amount: 640 } }
+    delete v5.cardMonths
+    expect(normalizeBudget(v5)!.cardMonths).toEqual({ '2026-10': { spent: 640, day: 0, budget: 1000 } })
+    // Nothing typed yet, or a month that isn't one: nothing kept.
+    expect(normalizeBudget({ ...v5, spent: { month: '', amount: 0 } })!.cardMonths).toEqual({})
+    expect(normalizeBudget({ ...v5, spent: { month: '2026-10x', amount: 9 } })!.cardMonths).toEqual({})
+    // Its day isn't known, so it reads as checked earlier in the month.
+    expect(variableCheck(normalizeBudget(v5)!, new Date(2026, 9, 20)).checked).toBe(0)
   })
 
   it('carries a first-version budget over, keeping its monthly income', () => {
